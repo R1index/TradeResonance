@@ -1,2 +1,1 @@
-flask
-python-dateutil
+discord.py
