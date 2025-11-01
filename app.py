@@ -13,6 +13,8 @@
     FLASK_ENV=development (по желанию)
 """
 from __future__ import annotations
+import csv
+import io
 import os
 import sqlite3
 from datetime import datetime
@@ -361,10 +363,17 @@ ROUTES_TABLE = r"""
 
 # ---------------------- Queries & logic ----------------------
 
-def distinct_values(field: str) -> List[str]:
+def distinct_values(field: str, limit: int | None = None) -> List[str]:
     assert field in ("city", "product")
+    sql = f"SELECT DISTINCT {field} FROM entries ORDER BY {field} ASC"
+    params: tuple[Any, ...]
+    if limit:
+        sql += " LIMIT ?"
+        params = (limit,)
+    else:
+        params = ()
     with get_conn() as c:
-        cur = c.execute(f"SELECT DISTINCT {field} FROM entries ORDER BY {field} ASC")
+        cur = c.execute(sql, params)
         return [row[0] for row in cur.fetchall()]
 
 
@@ -425,8 +434,8 @@ def index():
     t = STRINGS[lang]
     toggle_lang = 'en' if lang=='ru' else 'ru'
     # Начальные значения в datalist: по 50 штук
-    cities = distinct_values("city")[:50]
-    products = distinct_values("product")[:50]
+    cities = distinct_values("city", limit=50)
+    products = distinct_values("product", limit=50)
     resp = make_response(render_template_string(
         BASE_HTML,
         title=f"Trade Resonance | {t['title']}",
@@ -473,8 +482,9 @@ def add_entry():
             (city, product, price, trend, percent, created_at),
         )
 
-    entries_html = render_template_string(ENTRIES_TABLE, items=latest_prices_view(), t=STRINGS[get_lang()])
-    routes_html = render_template_string(ROUTES_TABLE, routes=compute_routes(), t=STRINGS[get_lang()])
+    lang = get_lang()
+    entries_html = render_template_string(ENTRIES_TABLE, items=latest_prices_view(), t=STRINGS[lang])
+    routes_html = render_template_string(ROUTES_TABLE, routes=compute_routes(), t=STRINGS[lang])
     return entries_html + routes_html
 
 @app.get("/entries")
@@ -488,13 +498,21 @@ def routes_view():
 @app.get("/suggest")
 def suggest():
     field = request.args.get("field")
-    q = (request.args.get("q") or "").lower()
+    q = (request.args.get("q") or "").strip()
     if field not in ("city", "product"):
         abort(400)
-    values = distinct_values(field)
-    if q:
-        values = [v for v in values if q in v.lower()]
-    return jsonify(values[:20])
+    like = f"%{q.lower()}%" if q else None
+    sql = f"SELECT DISTINCT {field} FROM entries"
+    params: tuple[Any, ...]
+    if like:
+        sql += f" WHERE LOWER({field}) LIKE ?"
+        params = (like,)
+    else:
+        params = ()
+    sql += f" ORDER BY {field} ASC LIMIT 20"
+    with get_conn() as c:
+        rows = c.execute(sql, params).fetchall()
+    return jsonify([row[0] for row in rows])
 
 @app.get("/series.json")
 def series_json():
@@ -516,11 +534,20 @@ def export_csv():
     sql = "SELECT * FROM entries ORDER BY datetime(created_at) DESC"
     with get_conn() as c:
         rows = c.execute(sql).fetchall()
-    lines = ["id,created_at,city,product,price,trend,percent"]
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["id", "created_at", "city", "product", "price", "trend", "percent"])
     for r in rows:
-        line = f"{r['id']},{r['created_at']},{r['city']},{r['product']},{r['price']},{r['trend']},{'' if r['percent'] is None else r['percent']}"
-        lines.append(line)
-    csv_data = "\n".join(lines)
+        writer.writerow([
+            r["id"],
+            r["created_at"],
+            r["city"],
+            r["product"],
+            r["price"],
+            r["trend"],
+            "" if r["percent"] is None else r["percent"],
+        ])
+    csv_data = buffer.getvalue()
     resp = make_response(csv_data)
     resp.headers["Content-Type"] = "text/csv; charset=utf-8"
     resp.headers["Content-Disposition"] = "attachment; filename=entries.csv"
