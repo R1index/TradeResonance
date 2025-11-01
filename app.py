@@ -412,10 +412,10 @@ async def add_entry_command(
     product: str,
     price: float,
     trend: TrendLiteral = "flat",
-    percent: Optional[Union[str, float]] = commands.parameter(
+    percent: Optional[float] = commands.parameter(
         default=None, description="Percent change (number)"
     ),
-    production: Optional[Union[str, bool]] = commands.parameter(
+    production: bool = commands.parameter(
         default=False, description="Mark the city as a production location"
     ),
 ):
