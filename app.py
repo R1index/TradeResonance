@@ -335,7 +335,12 @@ def parse_bool(value: Optional[str]) -> bool:
 
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents, description=APP_TITLE)
+bot = commands.Bot(
+    command_prefix=BOT_PREFIX,
+    intents=intents,
+    description=APP_TITLE,
+    help_command=None,
+)
 
 
 @bot.event
