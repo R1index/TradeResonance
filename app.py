@@ -6,7 +6,7 @@ import io
 import os
 import sqlite3
 from datetime import datetime
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Union, Literal
 
 import discord
 from discord.ext import commands
@@ -21,6 +21,10 @@ TREND_MAP = {
     "down": "📉 falling",
     "flat": "⏸️ unchanged",
 }
+
+TrendLiteral = Literal["up", "down", "flat"]
+SortLiteral = Literal["asc", "desc"]
+SuggestFieldLiteral = Literal["city", "product"]
 
 
 # ---------------------- DB helpers ----------------------
@@ -324,18 +328,39 @@ async def run_db(fn, *args, **kwargs):
     return await asyncio.to_thread(fn, *args, **kwargs)
 
 
-def parse_bool(value: Optional[str]) -> bool:
+def parse_bool(value: Optional[Union[str, bool]]) -> bool:
+    if isinstance(value, bool):
+        return value
     if value is None:
         return False
     value = value.strip().lower()
     return value in {"1", "true", "yes", "y", "production", "prod", "on"}
 
 
+def parse_percent(value: Optional[Union[str, float]]) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    normalized = value.replace(",", ".")
+    if not normalized:
+        return None
+    return float(normalized)
+
+
 # ---------------------- Discord bot ----------------------
 
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(
+
+
+class TradeBot(commands.Bot):
+    async def setup_hook(self) -> None:
+        ensure_schema()
+        await self.tree.sync()
+
+
+bot = TradeBot(
     command_prefix=BOT_PREFIX,
     intents=intents,
     description=APP_TITLE,
@@ -345,7 +370,6 @@ bot = commands.Bot(
 
 @bot.event
 async def on_ready():
-    ensure_schema()
     print(f"Logged in as {bot.user} (id={bot.user.id})")
 
 
@@ -360,35 +384,43 @@ async def on_command_error(ctx: commands.Context, error: commands.CommandError):
         raise error
 
 
-@bot.command(name="help")
+@bot.hybrid_command(name="help", with_app_command=True, description="Show available commands")
 async def help_command(ctx: commands.Context):
     help_text = (
         "**Trade Resonance Bot**\n"
-        "Available commands:\n"
-        "`!add <city> <product> <price> [trend] [percent] [production]` — add a new entry.\n"
-        "`!latest [limit]` — show the latest prices per city.\n"
-        "`!routes [limit]` — show the most profitable trade routes.\n"
-        "`!product <product> [asc|desc]` — list prices for a specific product.\n"
-        "`!series <city> <product>` — display the price history for a pair.\n"
-        "`!suggest <city|product> [query]` — provide autocomplete suggestions.\n"
-        "`!export` — export all records to CSV.\n"
-        "`!import` (with a CSV attachment) — import records.\n"
+        "Available commands (prefix `!` or `/` slash):\n"
+        "`add <city> <product> <price> [trend] [percent] [production]` — add a new entry.\n"
+        "`latest [limit]` — show the latest prices per city.\n"
+        "`routes [limit]` — show the most profitable trade routes.\n"
+        "`product <product> [asc|desc]` — list prices for a specific product.\n"
+        "`series <city> <product>` — display the price history for a pair.\n"
+        "`suggest <city|product> [query]` — provide autocomplete suggestions.\n"
+        "`export` — export all records to CSV.\n"
+        "`import` (with a CSV attachment) — import records.\n"
     )
     await ctx.reply(help_text)
 
 
-@bot.command(name="add")
+@bot.hybrid_command(
+    name="add",
+    with_app_command=True,
+    description="Add a new market entry",
+)
 async def add_entry_command(
     ctx: commands.Context,
     city: str,
     product: str,
     price: float,
-    trend: str = "flat",
-    percent: Optional[str] = None,
-    production: Optional[str] = None,
+    trend: TrendLiteral = "flat",
+    percent: Optional[Union[str, float]] = commands.parameter(
+        default=None, description="Percent change (number)"
+    ),
+    production: Optional[Union[str, bool]] = commands.parameter(
+        default=False, description="Mark the city as a production location"
+    ),
 ):
     try:
-        percent_value = float(percent.replace(",", ".")) if percent else None
+        percent_value = parse_percent(percent)
     except ValueError:
         await ctx.reply("Could not parse percent, please provide a number.")
         return
@@ -418,9 +450,17 @@ async def add_entry_command(
     await ctx.reply(message)
 
 
-@bot.command(name="latest")
-async def latest_command(ctx: commands.Context, limit: Optional[int] = None):
-    limit = limit or DEFAULT_LIMIT
+@bot.hybrid_command(
+    name="latest",
+    with_app_command=True,
+    description="Show the latest prices per city",
+)
+async def latest_command(
+    ctx: commands.Context,
+    limit: int = commands.parameter(
+        default=DEFAULT_LIMIT, description="Number of rows to return (1-50)"
+    ),
+):
     limit = max(1, min(limit, 50))
     rows = await run_db(latest_prices, limit)
     table = format_rows(
@@ -441,9 +481,17 @@ async def latest_command(ctx: commands.Context, limit: Optional[int] = None):
     await ctx.reply(table)
 
 
-@bot.command(name="routes")
-async def routes_command(ctx: commands.Context, limit: Optional[int] = None):
-    limit = limit or DEFAULT_LIMIT
+@bot.hybrid_command(
+    name="routes",
+    with_app_command=True,
+    description="Show the most profitable trade routes",
+)
+async def routes_command(
+    ctx: commands.Context,
+    limit: int = commands.parameter(
+        default=DEFAULT_LIMIT, description="Number of routes to show (1-50)"
+    ),
+):
     limit = max(1, min(limit, 50))
     routes = await run_db(compute_routes, limit)
     table = format_rows(
@@ -465,12 +513,18 @@ async def routes_command(ctx: commands.Context, limit: Optional[int] = None):
     await ctx.reply(table)
 
 
-@bot.command(name="product")
-async def product_command(ctx: commands.Context, product: str, sort: str = "asc"):
-    sort = sort.lower()
-    if sort not in ("asc", "desc"):
-        sort = "asc"
-    rows = await run_db(product_latest_prices, product, sort)
+@bot.hybrid_command(
+    name="product",
+    with_app_command=True,
+    description="List prices for a specific product",
+)
+async def product_command(
+    ctx: commands.Context, product: str, sort: SortLiteral = "asc"
+):
+    sort_value = (sort or "asc").lower()
+    if sort_value not in ("asc", "desc"):
+        sort_value = "asc"
+    rows = await run_db(product_latest_prices, product, sort_value)
     if not rows:
         await ctx.reply("No data for the selected product.")
         return
@@ -492,7 +546,11 @@ async def product_command(ctx: commands.Context, product: str, sort: str = "asc"
     await ctx.reply(table)
 
 
-@bot.command(name="series")
+@bot.hybrid_command(
+    name="series",
+    with_app_command=True,
+    description="Display price history for a city/product pair",
+)
 async def series_command(ctx: commands.Context, city: str, product: str):
     rows = await run_db(series, city, product)
     if not rows:
@@ -514,11 +572,19 @@ async def series_command(ctx: commands.Context, city: str, product: str):
     await ctx.reply(table)
 
 
-@bot.command(name="suggest")
-async def suggest_command(ctx: commands.Context, field: str, *, query: str = ""):
-    field = field.lower()
+@bot.hybrid_command(
+    name="suggest",
+    with_app_command=True,
+    description="Provide autocomplete suggestions",
+)
+async def suggest_command(
+    ctx: commands.Context,
+    field: SuggestFieldLiteral,
+    query: str = commands.parameter(default="", description="Optional search term"),
+):
+    field_value = field.lower()
     try:
-        values = await run_db(suggest_values, field, query)
+        values = await run_db(suggest_values, field_value, query)
     except ValueError as exc:
         await ctx.reply(str(exc))
         return
@@ -529,20 +595,39 @@ async def suggest_command(ctx: commands.Context, field: str, *, query: str = "")
     await ctx.reply(message)
 
 
-@bot.command(name="export")
+@bot.hybrid_command(
+    name="export",
+    with_app_command=True,
+    description="Export all records to CSV",
+)
 async def export_command(ctx: commands.Context):
+    if ctx.interaction:
+        await ctx.defer()
     data = await run_db(export_csv_bytes)
     buffer = io.BytesIO(data)
     buffer.seek(0)
     await ctx.reply(file=discord.File(buffer, filename="entries.csv"))
 
 
-@bot.command(name="import")
-async def import_command(ctx: commands.Context):
-    if not ctx.message.attachments:
+@bot.hybrid_command(
+    name="import",
+    with_app_command=True,
+    description="Import records from a CSV attachment",
+)
+async def import_command(
+    ctx: commands.Context,
+    file: Optional[discord.Attachment] = commands.parameter(
+        default=None, description="CSV file to import"
+    ),
+):
+    attachment = file
+    if attachment is None and ctx.message and ctx.message.attachments:
+        attachment = ctx.message.attachments[0]
+    if attachment is None:
         await ctx.reply("Attach a CSV file to the message.")
         return
-    attachment = ctx.message.attachments[0]
+    if ctx.interaction and not ctx.interaction.response.is_done():
+        await ctx.defer()
     data = await attachment.read()
     count = await run_db(import_from_csv_bytes, data)
     await ctx.reply(f"Imported records: {count}")
