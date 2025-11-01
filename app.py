@@ -72,6 +72,10 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "product_lookup_hint": "Введите название товара и нажмите \"Найти\".",
         "no_prices": "Нет данных по выбранному товару.",
         "prices_for": "Цены для",
+        "sort_label": "Сортировать",
+        "sort_price_low": "Цена ↑",
+        "sort_price_high": "Цена ↓",
+        "entries_count": "записей",
     },
     "en": {
         "title": "Profit Routes",
@@ -112,6 +116,10 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "product_lookup_hint": "Type a product name and press \"Search\".",
         "no_prices": "No data for the selected product.",
         "prices_for": "Prices for",
+        "sort_label": "Sort",
+        "sort_price_low": "Price ↑",
+        "sort_price_high": "Price ↓",
+        "entries_count": "entries",
     },
 }
 
@@ -166,37 +174,272 @@ BASE_HTML = r"""
   <script src="https://unpkg.com/htmx.org@2.0.3"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
-    :root { --bg:#0b0f14; --card:#111827; --muted:#9ca3af; --text:#e5e7eb; --accent:#22c55e; --border:#1f2937; }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial; background: var(--bg); color: var(--text); margin: 0; }
-    .container{ max-width: 1200px; margin: 0 auto; padding: 24px; }
-    .topbar{ display:flex; justify-content: space-between; align-items:center; margin-bottom: 12px; }
-    .grid{ display: grid; grid-template-columns: 1.1fr 1fr; gap: 20px; align-items: start; }
-    .grid-2{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
-    .card{ background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
-    h1{ font-size: 22px; margin: 0 0 12px; }
-    h2{ font-size: 18px; margin: 0 0 10px; color: var(--muted); }
-    label{ display:block; font-size: 13px; color: var(--muted); margin:10px 0 6px; }
-    input, select, button { width: 100%; padding: 10px 12px; border-radius: 10px; border:1px solid var(--border); background: #0f172a; color: var(--text); }
-    button{ background: linear-gradient(90deg, #22c55e, #10b981); color:#052e16; font-weight: 600; cursor: pointer; border: none; }
-    button.secondary{ background: #0f172a; color: var(--text); border:1px solid var(--border); }
-    table{ width:100%; border-collapse: collapse; font-size: 14px; }
-    th, td{ padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; }
-    th{ color: var(--muted); font-weight:600; }
-    .pill{ padding: 2px 8px; border-radius: 999px; font-size:12px; display:inline-block; }
-    .up{ background:#052e16; color:#22c55e; }
-    .down{ background:#3f0a0a; color:#ef4444; }
-    .flat{ background:#1f2937; color:#9ca3af; }
-    .row{ display:flex; gap:10px; }
-    .muted{ color:var(--muted); font-size:12px; }
-    .muted-block{ color:var(--muted); font-size:13px; margin-top:10px; }
-    .right{ text-align:right; }
-    .nowrap{ white-space:nowrap; }
-    .actions{ display:flex; gap:10px; }
-    .spacer{ height: 10px; }
-    a.link{ color:#a7f3d0; text-decoration:none; }
-    .checkbox{ display:flex; align-items:center; gap:8px; margin-top:12px; color:var(--muted); font-size:13px; }
-    .checkbox input{ width:auto; }
-    .center{ text-align:center; }
+    :root {
+      --bg: #06090f;
+      --bg-gradient: radial-gradient(circle at 20% 20%, rgba(34,197,94,0.12), transparent 55%),
+        radial-gradient(circle at 80% 0%, rgba(59,130,246,0.12), transparent 40%),
+        #06090f;
+      --card: rgba(15, 23, 42, 0.92);
+      --muted: #9ca3af;
+      --text: #e5e7eb;
+      --accent: #22c55e;
+      --border: rgba(148, 163, 184, 0.18);
+      --border-strong: rgba(148, 163, 184, 0.32);
+    }
+    body {
+      font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Noto Sans", Helvetica, Arial;
+      background: var(--bg-gradient);
+      color: var(--text);
+      margin: 0;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+      margin-top: 20px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.3);
+      backdrop-filter: blur(12px);
+    }
+    h1 {
+      font-size: 24px;
+      margin: 0 0 12px;
+    }
+    h2 {
+      font-size: 18px;
+      margin: 0;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      margin: 10px 0 6px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+    input,
+    select,
+    button {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(8, 13, 23, 0.9);
+      color: var(--text);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
+    }
+    input:focus,
+    select:focus,
+    button:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25);
+    }
+    button {
+      background: linear-gradient(120deg, #22c55e, #16a34a);
+      color: #052e16;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+    }
+    button.secondary {
+      background: rgba(15, 23, 42, 0.85);
+      color: var(--text);
+      border: 1px solid var(--border-strong);
+    }
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 20px rgba(34, 197, 94, 0.25);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th,
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+    }
+    tbody tr:nth-child(even) {
+      background: rgba(148, 163, 184, 0.06);
+    }
+    tbody tr:hover {
+      background: rgba(34, 197, 94, 0.08);
+    }
+    .table-scroll {
+      margin-top: 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: auto;
+      max-height: 360px;
+      background: rgba(8, 13, 23, 0.65);
+    }
+    .table-scroll table {
+      min-width: 560px;
+    }
+    .pill {
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      display: inline-block;
+      font-weight: 600;
+    }
+    .up {
+      background: rgba(34, 197, 94, 0.12);
+      color: #4ade80;
+    }
+    .down {
+      background: rgba(248, 113, 113, 0.12);
+      color: #fca5a5;
+    }
+    .flat {
+      background: rgba(148, 163, 184, 0.12);
+      color: #cbd5f5;
+    }
+    .row {
+      display: flex;
+      gap: 10px;
+    }
+    .row.wrap {
+      flex-wrap: wrap;
+    }
+    .row.wrap > * {
+      flex: 1 1 220px;
+    }
+    .muted {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .muted-block {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 10px;
+    }
+    .right {
+      text-align: right;
+    }
+    .nowrap {
+      white-space: nowrap;
+    }
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .spacer {
+      height: 10px;
+    }
+    a.link {
+      color: #a7f3d0;
+      text-decoration: none;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    a.link:hover {
+      color: #86efac;
+    }
+    .checkbox {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .checkbox input {
+      width: auto;
+    }
+    .center {
+      text-align: center;
+    }
+    details.collapsible {
+      position: relative;
+    }
+    details.collapsible summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    details.collapsible summary::-webkit-details-marker {
+      display: none;
+    }
+    details.collapsible summary h2 {
+      flex: 1;
+      margin: 0;
+    }
+    .summary-meta {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .sort-indicator {
+      font-size: 11px;
+      color: var(--muted);
+      margin-left: 6px;
+    }
+    .summary-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(8, 13, 23, 0.8);
+      transition: transform 0.2s ease;
+      font-size: 12px;
+    }
+    details[open] .summary-icon {
+      transform: rotate(180deg);
+    }
+    @media (max-width: 1024px) {
+      .grid,
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+      .container {
+        padding: 16px;
+      }
+      .table-scroll {
+        max-height: 420px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -225,7 +468,7 @@ BASE_HTML = r"""
           <div class="row">
             <div style="flex:1">
               <label>{{ t['price'] }}</label>
-              <input name="price" inputmode="decimal" placeholder="0.00" required />
+              <input name="price" inputmode="decimal" placeholder="0" required />
             </div>
             <div style="flex:1">
               <label>{{ t['trend'] }}</label>
@@ -237,7 +480,7 @@ BASE_HTML = r"""
             </div>
             <div style="flex:1">
               <label>{{ t['percent'] }}</label>
-              <input name="percent" inputmode="decimal" placeholder="3.5" />
+              <input name="percent" inputmode="decimal" placeholder="3" />
             </div>
           </div>
           <div class="spacer"></div>
@@ -273,10 +516,21 @@ BASE_HTML = r"""
 
       <div class="card" id="product-lookup">
         <h2>{{ t['product_lookup'] }}</h2>
-        <form hx-get="{{ url_for('product_prices', lang=lang) }}" hx-target="#product-lookup-results" hx-swap="outerHTML">
-          <label>{{ t['product'] }}</label>
-          <input id="lookup-product" name="product" list="lookup-products" placeholder="{{ t['product_lookup_placeholder'] }}" autocomplete="off" required />
-          <datalist id="lookup-products">{% for p in products %}<option value="{{ p }}">{% endfor %}</datalist>
+        <form id="lookup-form" hx-get="{{ url_for('product_prices', lang=lang) }}" hx-target="#product-lookup-results" hx-swap="outerHTML" hx-trigger="submit, change from:#lookup-sort">
+          <div class="row wrap">
+            <div>
+              <label for="lookup-product">{{ t['product'] }}</label>
+              <input id="lookup-product" name="product" list="lookup-products" placeholder="{{ t['product_lookup_placeholder'] }}" autocomplete="off" required />
+              <datalist id="lookup-products">{% for p in products %}<option value="{{ p }}">{% endfor %}</datalist>
+            </div>
+            <div>
+              <label for="lookup-sort">{{ t['sort_label'] }}</label>
+              <select id="lookup-sort" name="sort">
+                <option value="asc" selected>{{ t['sort_price_low'] }}</option>
+                <option value="desc">{{ t['sort_price_high'] }}</option>
+              </select>
+            </div>
+          </div>
           <div class="actions">
             <button type="submit">{{ t['search'] }}</button>
           </div>
@@ -362,108 +616,126 @@ wireChartSelectors();
 
 ENTRIES_TABLE = r"""
 <div class="card" id="entries" hx-swap-oob="true">
-  <h2>{{ t['last_entries'] }}</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>{{ t['when'] }}</th>
-        <th>{{ t['city'] }}</th>
-        <th>{{ t['product'] }}</th>
-        <th class="center">{{ t['production_city_short'] }}</th>
-        <th class="right">{{ t['price'] }}</th>
-        <th>{{ t['trend'] }}</th>
-        <th class="right">{{ t['percent'] }}</th>
-      </tr>
-    </thead>
-    <tbody>
-    {% for e in items %}
-      <tr>
-        <td class="nowrap">{{ e['created_at'][:19].replace('T',' ') }}</td>
-        <td>{{ e['city'] }}</td>
-        <td>{{ e['product'] }}</td>
-        <td class="center">{{ '✓' if e['is_production_city'] else '—' }}</td>
-        <td class="right">{{ '%.2f'|format(e['price']) }}</td>
-        <td>
-          {% set tcode = e['trend'] or 'flat' %}
-          <span class="pill {{ tcode }}">{{ { 'up': t['trend_up'], 'down': t['trend_down'], 'flat': t['trend_flat'] }[tcode] }}</span>
-        </td>
-        <td class="right">{{ ('%.2f%%'|format(e['percent'])) if e['percent'] is not none else '—' }}</td>
-      </tr>
-    {% else %}
-      <tr><td colspan="7" class="muted">{{ t['no_data'] }}</td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
+  <details class="collapsible" open>
+    <summary>
+      <h2>{{ t['last_entries'] }}</h2>
+      <span class="summary-meta">{{ items|length }} {{ t['entries_count'] }}</span>
+      <span class="summary-icon" aria-hidden="true">▾</span>
+    </summary>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>{{ t['when'] }}</th>
+            <th>{{ t['city'] }}</th>
+            <th>{{ t['product'] }}</th>
+            <th class="center">{{ t['production_city_short'] }}</th>
+            <th class="right">{{ t['price'] }}</th>
+            <th>{{ t['trend'] }}</th>
+            <th class="right">{{ t['percent'] }}</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for e in items %}
+          <tr>
+            <td class="nowrap">{{ e['created_at'][:19].replace('T',' ') }}</td>
+            <td>{{ e['city'] }}</td>
+            <td>{{ e['product'] }}</td>
+            <td class="center">{{ '✓' if e['is_production_city'] else '—' }}</td>
+            <td class="right">{{ '%.0f'|format(e['price']) }}</td>
+            <td>
+              {% set tcode = e['trend'] or 'flat' %}
+              <span class="pill {{ tcode }}">{{ { 'up': t['trend_up'], 'down': t['trend_down'], 'flat': t['trend_flat'] }[tcode] }}</span>
+            </td>
+            <td class="right">{{ ('%.0f%%'|format(e['percent'])) if e['percent'] is not none else '—' }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="7" class="muted">{{ t['no_data'] }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
 </div>
 """
 
 ROUTES_TABLE = r"""
 <div class="card" id="routes" hx-swap-oob="true">
   <h2>{{ t['routes_top'] }}</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>{{ t['product'] }}</th>
-        <th>{{ t['from_city'] }}</th>
-        <th>{{ t['to_city'] }}</th>
-        <th class="right">{{ t['price_from'] }}</th>
-        <th class="right">{{ t['price_to'] }}</th>
-        <th class="right">{{ t['profit'] }}</th>
-        <th class="right">{{ t['profit_pct'] }}</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for r in routes %}
-      <tr>
-        <td>{{ r['product'] }}</td>
-        <td>{{ r['from_city'] }}</td>
-        <td>{{ r['to_city'] }}</td>
-        <td class="right">{{ '%.2f'|format(r['from_price']) }}</td>
-        <td class="right">{{ '%.2f'|format(r['to_price']) }}</td>
-        <td class="right">{{ '%.2f'|format(r['profit_abs']) }}</td>
-        <td class="right">{{ '%.2f%%'|format(r['profit_pct']) }}</td>
-      </tr>
-      {% else %}
-      <tr><td colspan="7" class="muted">{{ t['no_routes'] }}</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>{{ t['product'] }}</th>
+          <th>{{ t['from_city'] }}</th>
+          <th>{{ t['to_city'] }}</th>
+          <th class="right">{{ t['price_from'] }}</th>
+          <th class="right">{{ t['price_to'] }}</th>
+          <th class="right">{{ t['profit'] }}</th>
+          <th class="right">{{ t['profit_pct'] }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in routes %}
+        <tr>
+          <td>{{ r['product'] }}</td>
+          <td>{{ r['from_city'] }}</td>
+          <td>{{ r['to_city'] }}</td>
+          <td class="right">{{ '%.0f'|format(r['from_price']) }}</td>
+          <td class="right">{{ '%.0f'|format(r['to_price']) }}</td>
+          <td class="right">{{ '%.0f'|format(r['profit_abs']) }}</td>
+          <td class="right">
+            {% if r['profit_pct'] is not none %}
+              {{ '%.0f%%'|format(r['profit_pct']) }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="muted">{{ t['no_routes'] }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 """
 
 PRODUCT_PRICES_TABLE = r"""
 <div id="product-lookup-results">
   {% if product %}
-    <p class="muted">{{ t['prices_for'] }} "{{ product }}"</p>
+    <p class="muted">{{ t['prices_for'] }} "{{ product }}" · {{ t['sort_label'] }}: {{ t['sort_price_low'] if sort == 'asc' else t['sort_price_high'] }}</p>
   {% endif %}
   {% if items %}
-  <table>
-    <thead>
-      <tr>
-        <th>{{ t['city'] }}</th>
-        <th class="center">{{ t['production_city_short'] }}</th>
-        <th class="right">{{ t['price'] }}</th>
-        <th>{{ t['trend'] }}</th>
-        <th class="right">{{ t['percent'] }}</th>
-        <th>{{ t['when'] }}</th>
-      </tr>
-    </thead>
-    <tbody>
-    {% for e in items %}
-      <tr>
-        <td>{{ e['city'] }}</td>
-        <td class="center">{{ '✓' if e['is_production_city'] else '—' }}</td>
-        <td class="right">{{ '%.2f'|format(e['price']) }}</td>
-        <td>
-          {% set tcode = e['trend'] or 'flat' %}
-          <span class="pill {{ tcode }}">{{ { 'up': t['trend_up'], 'down': t['trend_down'], 'flat': t['trend_flat'] }[tcode] }}</span>
-        </td>
-        <td class="right">{{ ('%.2f%%'|format(e['percent'])) if e['percent'] is not none else '—' }}</td>
-        <td class="nowrap">{{ e['created_at'][:19].replace('T',' ') }}</td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>{{ t['city'] }}</th>
+          <th class="center">{{ t['production_city_short'] }}</th>
+          <th class="right">{{ t['price'] }}<span class="sort-indicator">{{ '↑' if sort == 'asc' else '↓' }}</span></th>
+          <th>{{ t['trend'] }}</th>
+          <th class="right">{{ t['percent'] }}</th>
+          <th>{{ t['when'] }}</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for e in items %}
+        <tr>
+          <td>{{ e['city'] }}</td>
+          <td class="center">{{ '✓' if e['is_production_city'] else '—' }}</td>
+          <td class="right">{{ '%.0f'|format(e['price']) }}</td>
+          <td>
+            {% set tcode = e['trend'] or 'flat' %}
+            <span class="pill {{ tcode }}">{{ { 'up': t['trend_up'], 'down': t['trend_down'], 'flat': t['trend_flat'] }[tcode] }}</span>
+          </td>
+          <td class="right">{{ ('%.0f%%'|format(e['percent'])) if e['percent'] is not none else '—' }}</td>
+          <td class="nowrap">{{ e['created_at'][:19].replace('T',' ') }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
   {% else %}
     <p class="muted">{{ message }}</p>
   {% endif %}
@@ -536,8 +808,9 @@ def compute_routes(limit: int = 25) -> List[Dict[str, Any]]:
         return [dict(row) for row in rows]
 
 
-def product_latest_prices(product: str) -> List[sqlite3.Row]:
-    sql = r"""
+def product_latest_prices(product: str, sort: str = "asc") -> List[sqlite3.Row]:
+    order = "DESC" if sort == "desc" else "ASC"
+    sql = f"""
     WITH latest AS (
       SELECT e.*
       FROM entries e
@@ -550,7 +823,7 @@ def product_latest_prices(product: str) -> List[sqlite3.Row]:
       ON e.city = m.city AND datetime(e.created_at) = m.mx
       WHERE e.product = ?
     )
-    SELECT * FROM latest ORDER BY price ASC
+    SELECT * FROM latest ORDER BY price {order}, datetime(created_at) DESC
     """
     with get_conn() as c:
         return c.execute(sql, (product, product)).fetchall()
@@ -627,6 +900,8 @@ def entries_table():
 def product_prices():
     lang = get_lang()
     product = (request.args.get("product") or "").strip()
+    sort = (request.args.get("sort") or "asc").strip().lower()
+    sort = "desc" if sort == "desc" else "asc"
     if not product:
         message = STRINGS[lang]["product_lookup_hint"]
         return render_template_string(
@@ -634,16 +909,18 @@ def product_prices():
             items=[],
             product=None,
             message=message,
+            sort=sort,
             t=STRINGS[lang],
         )
 
-    rows = product_latest_prices(product)
+    rows = product_latest_prices(product, sort=sort)
     message = STRINGS[lang]["no_prices"]
     return render_template_string(
         PRODUCT_PRICES_TABLE,
         items=rows,
         product=product,
         message=message,
+        sort=sort,
         t=STRINGS[lang],
     )
 
