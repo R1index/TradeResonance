@@ -45,6 +45,8 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "reset": "Очистить",
         "last_entries": "Последние записи",
         "routes_top": "Топ маршрутов по прибыли",
+        "production_city": "Производство города",
+        "production_city_short": "Производство",
         "when": "Когда",
         "no_data": "Пока нет данных.",
         "no_routes": "Недостаточно данных для расчёта маршрутов.",
@@ -74,6 +76,8 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "reset": "Reset",
         "last_entries": "Latest entries",
         "routes_top": "Top profit routes",
+        "production_city": "Production city",
+        "production_city_short": "Production",
         "when": "When",
         "no_data": "No data yet.",
         "no_routes": "Not enough data to compute routes.",
@@ -112,14 +116,25 @@ CREATE TABLE IF NOT EXISTS entries (
     price REAL NOT NULL CHECK(price >= 0),
     trend TEXT CHECK(trend IN ('up','down','flat')),
     percent REAL,
+    is_production_city INTEGER NOT NULL DEFAULT 0 CHECK(is_production_city IN (0,1)),
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_entries_city_product ON entries(city, product);
 CREATE INDEX IF NOT EXISTS idx_entries_created ON entries(created_at);
 """
 
-with get_conn() as c:
-    c.executescript(SCHEMA_SQL)
+
+def ensure_schema() -> None:
+    with get_conn() as c:
+        c.executescript(SCHEMA_SQL)
+        cols = {row[1] for row in c.execute("PRAGMA table_info(entries)")}
+        if "is_production_city" not in cols:
+            c.execute(
+                "ALTER TABLE entries ADD COLUMN is_production_city INTEGER NOT NULL DEFAULT 0"
+            )
+
+
+ensure_schema()
 
 # ---------------------- HTML (Jinja2) ----------------------
 
@@ -160,6 +175,9 @@ BASE_HTML = r"""
     .actions{ display:flex; gap:10px; }
     .spacer{ height: 10px; }
     a.link{ color:#a7f3d0; text-decoration:none; }
+    .checkbox{ display:flex; align-items:center; gap:8px; margin-top:12px; color:var(--muted); font-size:13px; }
+    .checkbox input{ width:auto; }
+    .center{ text-align:center; }
   </style>
 </head>
 <body>
@@ -204,6 +222,10 @@ BASE_HTML = r"""
             </div>
           </div>
           <div class="spacer"></div>
+          <label class="checkbox">
+            <input type="checkbox" name="is_production_city" value="1" />
+            <span>{{ t['production_city'] }}</span>
+          </label>
           <div class="actions">
             <button type="submit">{{ t['save'] }}</button>
             <button class="secondary" type="reset">{{ t['reset'] }}</button>
@@ -301,6 +323,7 @@ ENTRIES_TABLE = r"""
         <th>{{ t['when'] }}</th>
         <th>{{ t['city'] }}</th>
         <th>{{ t['product'] }}</th>
+        <th class="center">{{ t['production_city_short'] }}</th>
         <th class="right">{{ t['price'] }}</th>
         <th>{{ t['trend'] }}</th>
         <th class="right">{{ t['percent'] }}</th>
@@ -312,6 +335,7 @@ ENTRIES_TABLE = r"""
         <td class="nowrap">{{ e['created_at'][:19].replace('T',' ') }}</td>
         <td>{{ e['city'] }}</td>
         <td>{{ e['product'] }}</td>
+        <td class="center">{{ '✓' if e['is_production_city'] else '—' }}</td>
         <td class="right">{{ '%.2f'|format(e['price']) }}</td>
         <td>
           {% set tcode = e['trend'] or 'flat' %}
@@ -320,7 +344,7 @@ ENTRIES_TABLE = r"""
         <td class="right">{{ ('%.2f%%'|format(e['percent'])) if e['percent'] is not none else '—' }}</td>
       </tr>
     {% else %}
-      <tr><td colspan="6" class="muted">{{ t['no_data'] }}</td></tr>
+      <tr><td colspan="7" class="muted">{{ t['no_data'] }}</td></tr>
     {% endfor %}
     </tbody>
   </table>
@@ -418,7 +442,7 @@ def compute_routes(limit: int = 25) -> List[Dict[str, Any]]:
     FROM latest a
     JOIN latest b
       ON a.product = b.product AND a.city <> b.city
-    WHERE b.price > a.price
+    WHERE b.price > a.price AND a.is_production_city = 1
     ORDER BY profit_pct DESC, profit_abs DESC
     LIMIT ?
     """
@@ -475,11 +499,13 @@ def add_entry():
     if trend not in ("up", "down", "flat"):
         trend = "flat"
 
+    is_production_city = 1 if request.form.get("is_production_city") else 0
+
     created_at = datetime.utcnow().isoformat()
     with get_conn() as c:
         c.execute(
-            "INSERT INTO entries(city, product, price, trend, percent, created_at) VALUES (?,?,?,?,?,?)",
-            (city, product, price, trend, percent, created_at),
+            "INSERT INTO entries(city, product, price, trend, percent, is_production_city, created_at) VALUES (?,?,?,?,?,?,?)",
+            (city, product, price, trend, percent, is_production_city, created_at),
         )
 
     lang = get_lang()
@@ -536,7 +562,16 @@ def export_csv():
         rows = c.execute(sql).fetchall()
     buffer = io.StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(["id", "created_at", "city", "product", "price", "trend", "percent"])
+    writer.writerow([
+        "id",
+        "created_at",
+        "city",
+        "product",
+        "price",
+        "trend",
+        "percent",
+        "is_production_city",
+    ])
     for r in rows:
         writer.writerow([
             r["id"],
@@ -546,6 +581,7 @@ def export_csv():
             r["price"],
             r["trend"],
             "" if r["percent"] is None else r["percent"],
+            r["is_production_city"],
         ])
     csv_data = buffer.getvalue()
     resp = make_response(csv_data)
