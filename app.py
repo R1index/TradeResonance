@@ -63,6 +63,15 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "choose_pair": "Выберите город и товар",
         "lang_toggle": "EN",
         "export": "Экспорт CSV",
+        "import": "Импорт CSV",
+        "choose_file": "Выберите CSV файл",
+        "upload": "Загрузить",
+        "search": "Найти",
+        "product_lookup": "Цены по товарам",
+        "product_lookup_placeholder": "Введите товар",
+        "product_lookup_hint": "Введите название товара и нажмите \"Найти\".",
+        "no_prices": "Нет данных по выбранному товару.",
+        "prices_for": "Цены для",
     },
     "en": {
         "title": "Profit Routes",
@@ -94,6 +103,15 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "choose_pair": "Select city & product",
         "lang_toggle": "RU",
         "export": "Export CSV",
+        "import": "Import CSV",
+        "choose_file": "Select CSV file",
+        "upload": "Upload",
+        "search": "Search",
+        "product_lookup": "Prices by product",
+        "product_lookup_placeholder": "Enter product",
+        "product_lookup_hint": "Type a product name and press \"Search\".",
+        "no_prices": "No data for the selected product.",
+        "prices_for": "Prices for",
     },
 }
 
@@ -170,6 +188,7 @@ BASE_HTML = r"""
     .flat{ background:#1f2937; color:#9ca3af; }
     .row{ display:flex; gap:10px; }
     .muted{ color:var(--muted); font-size:12px; }
+    .muted-block{ color:var(--muted); font-size:13px; margin-top:10px; }
     .right{ text-align:right; }
     .nowrap{ white-space:nowrap; }
     .actions{ display:flex; gap:10px; }
@@ -251,6 +270,32 @@ BASE_HTML = r"""
         <canvas id="trendCanvas" height="140"></canvas>
         <p class="muted" id="chart-hint">{{ t['choose_pair'] }}</p>
       </div>
+
+      <div class="card" id="product-lookup">
+        <h2>{{ t['product_lookup'] }}</h2>
+        <form hx-get="{{ url_for('product_prices', lang=lang) }}" hx-target="#product-lookup-results" hx-swap="outerHTML">
+          <label>{{ t['product'] }}</label>
+          <input id="lookup-product" name="product" list="lookup-products" placeholder="{{ t['product_lookup_placeholder'] }}" autocomplete="off" required />
+          <datalist id="lookup-products">{% for p in products %}<option value="{{ p }}">{% endfor %}</datalist>
+          <div class="actions">
+            <button type="submit">{{ t['search'] }}</button>
+          </div>
+        </form>
+        <div class="spacer"></div>
+        <div id="product-lookup-results" class="muted">{{ t['product_lookup_hint'] }}</div>
+      </div>
+
+      <div class="card" id="import-card">
+        <h2>{{ t['import'] }}</h2>
+        <form action="{{ url_for('import_csv', lang=lang) }}" method="post" enctype="multipart/form-data">
+          <label>{{ t['choose_file'] }}</label>
+          <input type="file" name="file" accept=".csv,text/csv" required />
+          <div class="actions">
+            <button type="submit">{{ t['upload'] }}</button>
+          </div>
+        </form>
+        <p class="muted-block">{{ t['export'] }} → entries.csv</p>
+      </div>
     </div>
   </div>
 
@@ -273,6 +318,7 @@ bindTypeahead('chart-city','chart-cities','city');
 bindTypeahead('chart-product','chart-products','product');
 bindTypeahead('city','cities','city');
 bindTypeahead('product','products','product');
+bindTypeahead('lookup-product','lookup-products','product');
 
 // ---- Trend chart ----
 let chart;
@@ -385,6 +431,45 @@ ROUTES_TABLE = r"""
 </div>
 """
 
+PRODUCT_PRICES_TABLE = r"""
+<div id="product-lookup-results">
+  {% if product %}
+    <p class="muted">{{ t['prices_for'] }} "{{ product }}"</p>
+  {% endif %}
+  {% if items %}
+  <table>
+    <thead>
+      <tr>
+        <th>{{ t['city'] }}</th>
+        <th class="center">{{ t['production_city_short'] }}</th>
+        <th class="right">{{ t['price'] }}</th>
+        <th>{{ t['trend'] }}</th>
+        <th class="right">{{ t['percent'] }}</th>
+        <th>{{ t['when'] }}</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for e in items %}
+      <tr>
+        <td>{{ e['city'] }}</td>
+        <td class="center">{{ '✓' if e['is_production_city'] else '—' }}</td>
+        <td class="right">{{ '%.2f'|format(e['price']) }}</td>
+        <td>
+          {% set tcode = e['trend'] or 'flat' %}
+          <span class="pill {{ tcode }}">{{ { 'up': t['trend_up'], 'down': t['trend_down'], 'flat': t['trend_flat'] }[tcode] }}</span>
+        </td>
+        <td class="right">{{ ('%.2f%%'|format(e['percent'])) if e['percent'] is not none else '—' }}</td>
+        <td class="nowrap">{{ e['created_at'][:19].replace('T',' ') }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="muted">{{ message }}</p>
+  {% endif %}
+</div>
+"""
+
 # ---------------------- Queries & logic ----------------------
 
 def distinct_values(field: str, limit: int | None = None) -> List[str]:
@@ -449,6 +534,26 @@ def compute_routes(limit: int = 25) -> List[Dict[str, Any]]:
     with get_conn() as c:
         rows = c.execute(sql, (limit,)).fetchall()
         return [dict(row) for row in rows]
+
+
+def product_latest_prices(product: str) -> List[sqlite3.Row]:
+    sql = r"""
+    WITH latest AS (
+      SELECT e.*
+      FROM entries e
+      JOIN (
+        SELECT city, MAX(datetime(created_at)) AS mx
+        FROM entries
+        WHERE product = ?
+        GROUP BY city
+      ) m
+      ON e.city = m.city AND datetime(e.created_at) = m.mx
+      WHERE e.product = ?
+    )
+    SELECT * FROM latest ORDER BY price ASC
+    """
+    with get_conn() as c:
+        return c.execute(sql, (product, product)).fetchall()
 
 # ---------------------- Routes ----------------------
 
@@ -516,6 +621,116 @@ def add_entry():
 @app.get("/entries")
 def entries_table():
     return render_template_string(ENTRIES_TABLE, items=latest_prices_view(), t=STRINGS[get_lang()])
+
+
+@app.get("/product-prices")
+def product_prices():
+    lang = get_lang()
+    product = (request.args.get("product") or "").strip()
+    if not product:
+        message = STRINGS[lang]["product_lookup_hint"]
+        return render_template_string(
+            PRODUCT_PRICES_TABLE,
+            items=[],
+            product=None,
+            message=message,
+            t=STRINGS[lang],
+        )
+
+    rows = product_latest_prices(product)
+    message = STRINGS[lang]["no_prices"]
+    return render_template_string(
+        PRODUCT_PRICES_TABLE,
+        items=rows,
+        product=product,
+        message=message,
+        t=STRINGS[lang],
+    )
+
+
+@app.post("/import")
+def import_csv():
+    lang = get_lang()
+    uploaded = request.files.get("file")
+    if uploaded is None or uploaded.filename == "":
+        return redirect(url_for("index", lang=lang))
+
+    data = uploaded.read()
+    if not data:
+        return redirect(url_for("index", lang=lang))
+
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = data.decode("utf-8", errors="ignore")
+
+    reader = csv.DictReader(io.StringIO(text))
+    if not reader.fieldnames:
+        return redirect(url_for("index", lang=lang))
+
+    def normalize_key(key: str | None) -> str:
+        return (key or "").strip().lower()
+
+    now = datetime.utcnow().isoformat()
+    payload = []
+    for row in reader:
+        lowered = {normalize_key(k): (v.strip() if isinstance(v, str) else v) for k, v in row.items()}
+        city = (lowered.get("city") or "").strip()
+        product_val = (lowered.get("product") or "").strip()
+        price_raw = (lowered.get("price") or "").replace(",", ".").strip()
+        trend = (lowered.get("trend") or "flat").strip().lower()
+        percent_raw = (lowered.get("percent") or "").replace(",", ".").strip()
+        is_prod_raw = (lowered.get("is_production_city") or "").strip().lower()
+        created_raw = (lowered.get("created_at") or "").strip()
+
+        if not city or not product_val or not price_raw:
+            continue
+
+        try:
+            price = float(price_raw)
+        except ValueError:
+            continue
+
+        percent = None
+        if percent_raw:
+            try:
+                percent = float(percent_raw)
+            except ValueError:
+                percent = None
+
+        if trend not in ("up", "down", "flat"):
+            trend = "flat"
+
+        if is_prod_raw in ("1", "true", "yes", "y", "да", "истина", "production", "prod"):
+            is_prod = 1
+        else:
+            try:
+                is_prod = 1 if int(is_prod_raw) != 0 else 0
+            except ValueError:
+                is_prod = 0
+
+        created_at = created_raw or now
+        if created_raw:
+            try:
+                datetime.fromisoformat(created_raw.replace("Z", "+00:00"))
+            except ValueError:
+                try:
+                    parsed = datetime.strptime(created_raw, "%Y-%m-%d %H:%M:%S")
+                    created_at = parsed.isoformat()
+                except ValueError:
+                    created_at = now
+
+        payload.append((city, product_val, price, trend, percent, is_prod, created_at))
+
+    if payload:
+        with get_conn() as c:
+            c.executemany(
+                "INSERT INTO entries(city, product, price, trend, percent, is_production_city, created_at) VALUES (?,?,?,?,?,?,?)",
+                payload,
+            )
+
+    return redirect(url_for("index", lang=lang))
+
 
 @app.get("/routes")
 def routes_view():
