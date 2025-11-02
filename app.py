@@ -61,6 +61,7 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "product": "Товар",
         "price": "Цена",
         "trend": "Тренд",
+        "trend_hint": "Восходящий и нисходящий тренд",
         "percent": "Процент, %",
         "save": "Сохранить",
         "reset": "Очистить",
@@ -112,6 +113,7 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "product": "Product",
         "price": "Price",
         "trend": "Trend",
+        "trend_hint": "Upward or downward trend",
         "percent": "Percent, %",
         "save": "Save",
         "reset": "Reset",
@@ -576,6 +578,81 @@ BASE_HTML = r"""
       min-width: 52px;
       text-align: right;
     }
+    .trend-field {
+      margin-top: 18px;
+    }
+    .trend-caption {
+      display: block;
+      font-size: 13px;
+      color: #e2e8f0;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      margin-bottom: 10px;
+    }
+    .trend-toggle {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .trend-option {
+      position: relative;
+      flex: 1 1 140px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(8, 13, 23, 0.65);
+      cursor: pointer;
+      transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+    }
+    .trend-option:hover {
+      border-color: rgba(59, 130, 246, 0.45);
+      background: rgba(15, 23, 42, 0.85);
+    }
+    .trend-option.active.up {
+      border-color: rgba(34, 197, 94, 0.8);
+      background: rgba(34, 197, 94, 0.12);
+      box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.35);
+    }
+    .trend-option.active.down {
+      border-color: rgba(248, 113, 113, 0.85);
+      background: rgba(248, 113, 113, 0.12);
+      box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.35);
+    }
+    .trend-option input[type="checkbox"] {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .trend-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(148, 163, 184, 0.16);
+    }
+    .trend-option svg {
+      width: 22px;
+      height: 22px;
+    }
+    .trend-option.up svg {
+      fill: #22c55e;
+    }
+    .trend-option.down svg {
+      fill: #f87171;
+    }
+    .trend-option .trend-text {
+      font-weight: 600;
+      color: #e2e8f0;
+      letter-spacing: 0.02em;
+    }
+    .trend-option.active .trend-icon {
+      background: rgba(15, 23, 42, 0.95);
+    }
     .spacer {
       height: 10px;
     }
@@ -747,14 +824,6 @@ BASE_HTML = r"""
                 <input name="price" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" required />
               </div>
               <div style="flex:1">
-                <label>{{ t['trend'] }}</label>
-                <select name="trend">
-                  <option value="up">{{ t['trend_up'] }}</option>
-                  <option value="flat" selected>{{ t['trend_flat'] }}</option>
-                  <option value="down">{{ t['trend_down'] }}</option>
-                </select>
-              </div>
-              <div style="flex:1">
                 <label for="percent-slider">{{ t['percent'] }}</label>
                 <div class="percent-control">
                   <button type="button" class="percent-btn" data-percent-delta="-1">-1%</button>
@@ -767,6 +836,30 @@ BASE_HTML = r"""
                   <button type="button" class="percent-preset" data-percent-value="100">100%</button>
                   <button type="button" class="percent-preset" data-percent-value="120">120%</button>
                 </div>
+              </div>
+            </div>
+            <div class="trend-field">
+              <span class="trend-caption">{{ t['trend_hint'] }}</span>
+              <input type="hidden" name="trend" value="flat" data-trend-input="true" />
+              <div class="trend-toggle" role="group" aria-label="{{ t['trend'] }}">
+                <label class="trend-option up" data-trend-option="up" role="checkbox" aria-checked="false" tabindex="0">
+                  <input type="checkbox" data-trend-toggle="up" />
+                  <span class="trend-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                      <path d="M12 5l7 7h-4v7h-6v-7H5l7-7z"></path>
+                    </svg>
+                  </span>
+                  <span class="trend-text">{{ t['trend_up'] }}</span>
+                </label>
+                <label class="trend-option down" data-trend-option="down" role="checkbox" aria-checked="false" tabindex="0">
+                  <input type="checkbox" data-trend-toggle="down" />
+                  <span class="trend-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                      <path d="M12 19l-7-7h4V5h6v7h4l-7 7z"></path>
+                    </svg>
+                  </span>
+                  <span class="trend-text">{{ t['trend_down'] }}</span>
+                </label>
               </div>
             </div>
             <div class="spacer"></div>
@@ -883,6 +976,13 @@ const tabButtons = Array.from(document.querySelectorAll('[data-tab-target]'));
 const tabPanels = Array.from(document.querySelectorAll('.tab-panel'));
 const addForm = document.getElementById('add-form');
 const saveButton = addForm ? addForm.querySelector('button[type="submit"]') : null;
+const priceInput = addForm ? addForm.querySelector('input[name="price"]') : null;
+const trendInput = addForm ? addForm.querySelector('input[data-trend-input]') : null;
+const trendToggleInputs = addForm ? Array.from(addForm.querySelectorAll('input[data-trend-toggle]')) : [];
+const trendOptionLabels = addForm ? Array.from(addForm.querySelectorAll('[data-trend-option]')) : [];
+const cityInput = document.getElementById('city');
+const productInput = document.getElementById('product');
+const productionCheckbox = addForm ? addForm.querySelector('input[name="is_production_city"]') : null;
 
 function sanitizeNumeric(value){
   if(value === null || value === undefined){ return ''; }
@@ -1146,6 +1246,7 @@ if(addForm){
   addForm.addEventListener('reset', () => {
     setTimeout(() => {
       setSliderValue(sliderMeta.defaultValue);
+      setTrendValue(trendInput ? trendInput.defaultValue : 'flat');
     }, 0);
   });
 }
@@ -1166,11 +1267,46 @@ document.querySelectorAll('.percent-preset').forEach(btn => {
   });
 });
 
-const cityInput = document.getElementById('city');
-const productInput = document.getElementById('product');
-const priceInput = addForm ? addForm.querySelector('input[name="price"]') : null;
-const trendSelect = addForm ? addForm.querySelector('select[name="trend"]') : null;
-const productionCheckbox = addForm ? addForm.querySelector('input[name="is_production_city"]') : null;
+function normalizeTrend(value){
+  return value === 'up' || value === 'down' ? value : 'flat';
+}
+
+function setTrendValue(value){
+  if(!trendInput){ return; }
+  const normalized = normalizeTrend(value);
+  trendInput.value = normalized;
+  trendToggleInputs.forEach((checkbox) => {
+    const match = checkbox.dataset.trendToggle === normalized;
+    checkbox.checked = match;
+  });
+  trendOptionLabels.forEach((label) => {
+    const match = label.dataset.trendOption === normalized;
+    label.classList.toggle('active', match);
+    label.setAttribute('aria-checked', match ? 'true' : 'false');
+  });
+}
+
+if(trendToggleInputs.length){
+  trendToggleInputs.forEach((checkbox) => {
+    checkbox.addEventListener('change', () => {
+      const targetValue = checkbox.checked ? checkbox.dataset.trendToggle : 'flat';
+      setTrendValue(targetValue);
+    });
+  });
+  trendOptionLabels.forEach((label) => {
+    label.addEventListener('keydown', (event) => {
+      if(event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar'){
+        event.preventDefault();
+        const checkbox = label.querySelector('input[data-trend-toggle]');
+        if(!checkbox){ return; }
+        const willActivate = !checkbox.checked;
+        setTrendValue(willActivate ? checkbox.dataset.trendToggle : 'flat');
+      }
+    });
+  });
+  setTrendValue(trendInput ? trendInput.value : 'flat');
+}
+
 let latestRequestId = 0;
 let autofillTimer = null;
 
@@ -1184,9 +1320,7 @@ function applyEntryToForm(dataset){
   if(priceInput){
     priceInput.value = sanitizeNumeric(dataset.price);
   }
-  if(trendSelect && dataset.trend){
-    trendSelect.value = dataset.trend;
-  }
+  setTrendValue(dataset.trend);
   if(productionCheckbox){
     productionCheckbox.checked = dataset.production === '1' || dataset.production === 'true';
   }
@@ -1222,8 +1356,8 @@ async function autofillLatestEntry(){
       if(priceInput && data.price !== null && data.price !== undefined){
         priceInput.value = sanitizeNumeric(data.price);
       }
-      if(trendSelect && typeof data.trend === 'string'){
-        trendSelect.value = data.trend;
+      if(typeof data.trend === 'string'){
+        setTrendValue(data.trend);
       }
       if(productionCheckbox){
         productionCheckbox.checked = Boolean(data.is_production_city);
