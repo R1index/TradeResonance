@@ -807,6 +807,17 @@ BASE_HTML = r"""
         max-height: 420px;
       }
     }
+    @media (max-width: 900px) {
+      .container {
+        padding: 18px;
+      }
+      .card {
+        padding: 18px;
+      }
+      .tabs {
+        gap: 10px;
+      }
+    }
     @media (max-width: 640px) {
       body {
         padding: 10px 0;
@@ -828,14 +839,51 @@ BASE_HTML = r"""
       .topbar .clock-display {
         margin: 0;
       }
+      .tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        gap: 10px;
+        padding-bottom: 6px;
+        margin: 0 -12px 18px;
+        padding-inline: 12px;
+        scrollbar-width: thin;
+      }
+      .tabs::-webkit-scrollbar {
+        height: 4px;
+      }
+      .tabs::-webkit-scrollbar-thumb {
+        background: rgba(148, 163, 184, 0.35);
+        border-radius: 999px;
+      }
+      .tab-button {
+        flex: 0 0 auto;
+        font-size: 12px;
+        padding: 8px 12px;
+        white-space: nowrap;
+      }
+      .tab-panels {
+        gap: 14px;
+      }
+      .card {
+        padding: 16px;
+      }
       .row.wrap {
         gap: 12px;
       }
       .row.wrap > * {
         flex: 1 1 160px;
       }
+      .tab-panel .row {
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: stretch;
+      }
+      .tab-panel .row > * {
+        flex: 1 1 100%;
+      }
       .actions {
         flex-wrap: wrap;
+        gap: 10px;
       }
       .actions button {
         flex: 1 1 160px;
@@ -843,12 +891,50 @@ BASE_HTML = r"""
       .percent-control {
         gap: 6px;
       }
+      .table-scroll {
+        margin: 12px -12px 0;
+        border-radius: 12px;
+      }
+      .table-scroll table {
+        min-width: 480px;
+      }
       table {
         font-size: 13px;
       }
       th,
       td {
         padding: 8px 10px;
+      }
+    }
+    @media (max-width: 480px) {
+      body {
+        padding: 6px 0;
+      }
+      .container {
+        padding: 10px;
+      }
+      h1 {
+        font-size: 18px;
+      }
+      h2 {
+        font-size: 15px;
+      }
+      label {
+        font-size: 12px;
+      }
+      input,
+      select,
+      button {
+        font-size: 14px;
+      }
+      .clock-display {
+        font-size: 16px;
+      }
+      .password-box {
+        min-width: 0;
+      }
+      .latest-autofill__content {
+        font-size: 12px;
       }
     }
   </style>
@@ -886,7 +972,7 @@ BASE_HTML = r"""
       <section class="tab-panel active" id="tab-add" role="tabpanel" aria-labelledby="tab-btn-add">
         <div class="card">
           <h2>{{ t['add_record'] }}</h2>
-          <form id="add-form" data-require-message="{{ t['password_required'] }}" hx-post="{{ url_for('add_entry', lang=lang) }}" hx-target="#entries, #routes" hx-select="#entries, #routes" hx-swap="outerHTML" hx-trigger="submit" hx-on::after-request="if(event.detail.successful){this.reset();}" hx-on::response-error="alert(event.detail.xhr.responseText || 'Save failed')">
+          <form id="add-form" data-require-message="{{ t['password_required'] }}" hx-post="{{ url_for('add_entry', lang=lang) }}" hx-target="#entries, #routes" hx-select="#entries, #routes" hx-swap="outerHTML" hx-trigger="submit" hx-on::response-error="alert(event.detail.xhr.responseText || 'Save failed')">
             <input type="hidden" name="password" data-password-field="true" />
             <label>{{ t['city'] }}</label>
             <input id="city" name="city" list="cities" placeholder="Berlin" autocomplete="off" required />
@@ -1558,6 +1644,34 @@ if(addForm){
       setSliderValue(sliderMeta.defaultValue);
       setTrendValue(trendInput ? trendInput.defaultValue : 'flat');
     }, 0);
+  });
+  addForm.addEventListener('htmx:beforeRequest', () => {
+    if(cityInput){
+      addForm.dataset.lastCityValue = cityInput.value;
+    }
+  });
+  addForm.addEventListener('htmx:afterRequest', (event) => {
+    if(!event.detail || !event.detail.successful){
+      return;
+    }
+    const preservedCity = addForm.dataset.lastCityValue || (cityInput ? cityInput.value : '');
+    addForm.reset();
+    syncPasswordFields();
+    const schedule = window.requestAnimationFrame ? window.requestAnimationFrame.bind(window) : (cb) => setTimeout(cb, 0);
+    schedule(() => {
+      if(cityInput){
+        cityInput.value = preservedCity;
+        cityInput.dispatchEvent(new Event('input', { bubbles: true }));
+        if(preservedCity){
+          cityInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+      if(productInput){
+        productInput.value = '';
+        productInput.focus();
+      }
+      delete addForm.dataset.lastCityValue;
+    });
   });
 }
 
