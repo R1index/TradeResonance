@@ -76,6 +76,7 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "choose_pair": "Выберите город и товар",
         "lang_toggle": "EN",
         "export": "Экспорт CSV",
+        "import": "Импорт CSV",
         "search": "Найти",
         "product_lookup": "Цены по товарам",
         "product_lookup_placeholder": "Введите товар",
@@ -86,6 +87,10 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "sort_price_low": "Цена ↑",
         "sort_price_high": "Цена ↓",
         "entries_count": "записей",
+        "city_products": "Товары города",
+        "city_products_hint": "Выберите город и нажмите \"Найти\".",
+        "city_products_no_data": "Нет данных о производстве выбранного города.",
+        "city_products_for": "Производство города",
     },
     "en": {
         "title": "Profit Routes",
@@ -117,6 +122,7 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "choose_pair": "Select city & product",
         "lang_toggle": "RU",
         "export": "Export CSV",
+        "import": "Import CSV",
         "search": "Search",
         "product_lookup": "Prices by product",
         "product_lookup_placeholder": "Enter product",
@@ -127,6 +133,10 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "sort_price_low": "Price ↑",
         "sort_price_high": "Price ↓",
         "entries_count": "entries",
+        "city_products": "City production",
+        "city_products_hint": "Choose a city and press \"Search\".",
+        "city_products_no_data": "No production data for the selected city.",
+        "city_products_for": "City production for",
     },
 }
 
@@ -364,6 +374,33 @@ BASE_HTML = r"""
     .row.wrap > * {
       flex: 1 1 220px;
     }
+    .topbar .row {
+      align-items: center;
+    }
+    .topbar form {
+      margin: 0;
+    }
+    .link-button {
+      width: auto;
+      background: none;
+      border: none;
+      color: #a7f3d0;
+      cursor: pointer;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      padding: 0;
+      font-size: 14px;
+      display: inline-flex;
+      align-items: center;
+      text-decoration: none;
+    }
+    .link-button:hover {
+      color: #86efac;
+    }
+    .link-button:focus {
+      outline: none;
+      color: #86efac;
+    }
     .muted {
       color: var(--muted);
       font-size: 12px;
@@ -474,6 +511,11 @@ BASE_HTML = r"""
       <div class="row">
         <a class="link" href="{{ url_for('index', lang=toggle_lang) }}" onclick="document.cookie='lang={{ toggle_lang }};path=/';">{{ t['lang_toggle'] }}</a>
         <span style="width:10px"></span>
+        <form id="import-form" hx-post="{{ url_for('import_csv_route') }}" hx-target="#entries, #routes" hx-select="#entries, #routes" hx-swap="outerHTML" hx-trigger="change from:#import-file" hx-encoding="multipart/form-data" hx-on::after-request="if(event.detail.successful){ this.reset(); }" hx-on::response-error="alert(event.detail.xhr.responseText || 'Import failed')">
+          <input id="import-file" type="file" name="file" accept=".csv" hidden />
+          <button type="button" class="link-button" onclick="document.getElementById('import-file').click();">{{ t['import'] }}</button>
+        </form>
+        <span style="width:10px"></span>
         <a class="link" href="{{ url_for('export_csv') }}">{{ t['export'] }}</a>
       </div>
     </div>
@@ -567,6 +609,24 @@ BASE_HTML = r"""
         <div id="product-lookup-results" class="muted">{{ t['product_lookup_hint'] }}</div>
       </div>
 
+      <div class="card" id="city-production">
+        <h2>{{ t['city_products'] }}</h2>
+        <form id="city-production-form" hx-get="{{ url_for('city_products', lang=lang) }}" hx-target="#city-production-results" hx-swap="outerHTML" hx-trigger="submit, change from:#production-city">
+          <div class="row wrap">
+            <div style="flex:1">
+              <label for="production-city">{{ t['city'] }}</label>
+              <input id="production-city" name="city" list="production-cities" placeholder="{{ t['city'] }}" autocomplete="off" required />
+              <datalist id="production-cities">{% for c in cities %}<option value="{{ c }}">{% endfor %}</datalist>
+            </div>
+          </div>
+          <div class="actions">
+            <button type="submit">{{ t['search'] }}</button>
+          </div>
+        </form>
+        <div class="spacer"></div>
+        <div id="city-production-results" class="muted">{{ t['city_products_hint'] }}</div>
+      </div>
+
     </div>
   </div>
 
@@ -590,6 +650,7 @@ bindTypeahead('chart-product','chart-products','product');
 bindTypeahead('city','cities','city');
 bindTypeahead('product','products','product');
 bindTypeahead('lookup-product','lookup-products','product');
+bindTypeahead('production-city','production-cities','city');
 
 // ---- Trend chart ----
 let chart;
@@ -775,6 +836,45 @@ PRODUCT_PRICES_TABLE = r"""
 </div>
 """
 
+CITY_PRODUCTS_TABLE = r"""
+<div id="city-production-results">
+  {% if city %}
+    <p class="muted">{{ t['city_products_for'] }} "{{ city }}"</p>
+  {% endif %}
+  {% if items %}
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>{{ t['product'] }}</th>
+          <th class="right">{{ t['price'] }}</th>
+          <th>{{ t['trend'] }}</th>
+          <th class="right">{{ t['percent'] }}</th>
+          <th>{{ t['when'] }}</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for e in items %}
+        <tr>
+          <td>{{ e['product'] }}</td>
+          <td class="right">{{ '%.0f'|format(e['price']) }}</td>
+          <td>
+            {% set tcode = e['trend'] or 'flat' %}
+            <span class="pill {{ tcode }}">{{ { 'up': t['trend_up'], 'down': t['trend_down'], 'flat': t['trend_flat'] }[tcode] }}</span>
+          </td>
+          <td class="right">{{ ('%.0f%%'|format(e['percent'])) if e['percent'] is not none else '—' }}</td>
+          <td class="nowrap">{{ e['created_at'][:19].replace('T',' ') }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <p class="muted">{{ message }}</p>
+  {% endif %}
+</div>
+"""
+
 # ---------------------- Queries & logic ----------------------
 
 def distinct_values(field: str, limit: int | None = None) -> List[str]:
@@ -861,6 +961,21 @@ def product_latest_prices(product: str, sort: str = "asc") -> List[Dict[str, Any
     """
     with get_conn() as conn:
         rows = conn.execute(sql, (product, product)).fetchall()
+    return rows_to_dicts(rows)
+
+
+def city_production_products(city: str) -> List[Dict[str, Any]]:
+    sql = r"""
+    WITH latest AS (
+      SELECT DISTINCT ON (product) e.*
+      FROM entries e
+      WHERE e.city = %s AND e.is_production_city IS TRUE
+      ORDER BY product, created_at DESC
+    )
+    SELECT * FROM latest ORDER BY product ASC
+    """
+    with get_conn() as conn:
+        rows = conn.execute(sql, (city,)).fetchall()
     return rows_to_dicts(rows)
 
 # ---------------------- Routes ----------------------
@@ -962,6 +1077,31 @@ def product_prices():
     )
 
 
+@app.get("/city-products")
+def city_products():
+    lang = get_lang()
+    city = (request.args.get("city") or "").strip()
+    if not city:
+        message = STRINGS[lang]["city_products_hint"]
+        return render_template_string(
+            CITY_PRODUCTS_TABLE,
+            items=[],
+            city=None,
+            message=message,
+            t=STRINGS[lang],
+        )
+
+    rows = city_production_products(city)
+    message = STRINGS[lang]["city_products_no_data"]
+    return render_template_string(
+        CITY_PRODUCTS_TABLE,
+        items=rows,
+        city=city,
+        message=message,
+        t=STRINGS[lang],
+    )
+
+
 @app.get("/routes")
 def routes_view():
     return render_template_string(ROUTES_TABLE, routes=compute_routes(), t=STRINGS[get_lang()])
@@ -1005,6 +1145,86 @@ def series_json():
             item["ts"] = _as_utc(ts).isoformat(timespec="seconds")
         data.append(item)
     return jsonify(data)
+
+
+@app.post("/import.csv")
+def import_csv_route():
+    lang = get_lang()
+    uploaded = request.files.get("file")
+    if not uploaded or uploaded.filename == "":
+        return make_response("CSV file required", 400)
+
+    try:
+        content = uploaded.read().decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return make_response("CSV must be UTF-8", 400)
+
+    if not content.strip():
+        return make_response("Empty CSV", 400)
+
+    reader = csv.DictReader(io.StringIO(content))
+    if reader.fieldnames is None:
+        return make_response("Missing CSV header", 400)
+
+    rows: List[tuple[Any, ...]] = []
+    for row in reader:
+        city = (row.get("city") or "").strip()
+        product = (row.get("product") or "").strip()
+        price_raw = str(row.get("price") or "").replace(",", ".").strip()
+        if not city or not product or not price_raw:
+            continue
+        try:
+            price = float(price_raw)
+        except ValueError:
+            continue
+        if price < 0:
+            continue
+
+        trend = (row.get("trend") or "flat").strip().lower()
+        if trend not in ("up", "down", "flat"):
+            trend = "flat"
+
+        percent_raw = row.get("percent")
+        percent = None
+        if percent_raw not in (None, ""):
+            try:
+                percent = float(str(percent_raw).replace(",", "."))
+            except ValueError:
+                percent = None
+
+        is_prod_raw = row.get("is_production_city")
+        is_production = False
+        if isinstance(is_prod_raw, str):
+            is_production = is_prod_raw.strip().lower() in {"1", "true", "yes", "y", "да"}
+        elif is_prod_raw is not None:
+            is_production = bool(is_prod_raw)
+
+        created_raw = row.get("created_at") or row.get("timestamp")
+        created_at = datetime.now(timezone.utc)
+        if created_raw:
+            try:
+                created_at = datetime.fromisoformat(str(created_raw).strip())
+            except ValueError:
+                created_at = datetime.now(timezone.utc)
+        created_at = _as_utc(created_at)
+
+        rows.append((city, product, price, trend, percent, is_production, created_at))
+
+    if not rows:
+        return make_response("No valid rows found", 400)
+
+    sql = (
+        "INSERT INTO entries(city, product, price, trend, percent, is_production_city, created_at) "
+        "VALUES (%s,%s,%s,%s,%s,%s,%s)"
+    )
+    with get_conn() as conn:
+        for record in rows:
+            conn.execute(sql, record)
+
+    entries_html = render_template_string(ENTRIES_TABLE, items=latest_prices_view(), t=STRINGS[lang])
+    routes_html = render_template_string(ROUTES_TABLE, routes=compute_routes(), t=STRINGS[lang])
+    return entries_html + routes_html
+
 
 @app.get("/export.csv")
 def export_csv():
