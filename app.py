@@ -99,7 +99,6 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "city_products_hint": "Выберите город и нажмите \"Найти\".",
         "city_products_no_data": "Нет данных о производстве выбранного города.",
         "city_products_for": "Производство города",
-        "quick_fill_hint": "Недавние сочетания — нажмите, чтобы подставить",
         "password_placeholder": "Пароль доступа",
         "password_hint": "Пароль нужен для сохранения и работы с CSV.",
         "password_required": "Введите пароль доступа",
@@ -151,7 +150,6 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "city_products_hint": "Choose a city and press \"Search\".",
         "city_products_no_data": "No production data for the selected city.",
         "city_products_for": "City production for",
-        "quick_fill_hint": "Recent combos — click to autofill",
         "password_placeholder": "Access password",
         "password_hint": "Password is required for saving and CSV actions.",
         "password_required": "Enter the access password",
@@ -564,33 +562,6 @@ BASE_HTML = r"""
       transform: translateY(-1px);
       box-shadow: 0 12px 18px rgba(34, 197, 94, 0.2);
     }
-    .quick-fill {
-      margin-top: 16px;
-    }
-    .quick-fill[hidden] {
-      display: none;
-    }
-    .quick-fill-buttons {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 8px;
-    }
-    .quick-fill-btn {
-      width: auto;
-      padding: 6px 12px;
-      border-radius: 999px;
-      background: rgba(59, 130, 246, 0.14);
-      color: #bfdbfe;
-      border: 1px solid rgba(59, 130, 246, 0.28);
-      cursor: pointer;
-      font-size: 12px;
-      transition: transform 0.15s ease, box-shadow 0.2s ease;
-    }
-    .quick-fill-btn:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 12px 18px rgba(59, 130, 246, 0.2);
-    }
     .password-box {
       display: flex;
       flex-direction: column;
@@ -770,15 +741,10 @@ BASE_HTML = r"""
             <input id="product" name="product" list="products" placeholder="Copper" autocomplete="off" required />
             <datalist id="products">{% for p in products %}<option value="{{ p }}">{% endfor %}</datalist>
 
-            <div id="quick-fill" class="quick-fill" hidden>
-              <span class="muted">{{ t['quick_fill_hint'] }}</span>
-              <div id="quick-fill-buttons" class="quick-fill-buttons"></div>
-            </div>
-
             <div class="row wrap">
               <div style="flex:1">
                 <label>{{ t['price'] }}</label>
-                <input name="price" inputmode="decimal" placeholder="0" required />
+                <input name="price" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" required />
               </div>
               <div style="flex:1">
                 <label>{{ t['trend'] }}</label>
@@ -913,12 +879,18 @@ bindTypeahead('production-city','production-cities','city');
 const adminPasswordInput = document.getElementById('admin-password');
 const importForm = document.getElementById('import-form');
 const exportLink = document.getElementById('export-link');
-const quickFillWrapper = document.getElementById('quick-fill');
-const quickFillButtons = document.getElementById('quick-fill-buttons');
 const tabButtons = Array.from(document.querySelectorAll('[data-tab-target]'));
 const tabPanels = Array.from(document.querySelectorAll('.tab-panel'));
 const addForm = document.getElementById('add-form');
 const saveButton = addForm ? addForm.querySelector('button[type="submit"]') : null;
+
+function sanitizeNumeric(value){
+  if(value === null || value === undefined){ return ''; }
+  const normalized = String(value).replace(',', '.').trim();
+  if(!normalized){ return ''; }
+  const match = normalized.match(/^\d+(?:\.\d+)?/);
+  return match ? match[0] : '';
+}
 
 function passwordMessage(target){
   return (target && target.dataset && target.dataset.requireMessage)
@@ -1200,23 +1172,17 @@ const priceInput = addForm ? addForm.querySelector('input[name="price"]') : null
 const trendSelect = addForm ? addForm.querySelector('select[name="trend"]') : null;
 const productionCheckbox = addForm ? addForm.querySelector('input[name="is_production_city"]') : null;
 let latestRequestId = 0;
-
-function cleanNumericTail(value){
-  if(value === null || value === undefined){ return ''; }
-  return String(value).trim().replace(/[.,]+$/, '');
-}
+let autofillTimer = null;
 
 function applyEntryToForm(dataset){
   if(cityInput){
     cityInput.value = dataset.city || '';
-    cityInput.dispatchEvent(new Event('input', { bubbles: true }));
   }
   if(productInput){
     productInput.value = dataset.product || '';
-    productInput.dispatchEvent(new Event('input', { bubbles: true }));
   }
   if(priceInput){
-    priceInput.value = cleanNumericTail(dataset.price);
+    priceInput.value = sanitizeNumeric(dataset.price);
   }
   if(trendSelect && dataset.trend){
     trendSelect.value = dataset.trend;
@@ -1225,43 +1191,9 @@ function applyEntryToForm(dataset){
     productionCheckbox.checked = dataset.production === '1' || dataset.production === 'true';
   }
   setSliderValue(dataset.percent);
-  autofillLatestEntry();
+  queueAutofillLatestEntry();
 }
-
-function rebuildQuickFill(){
-  if(!quickFillWrapper || !quickFillButtons){ return; }
-  const fragment = document.createDocumentFragment();
-  const seen = new Set();
-  const rows = Array.from(document.querySelectorAll('#entries tr.entry-row'));
-  for(const row of rows){
-    const city = row.dataset.city || '';
-    const product = row.dataset.product || '';
-    if(!city || !product){ continue; }
-    const key = `${city}__${product}`;
-    if(seen.has(key)){ continue; }
-    seen.add(key);
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'quick-fill-btn';
-    btn.textContent = `${city} · ${product}`;
-    btn.dataset.city = city;
-    btn.dataset.product = product;
-    btn.dataset.price = cleanNumericTail(row.dataset.price || '');
-    btn.dataset.trend = row.dataset.trend || '';
-    btn.dataset.percent = row.dataset.percent || '';
-    btn.dataset.production = row.dataset.production || '';
-    btn.addEventListener('click', () => applyEntryToForm(btn.dataset));
-    fragment.appendChild(btn);
-    if(seen.size >= 6){ break; }
-  }
-  quickFillButtons.replaceChildren(fragment);
-  quickFillWrapper.hidden = seen.size === 0;
-}
-
 document.body.addEventListener('htmx:afterSwap', (event) => {
-  if(event.target && event.target.id === 'entries'){
-    rebuildQuickFill();
-  }
   if(adminPasswordInput){
     syncPasswordFields();
   }
@@ -1273,8 +1205,6 @@ document.body.addEventListener('click', (event) => {
     applyEntryToForm(row.dataset);
   }
 });
-
-rebuildQuickFill();
 
 async function autofillLatestEntry(){
   if(!cityInput || !productInput){ return; }
@@ -1290,7 +1220,7 @@ async function autofillLatestEntry(){
     if(requestId !== latestRequestId){ return; }
     if(data && data.found){
       if(priceInput && data.price !== null && data.price !== undefined){
-        priceInput.value = cleanNumericTail(data.price);
+        priceInput.value = sanitizeNumeric(data.price);
       }
       if(trendSelect && typeof data.trend === 'string'){
         trendSelect.value = data.trend;
@@ -1305,17 +1235,27 @@ async function autofillLatestEntry(){
   }
 }
 
+function queueAutofillLatestEntry(){
+  if(autofillTimer){
+    clearTimeout(autofillTimer);
+  }
+  autofillTimer = setTimeout(() => {
+    autofillTimer = null;
+    autofillLatestEntry();
+  }, 120);
+}
+
 if(cityInput){
-  cityInput.addEventListener('change', autofillLatestEntry);
-  cityInput.addEventListener('blur', autofillLatestEntry);
+  cityInput.addEventListener('input', queueAutofillLatestEntry);
+  cityInput.addEventListener('change', queueAutofillLatestEntry);
 }
 if(productInput){
-  productInput.addEventListener('change', autofillLatestEntry);
-  productInput.addEventListener('blur', autofillLatestEntry);
+  productInput.addEventListener('input', queueAutofillLatestEntry);
+  productInput.addEventListener('change', queueAutofillLatestEntry);
 }
 
 if(cityInput && productInput && cityInput.value && productInput.value){
-  autofillLatestEntry();
+  queueAutofillLatestEntry();
 }
 
 wireChartSelectors();
