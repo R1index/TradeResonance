@@ -21,14 +21,20 @@ from datetime import datetime, timezone
 from typing import List, Dict, Any, Iterable, Mapping
 
 from flask import (
-    Flask, request, redirect, url_for, jsonify, make_response,
-    render_template_string, abort
+    Flask,
+    Response,
+    abort,
+    jsonify,
+    make_response,
+    render_template_string,
+    request,
+    url_for,
 )
 
 import psycopg
 from psycopg.rows import dict_row
 
-APP_TITLE = "Trade Resonance | Profit Routes"
+APP_TITLE = "Trade Resonance"
 DATABASE_URL = (
     os.environ.get("DATABASE_URL")
     or os.environ.get("RAILWAY_DATABASE_URL")
@@ -200,6 +206,27 @@ def password_matches(submitted: str | None) -> bool:
     return True
 
 
+def submitted_password() -> str:
+    """Считывает пароль из формы, query string или заголовка."""
+
+    candidates = (
+        request.values.get("password"),
+        request.headers.get("X-Access-Password"),
+    )
+    for value in candidates:
+        if value:
+            return value.strip()
+    return ""
+
+
+def ensure_password(lang: str) -> Response | None:
+    """Проверяет пароль и возвращает ответ 403 при ошибке."""
+
+    if not password_matches(submitted_password()):
+        return make_response(STRINGS[lang]["password_invalid"], 403)
+    return None
+
+
 def _as_utc(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
@@ -216,6 +243,18 @@ def _normalize_row(row: Dict[str, Any]) -> Dict[str, Any]:
 
 def rows_to_dicts(rows: Iterable[Mapping[str, Any]]) -> List[Dict[str, Any]]:
     return [_normalize_row(r) for r in rows]
+
+
+def render_fragment(template: str, lang: str, **context: Any) -> str:
+    ctx = dict(context)
+    ctx.setdefault("t", STRINGS[lang])
+    return render_template_string(template, **ctx)
+
+
+def render_entries_and_routes(lang: str) -> str:
+    entries_html = render_fragment(ENTRIES_TABLE, lang, items=latest_prices_view())
+    routes_html = render_fragment(ROUTES_TABLE, lang, routes=compute_routes())
+    return entries_html + routes_html
 
 # ---------------------- HTML (Jinja2) ----------------------
 
@@ -1040,6 +1079,31 @@ const percentSlider = document.getElementById('percent-slider');
 const percentDisplay = document.getElementById('percent-display');
 const addForm = document.getElementById('add-form');
 
+function sliderMetaFactory(){
+  if(!percentSlider){
+    return { min: null, max: null, defaultValue: null };
+  }
+  const parse = (value) => {
+    if(value === null || value === undefined || value === ''){
+      return null;
+    }
+    const num = Number(value);
+    return Number.isNaN(num) ? null : num;
+  };
+  const min = parse(percentSlider.getAttribute('min'));
+  const max = parse(percentSlider.getAttribute('max'));
+  let defaultValue = parse(percentSlider.getAttribute('value'));
+  if(defaultValue === null){
+    defaultValue = parse(percentSlider.defaultValue);
+  }
+  if(defaultValue === null){
+    defaultValue = 100;
+  }
+  return { min, max, defaultValue };
+}
+
+const sliderMeta = sliderMetaFactory();
+
 attachPasswordGuard(addForm);
 attachPasswordGuard(importForm);
 
@@ -1047,6 +1111,47 @@ function updatePercentDisplay(){
   if(percentSlider && percentDisplay){
     percentDisplay.textContent = `${percentSlider.value}%`;
   }
+}
+
+function setSliderValue(rawValue, options){
+  if(!percentSlider){ return; }
+  const opts = Object.assign({ fallback: sliderMeta.defaultValue }, options || {});
+  let value = null;
+  if(typeof rawValue === 'number' && !Number.isNaN(rawValue)){
+    value = rawValue;
+  } else if(typeof rawValue === 'string'){
+    const trimmed = rawValue.trim();
+    if(trimmed !== ''){
+      const parsed = Number(trimmed);
+      if(!Number.isNaN(parsed)){
+        value = parsed;
+      }
+    }
+  } else if(rawValue !== undefined && rawValue !== null){
+    const parsed = Number(rawValue);
+    if(!Number.isNaN(parsed)){
+      value = parsed;
+    }
+  }
+  if(value === null){
+    const fallback = opts.fallback;
+    if(fallback === undefined || fallback === null){
+      return;
+    }
+    const parsedFallback = Number(fallback);
+    if(Number.isNaN(parsedFallback)){
+      return;
+    }
+    value = parsedFallback;
+  }
+  if(sliderMeta.min !== null){
+    value = Math.max(sliderMeta.min, value);
+  }
+  if(sliderMeta.max !== null){
+    value = Math.min(sliderMeta.max, value);
+  }
+  percentSlider.value = String(value);
+  percentSlider.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 if(percentSlider){
@@ -1058,11 +1163,7 @@ updatePercentDisplay();
 if(addForm){
   addForm.addEventListener('reset', () => {
     setTimeout(() => {
-      if(percentSlider){
-        const defaultValue = percentSlider.getAttribute('value') || percentSlider.defaultValue || '100';
-        percentSlider.value = defaultValue;
-      }
-      updatePercentDisplay();
+      setSliderValue(sliderMeta.defaultValue);
     }, 0);
   });
 }
@@ -1072,33 +1173,14 @@ document.querySelectorAll('[data-percent-delta]').forEach(btn => {
     if(!percentSlider){ return; }
     const delta = Number(btn.dataset.percentDelta || 0);
     if(Number.isNaN(delta)){ return; }
-    const minAttr = percentSlider.getAttribute('min');
-    const maxAttr = percentSlider.getAttribute('max');
-    const min = minAttr !== null ? Number(minAttr) : null;
-    const max = maxAttr !== null ? Number(maxAttr) : null;
-    const current = Number(percentSlider.value || 0);
-    let next = current + delta;
-    if(min !== null && !Number.isNaN(min)){ next = Math.max(min, next); }
-    if(max !== null && !Number.isNaN(max)){ next = Math.min(max, next); }
-    percentSlider.value = String(next);
-    percentSlider.dispatchEvent(new Event('input', { bubbles: true }));
+    const current = Number(percentSlider.value || sliderMeta.defaultValue || 0);
+    setSliderValue(current + delta);
   });
 });
 
 document.querySelectorAll('.percent-preset').forEach(btn => {
   btn.addEventListener('click', () => {
-    if(!percentSlider){ return; }
-    const value = Number(btn.dataset.percentValue);
-    if(Number.isNaN(value)){ return; }
-    const minAttr = percentSlider.getAttribute('min');
-    const maxAttr = percentSlider.getAttribute('max');
-    const min = minAttr !== null ? Number(minAttr) : null;
-    const max = maxAttr !== null ? Number(maxAttr) : null;
-    let next = value;
-    if(min !== null && !Number.isNaN(min)){ next = Math.max(min, next); }
-    if(max !== null && !Number.isNaN(max)){ next = Math.min(max, next); }
-    percentSlider.value = String(next);
-    percentSlider.dispatchEvent(new Event('input', { bubbles: true }));
+    setSliderValue(btn.dataset.percentValue);
   });
 });
 
@@ -1132,26 +1214,13 @@ function applyEntryToForm(dataset){
   if(productionCheckbox){
     productionCheckbox.checked = dataset.production === '1' || dataset.production === 'true';
   }
-  if(percentSlider){
-    const raw = Number(dataset.percent);
-    if(!Number.isNaN(raw)){
-      const minAttr = percentSlider.getAttribute('min');
-      const maxAttr = percentSlider.getAttribute('max');
-      const min = minAttr !== null ? Number(minAttr) : null;
-      const max = maxAttr !== null ? Number(maxAttr) : null;
-      let next = raw;
-      if(min !== null && !Number.isNaN(min)){ next = Math.max(min, next); }
-      if(max !== null && !Number.isNaN(max)){ next = Math.min(max, next); }
-      percentSlider.value = String(next);
-    }
-    percentSlider.dispatchEvent(new Event('input', { bubbles: true }));
-  }
+  setSliderValue(dataset.percent);
   autofillLatestEntry();
 }
 
 function rebuildQuickFill(){
   if(!quickFillWrapper || !quickFillButtons){ return; }
-  quickFillButtons.innerHTML = '';
+  const fragment = document.createDocumentFragment();
   const seen = new Set();
   const rows = Array.from(document.querySelectorAll('#entries tr.entry-row'));
   for(const row of rows){
@@ -1172,9 +1241,10 @@ function rebuildQuickFill(){
     btn.dataset.percent = row.dataset.percent || '';
     btn.dataset.production = row.dataset.production || '';
     btn.addEventListener('click', () => applyEntryToForm(btn.dataset));
-    quickFillButtons.appendChild(btn);
+    fragment.appendChild(btn);
     if(seen.size >= 6){ break; }
   }
+  quickFillButtons.replaceChildren(fragment);
   quickFillWrapper.hidden = seen.size === 0;
 }
 
@@ -1218,22 +1288,7 @@ async function autofillLatestEntry(){
       if(productionCheckbox){
         productionCheckbox.checked = Boolean(data.is_production_city);
       }
-      if(percentSlider){
-        if(typeof data.percent === 'number' && !Number.isNaN(data.percent)){
-          const minAttr = percentSlider.getAttribute('min');
-          const maxAttr = percentSlider.getAttribute('max');
-          const min = minAttr !== null ? Number(minAttr) : null;
-          const max = maxAttr !== null ? Number(maxAttr) : null;
-          let value = Number(data.percent);
-          if(min !== null && !Number.isNaN(min)){ value = Math.max(min, value); }
-          if(max !== null && !Number.isNaN(max)){ value = Math.min(max, value); }
-          percentSlider.value = String(value);
-        } else {
-          const defaultValue = percentSlider.getAttribute('value') || percentSlider.defaultValue || '100';
-          percentSlider.value = defaultValue;
-        }
-        percentSlider.dispatchEvent(new Event('input', { bubbles: true }));
-      }
+      setSliderValue(data.percent);
     }
   } catch(err) {
     console.warn('latest entry lookup failed', err);
@@ -1552,12 +1607,17 @@ def index():
     # Начальные значения в datalist: по 50 штук
     cities = distinct_values("city", limit=50)
     products = distinct_values("product", limit=50)
-    resp = make_response(render_template_string(
-        BASE_HTML,
-        title=f"Trade Resonance | {t['title']}",
-        t=t, lang=lang, toggle_lang=toggle_lang,
-        cities=cities, products=products,
-    ))
+    resp = make_response(
+        render_fragment(
+            BASE_HTML,
+            lang,
+            title=f"{APP_TITLE} | {t['title']}",
+            lang=lang,
+            toggle_lang=toggle_lang,
+            cities=cities,
+            products=products,
+        )
+    )
     resp.set_cookie('lang', lang, max_age=60*60*24*365)
     return resp
 
@@ -1592,12 +1652,9 @@ def add_entry():
         return make_response(msg, 400)
 
     lang = get_lang()
-    password = (
-        (request.form.get("password") or "").strip()
-        or (request.headers.get("X-Access-Password") or "").strip()
-    )
-    if not password_matches(password):
-        return make_response(STRINGS[lang]["password_invalid"], 403)
+    guard = ensure_password(lang)
+    if guard is not None:
+        return guard
 
     city = (request.form.get("city") or "").strip()
     product = (request.form.get("product") or "").strip()
@@ -1636,13 +1693,12 @@ def add_entry():
         )
 
     lang = get_lang()
-    entries_html = render_template_string(ENTRIES_TABLE, items=latest_prices_view(), t=STRINGS[lang])
-    routes_html = render_template_string(ROUTES_TABLE, routes=compute_routes(), t=STRINGS[lang])
-    return entries_html + routes_html
+    return render_entries_and_routes(lang)
 
 @app.get("/entries")
 def entries_table():
-    return render_template_string(ENTRIES_TABLE, items=latest_prices_view(), t=STRINGS[get_lang()])
+    lang = get_lang()
+    return render_fragment(ENTRIES_TABLE, lang, items=latest_prices_view())
 
 
 @app.get("/product-prices")
@@ -1653,24 +1709,24 @@ def product_prices():
     sort = "desc" if sort == "desc" else "asc"
     if not product:
         message = STRINGS[lang]["product_lookup_hint"]
-        return render_template_string(
+        return render_fragment(
             PRODUCT_PRICES_TABLE,
+            lang,
             items=[],
             product=None,
             message=message,
             sort=sort,
-            t=STRINGS[lang],
         )
 
     rows = product_latest_prices(product, sort=sort)
     message = STRINGS[lang]["no_prices"]
-    return render_template_string(
+    return render_fragment(
         PRODUCT_PRICES_TABLE,
+        lang,
         items=rows,
         product=product,
         message=message,
         sort=sort,
-        t=STRINGS[lang],
     )
 
 
@@ -1680,28 +1736,29 @@ def city_products():
     city = (request.args.get("city") or "").strip()
     if not city:
         message = STRINGS[lang]["city_products_hint"]
-        return render_template_string(
+        return render_fragment(
             CITY_PRODUCTS_TABLE,
+            lang,
             items=[],
             city=None,
             message=message,
-            t=STRINGS[lang],
         )
 
     rows = city_production_products(city)
     message = STRINGS[lang]["city_products_no_data"]
-    return render_template_string(
+    return render_fragment(
         CITY_PRODUCTS_TABLE,
+        lang,
         items=rows,
         city=city,
         message=message,
-        t=STRINGS[lang],
     )
 
 
 @app.get("/routes")
 def routes_view():
-    return render_template_string(ROUTES_TABLE, routes=compute_routes(), t=STRINGS[get_lang()])
+    lang = get_lang()
+    return render_fragment(ROUTES_TABLE, lang, routes=compute_routes())
 
 @app.get("/suggest")
 def suggest():
@@ -1747,12 +1804,9 @@ def series_json():
 @app.post("/import.csv")
 def import_csv_route():
     lang = get_lang()
-    password = (
-        (request.form.get("password") or "").strip()
-        or (request.headers.get("X-Access-Password") or "").strip()
-    )
-    if not password_matches(password):
-        return make_response(STRINGS[lang]["password_invalid"], 403)
+    guard = ensure_password(lang)
+    if guard is not None:
+        return guard
 
     uploaded = request.files.get("file")
     if not uploaded or uploaded.filename == "":
@@ -1825,20 +1879,15 @@ def import_csv_route():
         for record in rows:
             conn.execute(sql, record)
 
-    entries_html = render_template_string(ENTRIES_TABLE, items=latest_prices_view(), t=STRINGS[lang])
-    routes_html = render_template_string(ROUTES_TABLE, routes=compute_routes(), t=STRINGS[lang])
-    return entries_html + routes_html
+    return render_entries_and_routes(lang)
 
 
 @app.get("/export.csv")
 def export_csv():
     lang = get_lang()
-    password = (
-        (request.args.get("password") or "").strip()
-        or (request.headers.get("X-Access-Password") or "").strip()
-    )
-    if not password_matches(password):
-        return make_response(STRINGS[lang]["password_invalid"], 403)
+    guard = ensure_password(lang)
+    if guard is not None:
+        return guard
 
     sql = "SELECT * FROM entries ORDER BY created_at DESC"
     with get_conn() as conn:
