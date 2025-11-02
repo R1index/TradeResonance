@@ -296,28 +296,161 @@ BASE_HTML = r"""
       color: var(--text);
       margin: 0;
     }
+    * {
+      box-sizing: border-box;
+    }
     .container {
       max-width: 1200px;
       margin: 0 auto;
       padding: 24px;
     }
-    .topbar {
+    .app-header {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      margin-bottom: 16px;
+      gap: 20px;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .brand-logo {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      background: linear-gradient(140deg, rgba(34,197,94,0.9), rgba(59,130,246,0.85));
+      color: #041f0f;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      box-shadow: 0 12px 24px rgba(34, 197, 94, 0.28);
+    }
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .brand-title {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+    .brand-subtitle {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+    }
+    .nav-toggle {
+      display: none;
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(8, 13, 23, 0.85);
+      color: var(--text);
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+      min-height: 0;
+    }
+    .nav-toggle:hover {
+      background: rgba(15, 23, 42, 0.95);
+      border-color: rgba(34, 197, 94, 0.35);
+      transform: none;
+      box-shadow: 0 12px 28px rgba(8, 13, 23, 0.45);
+    }
+    .nav-toggle:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.35);
+      border-color: rgba(34, 197, 94, 0.5);
+    }
+    .nav-toggle-bar {
+      position: relative;
+      width: 20px;
+      height: 2px;
+      border-radius: 999px;
+      background: var(--text);
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+    .nav-toggle-bar::before,
+    .nav-toggle-bar::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      width: 20px;
+      height: 2px;
+      border-radius: 999px;
+      background: var(--text);
+      transition: transform 0.2s ease;
+    }
+    .nav-toggle-bar::before {
+      transform: translateY(-6px);
+    }
+    .nav-toggle-bar::after {
+      transform: translateY(6px);
+    }
+    .nav-toggle[aria-expanded="true"] .nav-toggle-bar {
+      background: transparent;
+    }
+    .nav-toggle[aria-expanded="true"] .nav-toggle-bar::before {
+      transform: rotate(45deg);
+    }
+    .nav-toggle[aria-expanded="true"] .nav-toggle-bar::after {
+      transform: rotate(-45deg);
+    }
+    .nav-menu {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin-left: auto;
+    }
+    .nav-section {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .nav-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .nav-actions form {
+      margin: 0;
+    }
+    .nav-clock {
+      margin-left: auto;
+    }
+    .nav-divider {
+      width: 1px;
+      height: 32px;
+      background: var(--border);
+      opacity: 0.75;
     }
     .clock-display {
       font-family: "JetBrains Mono", "Roboto Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       font-size: 14px;
       letter-spacing: 0.08em;
       color: var(--muted);
-      padding: 6px 14px;
+      padding: 8px 16px;
       border-radius: 999px;
       border: 1px solid var(--border);
       background: rgba(8, 13, 23, 0.78);
       font-variant-numeric: tabular-nums;
-      min-width: 128px;
+      min-width: 140px;
       text-align: center;
       box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.14);
     }
@@ -329,9 +462,6 @@ BASE_HTML = r"""
       margin-top: 4px;
       color: var(--muted);
       opacity: 0.75;
-    }
-    .topbar .clock-display {
-      margin: 0 16px;
     }
     .tabs {
       display: flex;
@@ -419,6 +549,7 @@ BASE_HTML = r"""
       font-weight: 600;
       cursor: pointer;
       border: none;
+      min-height: 44px;
     }
     button:disabled {
       opacity: 0.6;
@@ -505,35 +636,59 @@ BASE_HTML = r"""
     .row.wrap > * {
       flex: 1 1 220px;
     }
-    .topbar .row {
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-      justify-content: flex-end;
+    .nav-password {
+      align-items: flex-start;
     }
-    .topbar form {
-      margin: 0;
+    .nav-password .password-box {
+      min-width: 220px;
     }
-    .link-button {
+    .nav-actions button,
+    .nav-actions .link-button,
+    .nav-actions a.link {
+      flex: 0 0 auto;
+    }
+    .link-button,
+    a.link {
       width: auto;
-      background: none;
-      border: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.88);
       color: #a7f3d0;
       cursor: pointer;
       font-weight: 600;
-      letter-spacing: 0.02em;
-      padding: 0;
+      letter-spacing: 0.03em;
       font-size: 14px;
-      display: inline-flex;
-      align-items: center;
       text-decoration: none;
+      min-height: 44px;
+      transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
     }
-    .link-button:hover {
-      color: #86efac;
+    .link-button:hover,
+    a.link:hover {
+      color: #bbf7d0;
+      border-color: rgba(34, 197, 94, 0.45);
+      background: rgba(34, 197, 94, 0.16);
+      box-shadow: 0 10px 24px rgba(34, 197, 94, 0.18);
     }
-    .link-button:focus {
+    .link-button:focus-visible,
+    a.link:focus-visible {
       outline: none;
-      color: #86efac;
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.35);
+    }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
     }
     .muted {
       color: var(--muted);
@@ -573,6 +728,7 @@ BASE_HTML = r"""
       background: rgba(34, 197, 94, 0.18);
       color: #4ade80;
       border: 1px solid rgba(34, 197, 94, 0.4);
+      min-height: 36px;
     }
     .percent-btn:hover {
       transform: translateY(-1px);
@@ -633,6 +789,7 @@ BASE_HTML = r"""
       border: 1px solid rgba(34, 197, 94, 0.28);
       cursor: pointer;
       transition: transform 0.15s ease, box-shadow 0.2s ease;
+      min-height: 36px;
     }
     .percent-preset:hover {
       transform: translateY(-1px);
@@ -730,15 +887,6 @@ BASE_HTML = r"""
     .spacer {
       height: 10px;
     }
-    a.link {
-      color: #a7f3d0;
-      text-decoration: none;
-      font-weight: 600;
-      letter-spacing: 0.02em;
-    }
-    a.link:hover {
-      color: #86efac;
-    }
     .checkbox {
       display: flex;
       align-items: center;
@@ -796,6 +944,59 @@ BASE_HTML = r"""
     details[open] .summary-icon {
       transform: rotate(180deg);
     }
+    /* Responsive navigation: below 900px the header collapses into a stacked drawer
+       controlled by the burger button so the layout stays touch-friendly on phones. */
+    @media (max-width: 900px) {
+      .app-header {
+        align-items: flex-start;
+      }
+      .nav-toggle {
+        display: inline-flex;
+      }
+      .nav-menu {
+        display: none;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 18px;
+        width: 100%;
+        padding: 18px;
+        border-radius: 20px;
+        border: 1px solid var(--border);
+        background: rgba(8, 13, 23, 0.9);
+        box-shadow: 0 18px 36px rgba(8, 13, 23, 0.5);
+      }
+      .nav-menu.open {
+        display: flex;
+      }
+      .nav-section {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+      .nav-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .nav-actions form,
+      .nav-actions a.link,
+      .nav-actions .link-button {
+        width: 100%;
+      }
+      .nav-divider {
+        width: 100%;
+        height: 1px;
+        background: rgba(148, 163, 184, 0.25);
+      }
+      .nav-password .password-box {
+        width: 100%;
+      }
+      .nav-clock {
+        margin-left: 0;
+      }
+      .nav-clock .clock-display {
+        width: 100%;
+      }
+    }
     @media (max-width: 1024px) {
       .container {
         padding: 16px;
@@ -820,10 +1021,19 @@ BASE_HTML = r"""
       h2 {
         font-size: 16px;
       }
-      .topbar {
-        flex-direction: column;
-        align-items: stretch;
+      .app-header {
         gap: 12px;
+      }
+      .brand-title {
+        font-size: 20px;
+      }
+      .brand-logo {
+        width: 40px;
+        height: 40px;
+      }
+      .nav-menu {
+        padding: 16px;
+        gap: 14px;
       }
       .tabs {
         flex-wrap: wrap;
@@ -883,24 +1093,44 @@ BASE_HTML = r"""
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="topbar">
-      <h1>{{ title }}</h1>
-      <div class="clock-display" id="live-clock" aria-live="polite">--:--:--</div>
-      <div class="row">
-        <a class="link" href="{{ url_for('index', lang=toggle_lang) }}" onclick="document.cookie='lang={{ toggle_lang }};path=/';">{{ t['lang_toggle'] }}</a>
-        <div class="password-box">
-          <input type="password" id="admin-password" placeholder="{{ t['password_placeholder'] }}" autocomplete="off" data-require-message="{{ t['password_required'] }}" />
-          <span class="password-hint">{{ t['password_hint'] }}</span>
+    <div class="container">
+      <header class="app-header">
+        <div class="brand">
+          <span class="brand-logo" aria-hidden="true">TR</span>
+          <div class="brand-text">
+            <h1 class="brand-title">{{ app_name or title }}</h1>
+            <span class="brand-subtitle">{{ t['title'] }}</span>
+          </div>
         </div>
-        <form id="import-form" data-require-message="{{ t['password_required'] }}" hx-post="{{ url_for('import_csv_route') }}" hx-target="#entries, #routes" hx-select="#entries, #routes" hx-swap="outerHTML" hx-trigger="change from:#import-file" hx-encoding="multipart/form-data" hx-on::after-request="if(event.detail.successful){ this.reset(); }" hx-on::response-error="alert(event.detail.xhr.responseText || 'Import failed')">
-          <input type="hidden" name="password" data-password-field="true" />
-          <input id="import-file" type="file" name="file" accept=".csv" hidden />
-          <button type="button" class="link-button" onclick="document.getElementById('import-file').click();">{{ t['import'] }}</button>
-        </form>
-        <a class="link" id="export-link" data-base-url="{{ url_for('export_csv') }}" data-require-message="{{ t['password_required'] }}" href="{{ url_for('export_csv') }}">{{ t['export'] }}</a>
-      </div>
-    </div>
+        <button class="nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="nav-menu">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="nav-toggle-bar" aria-hidden="true"></span>
+        </button>
+        <nav class="nav-menu" id="nav-menu" aria-label="Main navigation">
+          <div class="nav-section nav-links">
+            <a class="link" href="{{ url_for('index', lang=toggle_lang) }}" onclick="document.cookie='lang={{ toggle_lang }};path=/';">{{ t['lang_toggle'] }}</a>
+          </div>
+          <span class="nav-divider" aria-hidden="true"></span>
+          <div class="nav-section nav-password">
+            <div class="password-box">
+              <input type="password" id="admin-password" placeholder="{{ t['password_placeholder'] }}" autocomplete="off" data-require-message="{{ t['password_required'] }}" />
+              <span class="password-hint">{{ t['password_hint'] }}</span>
+            </div>
+          </div>
+          <span class="nav-divider" aria-hidden="true"></span>
+          <div class="nav-section nav-actions">
+            <form id="import-form" data-require-message="{{ t['password_required'] }}" hx-post="{{ url_for('import_csv_route') }}" hx-target="#entries, #routes" hx-select="#entries, #routes" hx-swap="outerHTML" hx-trigger="change from:#import-file" hx-encoding="multipart/form-data" hx-on::after-request="if(event.detail.successful){ this.reset(); }" hx-on::response-error="alert(event.detail.xhr.responseText || 'Import failed')">
+              <input type="hidden" name="password" data-password-field="true" />
+              <input id="import-file" type="file" name="file" accept=".csv" hidden />
+              <button type="button" class="link-button" onclick="document.getElementById('import-file').click();">{{ t['import'] }}</button>
+            </form>
+            <a class="link" id="export-link" data-base-url="{{ url_for('export_csv') }}" data-require-message="{{ t['password_required'] }}" href="{{ url_for('export_csv') }}">{{ t['export'] }}</a>
+          </div>
+          <div class="nav-section nav-clock">
+            <div class="clock-display" id="live-clock" aria-live="polite">--:--:--</div>
+          </div>
+        </nav>
+      </header>
 
     <div class="tabs" role="tablist">
       <button class="tab-button active" id="tab-btn-add" data-tab-target="tab-add" role="tab" aria-controls="tab-add" aria-selected="true">{{ t['add_record'] }}</button>
@@ -1093,6 +1323,41 @@ bindTypeahead('city','cities','city');
 bindTypeahead('product','products','product');
 bindTypeahead('lookup-product','lookup-products','product');
 bindTypeahead('production-city','production-cities','city');
+
+const navToggle = document.querySelector('[data-nav-toggle]');
+const navMenu = document.getElementById('nav-menu');
+const mobileNavQuery = window.matchMedia('(max-width: 900px)');
+
+function closeNavMenu(){
+  if(navToggle){
+    navToggle.setAttribute('aria-expanded', 'false');
+  }
+  if(navMenu){
+    navMenu.classList.remove('open');
+  }
+}
+
+// Responsive nav toggle keeps the header usable on phones by collapsing the menu into a drawer.
+if(navToggle && navMenu){
+  navToggle.addEventListener('click', () => {
+    const expanded = navToggle.getAttribute('aria-expanded') === 'true';
+    const next = !expanded;
+    navToggle.setAttribute('aria-expanded', String(next));
+    navMenu.classList.toggle('open', next);
+  });
+
+  const handleNavBreakpoint = (event) => {
+    if(!event.matches){
+      closeNavMenu();
+    }
+  };
+
+  if(mobileNavQuery.addEventListener){
+    mobileNavQuery.addEventListener('change', handleNavBreakpoint);
+  } else if(mobileNavQuery.addListener){
+    mobileNavQuery.addListener(handleNavBreakpoint);
+  }
+}
 
 const adminPasswordInput = document.getElementById('admin-password');
 const importForm = document.getElementById('import-form');
@@ -2185,6 +2450,7 @@ def index():
             BASE_HTML,
             lang=lang,
             title=f"{APP_TITLE} | {t['title']}",
+            app_name=APP_TITLE,
             toggle_lang=toggle_lang,
             cities=cities,
             products=products,
