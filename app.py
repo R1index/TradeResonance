@@ -801,21 +801,10 @@ BASE_HTML = r"""
         padding: 16px;
       }
       .tab-panels {
-        gap: 16px;
+        gap: 20px;
       }
       .table-scroll {
         max-height: 420px;
-      }
-    }
-    @media (max-width: 900px) {
-      .container {
-        padding: 18px;
-      }
-      .card {
-        padding: 18px;
-      }
-      .tabs {
-        gap: 10px;
       }
     }
     @media (max-width: 640px) {
@@ -836,33 +825,18 @@ BASE_HTML = r"""
         align-items: stretch;
         gap: 12px;
       }
-      .topbar .clock-display {
-        margin: 0;
-      }
       .tabs {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        gap: 10px;
-        padding-bottom: 6px;
-        margin: 0 -12px 18px;
-        padding-inline: 12px;
-        scrollbar-width: thin;
-      }
-      .tabs::-webkit-scrollbar {
-        height: 4px;
-      }
-      .tabs::-webkit-scrollbar-thumb {
-        background: rgba(148, 163, 184, 0.35);
-        border-radius: 999px;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 16px;
       }
       .tab-button {
-        flex: 0 0 auto;
+        flex: 1 1 150px;
         font-size: 12px;
         padding: 8px 12px;
-        white-space: nowrap;
       }
       .tab-panels {
-        gap: 14px;
+        gap: 16px;
       }
       .card {
         padding: 16px;
@@ -875,7 +849,7 @@ BASE_HTML = r"""
       }
       .tab-panel .row {
         flex-wrap: wrap;
-        gap: 10px;
+        gap: 12px;
         align-items: stretch;
       }
       .tab-panel .row > * {
@@ -892,7 +866,7 @@ BASE_HTML = r"""
         gap: 6px;
       }
       .table-scroll {
-        margin: 12px -12px 0;
+        margin-top: 12px;
         border-radius: 12px;
       }
       .table-scroll table {
@@ -904,37 +878,6 @@ BASE_HTML = r"""
       th,
       td {
         padding: 8px 10px;
-      }
-    }
-    @media (max-width: 480px) {
-      body {
-        padding: 6px 0;
-      }
-      .container {
-        padding: 10px;
-      }
-      h1 {
-        font-size: 18px;
-      }
-      h2 {
-        font-size: 15px;
-      }
-      label {
-        font-size: 12px;
-      }
-      input,
-      select,
-      button {
-        font-size: 14px;
-      }
-      .clock-display {
-        font-size: 16px;
-      }
-      .password-box {
-        min-width: 0;
-      }
-      .latest-autofill__content {
-        font-size: 12px;
       }
     }
   </style>
