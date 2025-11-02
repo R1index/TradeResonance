@@ -307,6 +307,23 @@ BASE_HTML = r"""
       align-items: center;
       margin-bottom: 16px;
     }
+    .clock-display {
+      font-family: "JetBrains Mono", "Roboto Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 14px;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      padding: 6px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(8, 13, 23, 0.78);
+      font-variant-numeric: tabular-nums;
+      min-width: 128px;
+      text-align: center;
+      box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.14);
+    }
+    .topbar .clock-display {
+      margin: 0 16px;
+    }
     .tabs {
       display: flex;
       flex-wrap: wrap;
@@ -799,6 +816,9 @@ BASE_HTML = r"""
         align-items: stretch;
         gap: 12px;
       }
+      .topbar .clock-display {
+        margin: 0;
+      }
       .row.wrap {
         gap: 12px;
       }
@@ -828,6 +848,7 @@ BASE_HTML = r"""
   <div class="container">
     <div class="topbar">
       <h1>{{ title }}</h1>
+      <div class="clock-display" id="live-clock" aria-live="polite">--:--:--</div>
       <div class="row">
         <a class="link" href="{{ url_for('index', lang=toggle_lang) }}" onclick="document.cookie='lang={{ toggle_lang }};path=/';">{{ t['lang_toggle'] }}</a>
         <div class="password-box">
@@ -869,7 +890,7 @@ BASE_HTML = r"""
             <div class="row wrap">
               <div style="flex:1">
                 <label>{{ t['price'] }}</label>
-                <input name="price" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" required />
+                <input name="price" type="number" inputmode="numeric" min="0" step="1" placeholder="0" required />
               </div>
               <div style="flex:1">
                 <label for="percent-slider">{{ t['percent'] }}</label>
@@ -1038,6 +1059,7 @@ bindTypeahead('production-city','production-cities','city');
 const adminPasswordInput = document.getElementById('admin-password');
 const importForm = document.getElementById('import-form');
 const exportLink = document.getElementById('export-link');
+const clockDisplay = document.getElementById('live-clock');
 const tabButtons = Array.from(document.querySelectorAll('[data-tab-target]'));
 const tabPanels = Array.from(document.querySelectorAll('.tab-panel'));
 const addForm = document.getElementById('add-form');
@@ -1069,8 +1091,8 @@ function sanitizeNumeric(value){
   if(value === null || value === undefined){ return ''; }
   const normalized = String(value).replace(',', '.').trim();
   if(!normalized){ return ''; }
-  const match = normalized.match(/^\d+(?:\.\d+)?/);
-  return match ? match[0] : '';
+  const match = normalized.match(/^(\d+)/);
+  return match ? match[1] : '';
 }
 
 function passwordMessage(target){
@@ -1087,6 +1109,19 @@ function flashElement(el){
   window.setTimeout(() => {
     el.classList.remove('pulse-highlight');
   }, 1300);
+}
+
+function updateClock(){
+  if(!clockDisplay){ return; }
+  const now = new Date();
+  try {
+    clockDisplay.textContent = now.toLocaleTimeString(undefined, { hour12: false });
+  } catch(err) {
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    clockDisplay.textContent = `${hours}:${minutes}:${seconds}`;
+  }
 }
 
 function safeNumber(value){
@@ -1309,6 +1344,11 @@ if(exportLink){
     url.searchParams.set('password', pwd);
     window.location.href = url.toString();
   });
+}
+
+if(clockDisplay){
+  updateClock();
+  window.setInterval(updateClock, 1000);
 }
 
 // ---- Trend chart ----
@@ -1659,6 +1699,12 @@ if(productInput){
 }
 
 if(priceInput){
+  priceInput.addEventListener('input', () => {
+    const sanitized = sanitizeNumeric(priceInput.value);
+    if(priceInput.value !== sanitized){
+      priceInput.value = sanitized;
+    }
+  });
   priceInput.addEventListener('blur', () => {
     const sanitized = sanitizeNumeric(priceInput.value);
     if(priceInput.value !== sanitized){
