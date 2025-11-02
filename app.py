@@ -258,17 +258,41 @@ BASE_HTML = r"""
       align-items: center;
       margin-bottom: 16px;
     }
-    .grid {
-      display: grid;
-      grid-template-columns: 1.1fr 1fr;
-      gap: 20px;
-      align-items: start;
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 20px;
     }
-    .grid-2 {
+    .tab-button {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 10px 16px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    }
+    .tab-button.active {
+      background: rgba(34, 197, 94, 0.18);
+      border-color: rgba(34, 197, 94, 0.45);
+      color: var(--text);
+    }
+    .tab-button:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.35);
+    }
+    .tab-panels {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 20px;
-      margin-top: 20px;
+    }
+    .tab-panel {
+      display: none;
+    }
+    .tab-panel.active {
+      display: block;
     }
     .card {
       background: var(--card);
@@ -606,12 +630,11 @@ BASE_HTML = r"""
       transform: rotate(180deg);
     }
     @media (max-width: 1024px) {
-      .grid,
-      .grid-2 {
-        grid-template-columns: 1fr;
-      }
       .container {
         padding: 16px;
+      }
+      .tab-panels {
+        gap: 16px;
       }
       .table-scroll {
         max-height: 420px;
@@ -671,6 +694,7 @@ BASE_HTML = r"""
           <span class="password-hint">{{ t['password_hint'] }}</span>
         </div>
         <form id="import-form" data-require-message="{{ t['password_required'] }}" hx-post="{{ url_for('import_csv_route') }}" hx-target="#entries, #routes" hx-select="#entries, #routes" hx-swap="outerHTML" hx-trigger="change from:#import-file" hx-encoding="multipart/form-data" hx-on::after-request="if(event.detail.successful){ this.reset(); }" hx-on::response-error="alert(event.detail.xhr.responseText || 'Import failed')">
+          <input type="hidden" name="password" data-password-field="true" />
           <input id="import-file" type="file" name="file" accept=".csv" hidden />
           <button type="button" class="link-button" onclick="document.getElementById('import-file').click();">{{ t['import'] }}</button>
         </form>
@@ -678,125 +702,144 @@ BASE_HTML = r"""
       </div>
     </div>
 
-    <div class="grid">
-      <div class="card">
-        <h2>{{ t['add_record'] }}</h2>
-        <form id="add-form" data-require-message="{{ t['password_required'] }}" hx-post="{{ url_for('add_entry', lang=lang) }}" hx-target="#entries, #routes" hx-select="#entries, #routes" hx-swap="outerHTML" hx-trigger="submit" hx-on::after-request="if(event.detail.successful){this.reset();}" hx-on::response-error="alert(event.detail.xhr.responseText || 'Save failed')">
-          <label>{{ t['city'] }}</label>
-          <input id="city" name="city" list="cities" placeholder="Berlin" autocomplete="off" required />
-          <datalist id="cities">{% for c in cities %}<option value="{{ c }}">{% endfor %}</datalist>
-
-          <label>{{ t['product'] }}</label>
-          <input id="product" name="product" list="products" placeholder="Copper" autocomplete="off" required />
-          <datalist id="products">{% for p in products %}<option value="{{ p }}">{% endfor %}</datalist>
-
-          <div id="quick-fill" class="quick-fill" hidden>
-            <span class="muted">{{ t['quick_fill_hint'] }}</span>
-            <div id="quick-fill-buttons" class="quick-fill-buttons"></div>
-          </div>
-
-          <div class="row wrap">
-            <div style="flex:1">
-              <label>{{ t['price'] }}</label>
-              <input name="price" inputmode="decimal" placeholder="0" required />
-            </div>
-            <div style="flex:1">
-              <label>{{ t['trend'] }}</label>
-              <select name="trend">
-                <option value="up">{{ t['trend_up'] }}</option>
-                <option value="flat" selected>{{ t['trend_flat'] }}</option>
-                <option value="down">{{ t['trend_down'] }}</option>
-              </select>
-            </div>
-            <div style="flex:1">
-              <label for="percent-slider">{{ t['percent'] }}</label>
-              <div class="percent-control">
-                <button type="button" class="percent-btn" data-percent-delta="-1">-1%</button>
-                <input id="percent-slider" name="percent" type="range" min="30" max="160" step="1" value="100" />
-                <button type="button" class="percent-btn" data-percent-delta="1">+1%</button>
-                <span id="percent-display" class="muted percent-display">100%</span>
-              </div>
-              <div class="percent-presets">
-                <button type="button" class="percent-preset" data-percent-value="80">80%</button>
-                <button type="button" class="percent-preset" data-percent-value="100">100%</button>
-                <button type="button" class="percent-preset" data-percent-value="120">120%</button>
-              </div>
-            </div>
-          </div>
-          <div class="spacer"></div>
-          <label class="checkbox">
-            <input type="checkbox" name="is_production_city" value="1" />
-            <span>{{ t['production_city'] }}</span>
-          </label>
-          <div class="actions">
-            <button type="submit">{{ t['save'] }}</button>
-            <button class="secondary" type="reset">{{ t['reset'] }}</button>
-          </div>
-        </form>
-      </div>
-
-      <div class="card" id="routes" hx-swap-oob="true" hx-get="{{ url_for('routes_view', lang=lang) }}" hx-trigger="load, every 30s" hx-swap="outerHTML"></div>
+    <div class="tabs" role="tablist">
+      <button class="tab-button active" id="tab-btn-add" data-tab-target="tab-add" role="tab" aria-controls="tab-add" aria-selected="true">{{ t['add_record'] }}</button>
+      <button class="tab-button" id="tab-btn-routes" data-tab-target="tab-routes" role="tab" aria-controls="tab-routes" aria-selected="false" tabindex="-1">{{ t['routes_top'] }}</button>
+      <button class="tab-button" id="tab-btn-entries" data-tab-target="tab-entries" role="tab" aria-controls="tab-entries" aria-selected="false" tabindex="-1">{{ t['last_entries'] }}</button>
+      <button class="tab-button" id="tab-btn-trend" data-tab-target="tab-trend" role="tab" aria-controls="tab-trend" aria-selected="false" tabindex="-1">{{ t['trend_chart'] }}</button>
+      <button class="tab-button" id="tab-btn-products" data-tab-target="tab-products" role="tab" aria-controls="tab-products" aria-selected="false" tabindex="-1">{{ t['product_lookup'] }}</button>
+      <button class="tab-button" id="tab-btn-city" data-tab-target="tab-city" role="tab" aria-controls="tab-city" aria-selected="false" tabindex="-1">{{ t['city_products'] }}</button>
     </div>
 
-    <div class="grid-2">
-      <div class="card" id="entries" hx-swap-oob="true" hx-get="{{ url_for('entries_table', lang=lang) }}" hx-trigger="load, every 15s" hx-swap="outerHTML"></div>
+    <div class="tab-panels">
+      <section class="tab-panel active" id="tab-add" role="tabpanel" aria-labelledby="tab-btn-add">
+        <div class="card">
+          <h2>{{ t['add_record'] }}</h2>
+          <form id="add-form" data-require-message="{{ t['password_required'] }}" hx-post="{{ url_for('add_entry', lang=lang) }}" hx-target="#entries, #routes" hx-select="#entries, #routes" hx-swap="outerHTML" hx-trigger="submit" hx-on::after-request="if(event.detail.successful){this.reset();}" hx-on::response-error="alert(event.detail.xhr.responseText || 'Save failed')">
+            <input type="hidden" name="password" data-password-field="true" />
+            <label>{{ t['city'] }}</label>
+            <input id="city" name="city" list="cities" placeholder="Berlin" autocomplete="off" required />
+            <datalist id="cities">{% for c in cities %}<option value="{{ c }}">{% endfor %}</datalist>
 
-      <div class="card" id="chart-card">
-        <h2>{{ t['trend_chart'] }}</h2>
-        <div class="row">
-          <input id="chart-city" placeholder="{{ t['city'] }}" list="chart-cities" autocomplete="off" />
-          <datalist id="chart-cities"></datalist>
-          <input id="chart-product" placeholder="{{ t['product'] }}" list="chart-products" autocomplete="off" />
-          <datalist id="chart-products"></datalist>
+            <label>{{ t['product'] }}</label>
+            <input id="product" name="product" list="products" placeholder="Copper" autocomplete="off" required />
+            <datalist id="products">{% for p in products %}<option value="{{ p }}">{% endfor %}</datalist>
+
+            <div id="quick-fill" class="quick-fill" hidden>
+              <span class="muted">{{ t['quick_fill_hint'] }}</span>
+              <div id="quick-fill-buttons" class="quick-fill-buttons"></div>
+            </div>
+
+            <div class="row wrap">
+              <div style="flex:1">
+                <label>{{ t['price'] }}</label>
+                <input name="price" inputmode="decimal" placeholder="0" required />
+              </div>
+              <div style="flex:1">
+                <label>{{ t['trend'] }}</label>
+                <select name="trend">
+                  <option value="up">{{ t['trend_up'] }}</option>
+                  <option value="flat" selected>{{ t['trend_flat'] }}</option>
+                  <option value="down">{{ t['trend_down'] }}</option>
+                </select>
+              </div>
+              <div style="flex:1">
+                <label for="percent-slider">{{ t['percent'] }}</label>
+                <div class="percent-control">
+                  <button type="button" class="percent-btn" data-percent-delta="-1">-1%</button>
+                  <input id="percent-slider" name="percent" type="range" min="30" max="160" step="1" value="100" />
+                  <button type="button" class="percent-btn" data-percent-delta="1">+1%</button>
+                  <span id="percent-display" class="muted percent-display">100%</span>
+                </div>
+                <div class="percent-presets">
+                  <button type="button" class="percent-preset" data-percent-value="80">80%</button>
+                  <button type="button" class="percent-preset" data-percent-value="100">100%</button>
+                  <button type="button" class="percent-preset" data-percent-value="120">120%</button>
+                </div>
+              </div>
+            </div>
+            <div class="spacer"></div>
+            <label class="checkbox">
+              <input type="checkbox" name="is_production_city" value="1" />
+              <span>{{ t['production_city'] }}</span>
+            </label>
+            <div class="actions">
+              <button type="submit">{{ t['save'] }}</button>
+              <button class="secondary" type="reset">{{ t['reset'] }}</button>
+            </div>
+          </form>
         </div>
-        <div class="spacer"></div>
-        <canvas id="trendCanvas" height="140"></canvas>
-        <p class="muted" id="chart-hint">{{ t['choose_pair'] }}</p>
-      </div>
+      </section>
 
-      <div class="card" id="product-lookup">
-        <h2>{{ t['product_lookup'] }}</h2>
-        <form id="lookup-form" hx-get="{{ url_for('product_prices', lang=lang) }}" hx-target="#product-lookup-results" hx-swap="outerHTML" hx-trigger="submit, change from:#lookup-sort">
-          <div class="row wrap">
-            <div>
-              <label for="lookup-product">{{ t['product'] }}</label>
-              <input id="lookup-product" name="product" list="lookup-products" placeholder="{{ t['product_lookup_placeholder'] }}" autocomplete="off" required />
-              <datalist id="lookup-products">{% for p in products %}<option value="{{ p }}">{% endfor %}</datalist>
-            </div>
-            <div>
-              <label for="lookup-sort">{{ t['sort_label'] }}</label>
-              <select id="lookup-sort" name="sort">
-                <option value="asc" selected>{{ t['sort_price_low'] }}</option>
-                <option value="desc">{{ t['sort_price_high'] }}</option>
-              </select>
-            </div>
-          </div>
-          <div class="actions">
-            <button type="submit">{{ t['search'] }}</button>
-          </div>
-        </form>
-        <div class="spacer"></div>
-        <div id="product-lookup-results" class="muted">{{ t['product_lookup_hint'] }}</div>
-      </div>
+      <section class="tab-panel" id="tab-routes" role="tabpanel" aria-labelledby="tab-btn-routes">
+        <div class="card" id="routes" hx-swap-oob="true" hx-get="{{ url_for('routes_view', lang=lang) }}" hx-trigger="load, every 30s" hx-swap="outerHTML"></div>
+      </section>
 
-      <div class="card" id="city-production">
-        <h2>{{ t['city_products'] }}</h2>
-        <form id="city-production-form" hx-get="{{ url_for('city_products', lang=lang) }}" hx-target="#city-production-results" hx-swap="outerHTML" hx-trigger="submit, change from:#production-city">
-          <div class="row wrap">
-            <div style="flex:1">
-              <label for="production-city">{{ t['city'] }}</label>
-              <input id="production-city" name="city" list="production-cities" placeholder="{{ t['city'] }}" autocomplete="off" required />
-              <datalist id="production-cities">{% for c in cities %}<option value="{{ c }}">{% endfor %}</datalist>
-            </div>
-          </div>
-          <div class="actions">
-            <button type="submit">{{ t['search'] }}</button>
-          </div>
-        </form>
-        <div class="spacer"></div>
-        <div id="city-production-results" class="muted">{{ t['city_products_hint'] }}</div>
-      </div>
+      <section class="tab-panel" id="tab-entries" role="tabpanel" aria-labelledby="tab-btn-entries">
+        <div class="card" id="entries" hx-swap-oob="true" hx-get="{{ url_for('entries_table', lang=lang) }}" hx-trigger="load, every 15s" hx-swap="outerHTML"></div>
+      </section>
 
+      <section class="tab-panel" id="tab-trend" role="tabpanel" aria-labelledby="tab-btn-trend">
+        <div class="card" id="chart-card">
+          <h2>{{ t['trend_chart'] }}</h2>
+          <div class="row">
+            <input id="chart-city" placeholder="{{ t['city'] }}" list="chart-cities" autocomplete="off" />
+            <datalist id="chart-cities"></datalist>
+            <input id="chart-product" placeholder="{{ t['product'] }}" list="chart-products" autocomplete="off" />
+            <datalist id="chart-products"></datalist>
+          </div>
+          <div class="spacer"></div>
+          <canvas id="trendCanvas" height="140"></canvas>
+          <p class="muted" id="chart-hint">{{ t['choose_pair'] }}</p>
+        </div>
+      </section>
+
+      <section class="tab-panel" id="tab-products" role="tabpanel" aria-labelledby="tab-btn-products">
+        <div class="card" id="product-lookup">
+          <h2>{{ t['product_lookup'] }}</h2>
+          <form id="lookup-form" hx-get="{{ url_for('product_prices', lang=lang) }}" hx-target="#product-lookup-results" hx-swap="outerHTML" hx-trigger="submit, change from:#lookup-sort">
+            <div class="row wrap">
+              <div>
+                <label for="lookup-product">{{ t['product'] }}</label>
+                <input id="lookup-product" name="product" list="lookup-products" placeholder="{{ t['product_lookup_placeholder'] }}" autocomplete="off" required />
+                <datalist id="lookup-products">{% for p in products %}<option value="{{ p }}">{% endfor %}</datalist>
+              </div>
+              <div>
+                <label for="lookup-sort">{{ t['sort_label'] }}</label>
+                <select id="lookup-sort" name="sort">
+                  <option value="asc" selected>{{ t['sort_price_low'] }}</option>
+                  <option value="desc">{{ t['sort_price_high'] }}</option>
+                </select>
+              </div>
+            </div>
+            <div class="actions">
+              <button type="submit">{{ t['search'] }}</button>
+            </div>
+          </form>
+          <div class="spacer"></div>
+          <div id="product-lookup-results" class="muted">{{ t['product_lookup_hint'] }}</div>
+        </div>
+      </section>
+
+      <section class="tab-panel" id="tab-city" role="tabpanel" aria-labelledby="tab-btn-city">
+        <div class="card" id="city-production">
+          <h2>{{ t['city_products'] }}</h2>
+          <form id="city-production-form" hx-get="{{ url_for('city_products', lang=lang) }}" hx-target="#city-production-results" hx-swap="outerHTML" hx-trigger="submit, change from:#production-city">
+            <div class="row wrap">
+              <div style="flex:1">
+                <label for="production-city">{{ t['city'] }}</label>
+                <input id="production-city" name="city" list="production-cities" placeholder="{{ t['city'] }}" autocomplete="off" required />
+                <datalist id="production-cities">{% for c in cities %}<option value="{{ c }}">{% endfor %}</datalist>
+              </div>
+            </div>
+            <div class="actions">
+              <button type="submit">{{ t['search'] }}</button>
+            </div>
+          </form>
+          <div class="spacer"></div>
+          <div id="city-production-results" class="muted">{{ t['city_products_hint'] }}</div>
+        </div>
+      </section>
     </div>
   </div>
 
@@ -827,6 +870,8 @@ const importForm = document.getElementById('import-form');
 const exportLink = document.getElementById('export-link');
 const quickFillWrapper = document.getElementById('quick-fill');
 const quickFillButtons = document.getElementById('quick-fill-buttons');
+const tabButtons = Array.from(document.querySelectorAll('[data-tab-target]'));
+const tabPanels = Array.from(document.querySelectorAll('.tab-panel'));
 
 function passwordMessage(target){
   return (target && target.dataset && target.dataset.requireMessage)
@@ -834,30 +879,117 @@ function passwordMessage(target){
     || 'Password required';
 }
 
+function syncPasswordFields(){
+  const pwd = adminPasswordInput ? adminPasswordInput.value.trim() : '';
+  document.querySelectorAll('input[data-password-field]').forEach((input) => {
+    input.value = pwd;
+  });
+}
+
+function obtainPassword(target, options){
+  const opts = Object.assign({ silent: false }, options || {});
+  const pwd = adminPasswordInput ? adminPasswordInput.value.trim() : '';
+  if(!pwd){
+    if(!opts.silent){
+      alert(passwordMessage(target));
+    }
+    if(adminPasswordInput){ adminPasswordInput.focus(); }
+    return null;
+  }
+  if(target && typeof target.querySelector === 'function'){
+    const hidden = target.querySelector('input[data-password-field]');
+    if(hidden){ hidden.value = pwd; }
+  }
+  syncPasswordFields();
+  return pwd;
+}
+
 function attachPasswordGuard(form){
   if(!form){ return; }
+  form.addEventListener('submit', (event) => {
+    if(!obtainPassword(form)){
+      form.dataset.passwordWarned = '1';
+      event.preventDefault();
+    } else {
+      form.dataset.passwordWarned = '';
+    }
+  });
   form.addEventListener('htmx:configRequest', (event) => {
-    const pwd = adminPasswordInput ? adminPasswordInput.value.trim() : '';
+    const silent = form.dataset.passwordWarned === '1';
+    form.dataset.passwordWarned = '';
+    const pwd = obtainPassword(form, { silent });
     if(!pwd){
       event.preventDefault();
-      alert(passwordMessage(form));
-      if(adminPasswordInput){ adminPasswordInput.focus(); }
       return;
     }
     event.detail.parameters = event.detail.parameters || {};
     event.detail.parameters.password = pwd;
+    event.detail.headers = event.detail.headers || {};
+    event.detail.headers['X-Access-Password'] = pwd;
   });
+}
+
+function activateTab(id){
+  if(!id){ return; }
+  let found = false;
+  tabButtons.forEach((btn) => {
+    const active = btn.dataset.tabTarget === id;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+    btn.setAttribute('tabindex', active ? '0' : '-1');
+    if(active){ found = true; }
+  });
+  tabPanels.forEach((panel) => {
+    panel.classList.toggle('active', panel.id === id);
+  });
+  if(found){
+    try {
+      localStorage.setItem('tr-active-tab', id);
+    } catch(err) {
+      /* ignore */
+    }
+  }
+}
+
+(function initTabs(){
+  if(!tabButtons.length || !tabPanels.length){ return; }
+  let initialId = null;
+  try {
+    const stored = localStorage.getItem('tr-active-tab');
+    if(stored && tabPanels.some((panel) => panel.id === stored)){
+      initialId = stored;
+    }
+  } catch(err) {
+    initialId = null;
+  }
+  if(!initialId){
+    const defaultBtn = tabButtons.find((btn) => btn.classList.contains('active'));
+    if(defaultBtn){ initialId = defaultBtn.dataset.tabTarget; }
+  }
+  if(initialId){
+    activateTab(initialId);
+  }
+  tabButtons.forEach((btn) => {
+    btn.addEventListener('click', () => activateTab(btn.dataset.tabTarget));
+    btn.addEventListener('keydown', (event) => {
+      if(event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar'){
+        event.preventDefault();
+        activateTab(btn.dataset.tabTarget);
+      }
+    });
+  });
+})();
+
+if(adminPasswordInput){
+  adminPasswordInput.addEventListener('input', syncPasswordFields);
+  syncPasswordFields();
 }
 
 if(exportLink){
   exportLink.addEventListener('click', (event) => {
     event.preventDefault();
-    const pwd = adminPasswordInput ? adminPasswordInput.value.trim() : '';
-    if(!pwd){
-      alert(passwordMessage(exportLink));
-      if(adminPasswordInput){ adminPasswordInput.focus(); }
-      return;
-    }
+    const pwd = obtainPassword(exportLink);
+    if(!pwd){ return; }
     const base = exportLink.dataset.baseUrl || exportLink.getAttribute('href') || '/export.csv';
     const url = new URL(base, window.location.origin);
     const currentParams = new URLSearchParams(window.location.search);
@@ -977,6 +1109,11 @@ const trendSelect = addForm ? addForm.querySelector('select[name="trend"]') : nu
 const productionCheckbox = addForm ? addForm.querySelector('input[name="is_production_city"]') : null;
 let latestRequestId = 0;
 
+function cleanNumericTail(value){
+  if(value === null || value === undefined){ return ''; }
+  return String(value).trim().replace(/[.,]+$/, '');
+}
+
 function applyEntryToForm(dataset){
   if(cityInput){
     cityInput.value = dataset.city || '';
@@ -986,8 +1123,8 @@ function applyEntryToForm(dataset){
     productInput.value = dataset.product || '';
     productInput.dispatchEvent(new Event('input', { bubbles: true }));
   }
-  if(priceInput && dataset.price){
-    priceInput.value = dataset.price;
+  if(priceInput){
+    priceInput.value = cleanNumericTail(dataset.price);
   }
   if(trendSelect && dataset.trend){
     trendSelect.value = dataset.trend;
@@ -1030,7 +1167,7 @@ function rebuildQuickFill(){
     btn.textContent = `${city} · ${product}`;
     btn.dataset.city = city;
     btn.dataset.product = product;
-    btn.dataset.price = row.dataset.price || '';
+    btn.dataset.price = cleanNumericTail(row.dataset.price || '');
     btn.dataset.trend = row.dataset.trend || '';
     btn.dataset.percent = row.dataset.percent || '';
     btn.dataset.production = row.dataset.production || '';
@@ -1044,6 +1181,9 @@ function rebuildQuickFill(){
 document.body.addEventListener('htmx:afterSwap', (event) => {
   if(event.target && event.target.id === 'entries'){
     rebuildQuickFill();
+  }
+  if(adminPasswordInput){
+    syncPasswordFields();
   }
 });
 
@@ -1070,7 +1210,7 @@ async function autofillLatestEntry(){
     if(requestId !== latestRequestId){ return; }
     if(data && data.found){
       if(priceInput && data.price !== null && data.price !== undefined){
-        priceInput.value = String(data.price);
+        priceInput.value = cleanNumericTail(data.price);
       }
       if(trendSelect && typeof data.trend === 'string'){
         trendSelect.value = data.trend;
