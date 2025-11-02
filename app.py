@@ -245,15 +245,15 @@ def rows_to_dicts(rows: Iterable[Mapping[str, Any]]) -> List[Dict[str, Any]]:
     return [_normalize_row(r) for r in rows]
 
 
-def render_fragment(template: str, lang: str, **context: Any) -> str:
+def render_fragment(template: str, *, lang: str, **context: Any) -> str:
     ctx = dict(context)
     ctx.setdefault("t", STRINGS[lang])
     return render_template_string(template, **ctx)
 
 
 def render_entries_and_routes(lang: str) -> str:
-    entries_html = render_fragment(ENTRIES_TABLE, lang, items=latest_prices_view())
-    routes_html = render_fragment(ROUTES_TABLE, lang, routes=compute_routes())
+    entries_html = render_fragment(ENTRIES_TABLE, lang=lang, items=latest_prices_view())
+    routes_html = render_fragment(ROUTES_TABLE, lang=lang, routes=compute_routes())
     return entries_html + routes_html
 
 # ---------------------- HTML (Jinja2) ----------------------
@@ -1610,9 +1610,8 @@ def index():
     resp = make_response(
         render_fragment(
             BASE_HTML,
-            lang,
-            title=f"{APP_TITLE} | {t['title']}",
             lang=lang,
+            title=f"{APP_TITLE} | {t['title']}",
             toggle_lang=toggle_lang,
             cities=cities,
             products=products,
@@ -1698,7 +1697,7 @@ def add_entry():
 @app.get("/entries")
 def entries_table():
     lang = get_lang()
-    return render_fragment(ENTRIES_TABLE, lang, items=latest_prices_view())
+    return render_fragment(ENTRIES_TABLE, lang=lang, items=latest_prices_view())
 
 
 @app.get("/product-prices")
@@ -1711,7 +1710,7 @@ def product_prices():
         message = STRINGS[lang]["product_lookup_hint"]
         return render_fragment(
             PRODUCT_PRICES_TABLE,
-            lang,
+            lang=lang,
             items=[],
             product=None,
             message=message,
@@ -1722,7 +1721,7 @@ def product_prices():
     message = STRINGS[lang]["no_prices"]
     return render_fragment(
         PRODUCT_PRICES_TABLE,
-        lang,
+        lang=lang,
         items=rows,
         product=product,
         message=message,
@@ -1738,7 +1737,7 @@ def city_products():
         message = STRINGS[lang]["city_products_hint"]
         return render_fragment(
             CITY_PRODUCTS_TABLE,
-            lang,
+            lang=lang,
             items=[],
             city=None,
             message=message,
@@ -1748,7 +1747,7 @@ def city_products():
     message = STRINGS[lang]["city_products_no_data"]
     return render_fragment(
         CITY_PRODUCTS_TABLE,
-        lang,
+        lang=lang,
         items=rows,
         city=city,
         message=message,
@@ -1758,7 +1757,7 @@ def city_products():
 @app.get("/routes")
 def routes_view():
     lang = get_lang()
-    return render_fragment(ROUTES_TABLE, lang, routes=compute_routes())
+    return render_fragment(ROUTES_TABLE, lang=lang, routes=compute_routes())
 
 @app.get("/suggest")
 def suggest():
