@@ -366,10 +366,13 @@ BASE_HTML = r"""
     }
     .row {
       display: flex;
-      gap: 10px;
+      gap: 12px;
+      align-items: center;
     }
     .row.wrap {
       flex-wrap: wrap;
+      gap: 16px;
+      align-items: stretch;
     }
     .row.wrap > * {
       flex: 1 1 220px;
@@ -420,6 +423,34 @@ BASE_HTML = r"""
       display: flex;
       gap: 10px;
       margin-top: 12px;
+    }
+    .percent-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .percent-control input[type="range"] {
+      flex: 1 1 140px;
+      min-width: 120px;
+    }
+    .percent-btn {
+      width: auto;
+      padding: 6px 10px;
+      font-size: 12px;
+      border-radius: 999px;
+      background: rgba(34, 197, 94, 0.18);
+      color: #4ade80;
+      border: 1px solid rgba(34, 197, 94, 0.4);
+    }
+    .percent-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: none;
+      background: rgba(34, 197, 94, 0.28);
+    }
+    .percent-display {
+      min-width: 52px;
+      text-align: right;
     }
     .spacer {
       height: 10px;
@@ -502,6 +533,47 @@ BASE_HTML = r"""
         max-height: 420px;
       }
     }
+    @media (max-width: 640px) {
+      body {
+        padding: 10px 0;
+      }
+      .container {
+        padding: 12px;
+      }
+      h1 {
+        font-size: 20px;
+      }
+      h2 {
+        font-size: 16px;
+      }
+      .topbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+      }
+      .row.wrap {
+        gap: 12px;
+      }
+      .row.wrap > * {
+        flex: 1 1 160px;
+      }
+      .actions {
+        flex-wrap: wrap;
+      }
+      .actions button {
+        flex: 1 1 160px;
+      }
+      .percent-control {
+        gap: 6px;
+      }
+      table {
+        font-size: 13px;
+      }
+      th,
+      td {
+        padding: 8px 10px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -532,7 +604,7 @@ BASE_HTML = r"""
           <input id="product" name="product" list="products" placeholder="Copper" autocomplete="off" required />
           <datalist id="products">{% for p in products %}<option value="{{ p }}">{% endfor %}</datalist>
 
-          <div class="row">
+          <div class="row wrap">
             <div style="flex:1">
               <label>{{ t['price'] }}</label>
               <input name="price" inputmode="decimal" placeholder="0" required />
@@ -547,9 +619,11 @@ BASE_HTML = r"""
             </div>
             <div style="flex:1">
               <label for="percent-slider">{{ t['percent'] }}</label>
-              <div style="display:flex;align-items:center;gap:0.5rem;">
+              <div class="percent-control">
+                <button type="button" class="percent-btn" data-percent-delta="-1">-1%</button>
                 <input id="percent-slider" name="percent" type="range" min="30" max="160" step="1" value="100" />
-                <span id="percent-display" class="muted">100%</span>
+                <button type="button" class="percent-btn" data-percent-delta="1">+1%</button>
+                <span id="percent-display" class="muted percent-display">100%</span>
               </div>
             </div>
           </div>
@@ -689,19 +763,114 @@ function wireChartSelectors(){
 
 const percentSlider = document.getElementById('percent-slider');
 const percentDisplay = document.getElementById('percent-display');
-if(percentSlider && percentDisplay){
-  const updatePercent = () => {
+const addForm = document.getElementById('add-form');
+
+function updatePercentDisplay(){
+  if(percentSlider && percentDisplay){
     percentDisplay.textContent = `${percentSlider.value}%`;
-  };
-  percentSlider.addEventListener('input', updatePercent);
-  updatePercent();
-  const addForm = document.getElementById('add-form');
-  if(addForm){
-    addForm.addEventListener('reset', () => {
-      setTimeout(updatePercent, 0);
-    });
   }
 }
+
+if(percentSlider){
+  percentSlider.addEventListener('input', updatePercentDisplay);
+}
+
+updatePercentDisplay();
+
+if(addForm){
+  addForm.addEventListener('reset', () => {
+    setTimeout(() => {
+      if(percentSlider){
+        const defaultValue = percentSlider.getAttribute('value') || percentSlider.defaultValue || '100';
+        percentSlider.value = defaultValue;
+      }
+      updatePercentDisplay();
+    }, 0);
+  });
+}
+
+document.querySelectorAll('[data-percent-delta]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if(!percentSlider){ return; }
+    const delta = Number(btn.dataset.percentDelta || 0);
+    if(Number.isNaN(delta)){ return; }
+    const minAttr = percentSlider.getAttribute('min');
+    const maxAttr = percentSlider.getAttribute('max');
+    const min = minAttr !== null ? Number(minAttr) : null;
+    const max = maxAttr !== null ? Number(maxAttr) : null;
+    const current = Number(percentSlider.value || 0);
+    let next = current + delta;
+    if(min !== null && !Number.isNaN(min)){ next = Math.max(min, next); }
+    if(max !== null && !Number.isNaN(max)){ next = Math.min(max, next); }
+    percentSlider.value = String(next);
+    percentSlider.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+});
+
+const cityInput = document.getElementById('city');
+const productInput = document.getElementById('product');
+const priceInput = addForm ? addForm.querySelector('input[name="price"]') : null;
+const trendSelect = addForm ? addForm.querySelector('select[name="trend"]') : null;
+const productionCheckbox = addForm ? addForm.querySelector('input[name="is_production_city"]') : null;
+let latestRequestId = 0;
+
+async function autofillLatestEntry(){
+  if(!cityInput || !productInput){ return; }
+  const city = cityInput.value.trim();
+  const product = productInput.value.trim();
+  if(!city || !product){ return; }
+  const requestId = ++latestRequestId;
+  try {
+    const params = new URLSearchParams({ city, product });
+    const res = await fetch(`/latest-entry.json?${params.toString()}`);
+    if(!res.ok){ return; }
+    const data = await res.json();
+    if(requestId !== latestRequestId){ return; }
+    if(data && data.found){
+      if(priceInput && data.price !== null && data.price !== undefined){
+        priceInput.value = String(data.price);
+      }
+      if(trendSelect && typeof data.trend === 'string'){
+        trendSelect.value = data.trend;
+      }
+      if(productionCheckbox){
+        productionCheckbox.checked = Boolean(data.is_production_city);
+      }
+      if(percentSlider){
+        if(typeof data.percent === 'number' && !Number.isNaN(data.percent)){
+          const minAttr = percentSlider.getAttribute('min');
+          const maxAttr = percentSlider.getAttribute('max');
+          const min = minAttr !== null ? Number(minAttr) : null;
+          const max = maxAttr !== null ? Number(maxAttr) : null;
+          let value = Number(data.percent);
+          if(min !== null && !Number.isNaN(min)){ value = Math.max(min, value); }
+          if(max !== null && !Number.isNaN(max)){ value = Math.min(max, value); }
+          percentSlider.value = String(value);
+        } else {
+          const defaultValue = percentSlider.getAttribute('value') || percentSlider.defaultValue || '100';
+          percentSlider.value = defaultValue;
+        }
+        percentSlider.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
+  } catch(err) {
+    console.warn('latest entry lookup failed', err);
+  }
+}
+
+if(cityInput){
+  cityInput.addEventListener('change', autofillLatestEntry);
+  cityInput.addEventListener('blur', autofillLatestEntry);
+}
+if(productInput){
+  productInput.addEventListener('change', autofillLatestEntry);
+  productInput.addEventListener('blur', autofillLatestEntry);
+}
+
+if(cityInput && productInput && cityInput.value && productInput.value){
+  autofillLatestEntry();
+}
+
 wireChartSelectors();
 </script>
 </body>
@@ -891,6 +1060,19 @@ def distinct_values(field: str, limit: int | None = None) -> List[str]:
         return [row[field] for row in cur.fetchall()]
 
 
+def latest_entry_for(city: str, product: str) -> Dict[str, Any] | None:
+    sql = """
+    SELECT price, trend, percent, is_production_city, created_at
+    FROM entries
+    WHERE city = %s AND product = %s
+    ORDER BY created_at DESC
+    LIMIT 1
+    """
+    with get_conn() as conn:
+        row = conn.execute(sql, (city, product)).fetchone()
+    return dict(row) if row else None
+
+
 def latest_prices_view() -> List[Dict[str, Any]]:
     sql = r"""
     WITH latest AS (
@@ -996,6 +1178,31 @@ def index():
     ))
     resp.set_cookie('lang', lang, max_age=60*60*24*365)
     return resp
+
+
+@app.get("/latest-entry.json")
+def latest_entry_json():
+    city = (request.args.get("city") or "").strip()
+    product = (request.args.get("product") or "").strip()
+    if not city or not product:
+        return jsonify({"found": False})
+
+    row = latest_entry_for(city, product)
+    if not row:
+        return jsonify({"found": False})
+
+    created_at = row.get("created_at")
+    return jsonify(
+        {
+            "found": True,
+            "price": row.get("price"),
+            "trend": row.get("trend"),
+            "percent": row.get("percent"),
+            "is_production_city": row.get("is_production_city"),
+            "updated_at": created_at.isoformat() if isinstance(created_at, datetime) else None,
+        }
+    )
+
 
 @app.post("/add")
 def add_entry():
