@@ -53,7 +53,7 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "product": "Товар",
         "price": "Цена",
         "trend": "Тренд",
-        "percent": "Процент (опц.)",
+        "percent": "Процент, %",
         "save": "Сохранить",
         "reset": "Очистить",
         "last_entries": "Последние записи",
@@ -76,9 +76,6 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "choose_pair": "Выберите город и товар",
         "lang_toggle": "EN",
         "export": "Экспорт CSV",
-        "import": "Импорт CSV",
-        "choose_file": "Выберите CSV файл",
-        "upload": "Загрузить",
         "search": "Найти",
         "product_lookup": "Цены по товарам",
         "product_lookup_placeholder": "Введите товар",
@@ -97,7 +94,7 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "product": "Product",
         "price": "Price",
         "trend": "Trend",
-        "percent": "Percent (opt)",
+        "percent": "Percent, %",
         "save": "Save",
         "reset": "Reset",
         "last_entries": "Latest entries",
@@ -120,9 +117,6 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "choose_pair": "Select city & product",
         "lang_toggle": "RU",
         "export": "Export CSV",
-        "import": "Import CSV",
-        "choose_file": "Select CSV file",
-        "upload": "Upload",
         "search": "Search",
         "product_lookup": "Prices by product",
         "product_lookup_placeholder": "Enter product",
@@ -487,7 +481,7 @@ BASE_HTML = r"""
     <div class="grid">
       <div class="card">
         <h2>{{ t['add_record'] }}</h2>
-        <form id="add-form" hx-post="{{ url_for('add_entry', lang=lang) }}" hx-target="#entries, #routes" hx-select="#entries, #routes" hx-swap="outerHTML" hx-trigger="submit">
+        <form id="add-form" hx-post="{{ url_for('add_entry', lang=lang) }}" hx-target="#entries, #routes" hx-select="#entries, #routes" hx-swap="outerHTML" hx-trigger="submit" hx-on::after-request="if(event.detail.successful){this.reset();}">
           <label>{{ t['city'] }}</label>
           <input id="city" name="city" list="cities" placeholder="Berlin" autocomplete="off" required />
           <datalist id="cities">{% for c in cities %}<option value="{{ c }}">{% endfor %}</datalist>
@@ -510,8 +504,11 @@ BASE_HTML = r"""
               </select>
             </div>
             <div style="flex:1">
-              <label>{{ t['percent'] }}</label>
-              <input name="percent" inputmode="decimal" placeholder="3" />
+              <label for="percent-slider">{{ t['percent'] }}</label>
+              <div style="display:flex;align-items:center;gap:0.5rem;">
+                <input id="percent-slider" name="percent" type="range" min="30" max="160" step="1" value="100" />
+                <span id="percent-display" class="muted">100%</span>
+              </div>
             </div>
           </div>
           <div class="spacer"></div>
@@ -570,17 +567,6 @@ BASE_HTML = r"""
         <div id="product-lookup-results" class="muted">{{ t['product_lookup_hint'] }}</div>
       </div>
 
-      <div class="card" id="import-card">
-        <h2>{{ t['import'] }}</h2>
-        <form action="{{ url_for('import_csv', lang=lang) }}" method="post" enctype="multipart/form-data">
-          <label>{{ t['choose_file'] }}</label>
-          <input type="file" name="file" accept=".csv,text/csv" required />
-          <div class="actions">
-            <button type="submit">{{ t['upload'] }}</button>
-          </div>
-        </form>
-        <p class="muted-block">{{ t['export'] }} → entries.csv</p>
-      </div>
     </div>
   </div>
 
@@ -638,6 +624,22 @@ function wireChartSelectors(){
   function maybe(){ if(c.value && p.value){ loadSeries(c.value, p.value); } }
   c.addEventListener('change', maybe);
   p.addEventListener('change', maybe);
+}
+
+const percentSlider = document.getElementById('percent-slider');
+const percentDisplay = document.getElementById('percent-display');
+if(percentSlider && percentDisplay){
+  const updatePercent = () => {
+    percentDisplay.textContent = `${percentSlider.value}%`;
+  };
+  percentSlider.addEventListener('input', updatePercent);
+  updatePercent();
+  const addForm = document.getElementById('add-form');
+  if(addForm){
+    addForm.addEventListener('reset', () => {
+      setTimeout(updatePercent, 0);
+    });
+  }
 }
 wireChartSelectors();
 </script>
@@ -906,6 +908,8 @@ def add_entry():
             percent = float(percent_raw)
         except ValueError:
             return bad("Invalid percent")
+        if not 30 <= percent <= 160:
+            return bad("Percent must be between 30 and 160")
 
     if trend not in ("up", "down", "flat"):
         trend = "flat"
@@ -956,91 +960,6 @@ def product_prices():
         sort=sort,
         t=STRINGS[lang],
     )
-
-
-@app.post("/import")
-def import_csv():
-    lang = get_lang()
-    uploaded = request.files.get("file")
-    if uploaded is None or uploaded.filename == "":
-        return redirect(url_for("index", lang=lang))
-
-    data = uploaded.read()
-    if not data:
-        return redirect(url_for("index", lang=lang))
-
-    try:
-        text = data.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        text = data.decode("utf-8", errors="ignore")
-
-    reader = csv.DictReader(io.StringIO(text))
-    if not reader.fieldnames:
-        return redirect(url_for("index", lang=lang))
-
-    def normalize_key(key: str | None) -> str:
-        return (key or "").strip().lower()
-
-    now = datetime.now(timezone.utc)
-    payload = []
-    for row in reader:
-        lowered = {normalize_key(k): (v.strip() if isinstance(v, str) else v) for k, v in row.items()}
-        city = (lowered.get("city") or "").strip()
-        product_val = (lowered.get("product") or "").strip()
-        price_raw = (lowered.get("price") or "").replace(",", ".").strip()
-        trend = (lowered.get("trend") or "flat").strip().lower()
-        percent_raw = (lowered.get("percent") or "").replace(",", ".").strip()
-        is_prod_raw = (lowered.get("is_production_city") or "").strip().lower()
-        created_raw = (lowered.get("created_at") or "").strip()
-
-        if not city or not product_val or not price_raw:
-            continue
-
-        try:
-            price = float(price_raw)
-        except ValueError:
-            continue
-
-        percent = None
-        if percent_raw:
-            try:
-                percent = float(percent_raw)
-            except ValueError:
-                percent = None
-
-        if trend not in ("up", "down", "flat"):
-            trend = "flat"
-
-        if is_prod_raw in ("1", "true", "yes", "y", "да", "истина", "production", "prod"):
-            is_prod = True
-        else:
-            try:
-                is_prod = bool(int(is_prod_raw))
-            except ValueError:
-                is_prod = False
-
-        created_at = now
-        if created_raw:
-            try:
-                parsed = datetime.fromisoformat(created_raw.replace("Z", "+00:00"))
-            except ValueError:
-                try:
-                    parsed = datetime.strptime(created_raw, "%Y-%m-%d %H:%M:%S")
-                    parsed = parsed.replace(tzinfo=timezone.utc)
-                except ValueError:
-                    parsed = now
-            created_at = _as_utc(parsed)
-
-        payload.append((city, product_val, price, trend, percent, is_prod, created_at))
-
-    if payload:
-        with get_conn() as conn:
-            conn.executemany(
-                "INSERT INTO entries(city, product, price, trend, percent, is_production_city, created_at) VALUES (%s,%s,%s,%s,%s,%s,%s)",
-                payload,
-            )
-
-    return redirect(url_for("index", lang=lang))
 
 
 @app.get("/routes")
