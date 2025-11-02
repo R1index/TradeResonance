@@ -35,6 +35,8 @@ DATABASE_URL = (
     or os.environ.get("POSTGRES_URL")
 )
 
+ACCESS_PASSWORD = os.environ.get("ACCESS_PASSWORD", "reso2025")
+
 if not DATABASE_URL:
     raise RuntimeError(
         "DATABASE_URL (или совместимая переменная окружения) не задана. "
@@ -91,6 +93,12 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "city_products_hint": "Выберите город и нажмите \"Найти\".",
         "city_products_no_data": "Нет данных о производстве выбранного города.",
         "city_products_for": "Производство города",
+        "quick_fill_hint": "Недавние сочетания — нажмите, чтобы подставить",
+        "password_placeholder": "Пароль доступа",
+        "password_hint": "Пароль нужен для сохранения и работы с CSV.",
+        "password_required": "Введите пароль доступа",
+        "password_invalid": "Неверный пароль",
+        "click_to_fill": "Кликните, чтобы подставить запись в форму",
     },
     "en": {
         "title": "Profit Routes",
@@ -137,6 +145,12 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "city_products_hint": "Choose a city and press \"Search\".",
         "city_products_no_data": "No production data for the selected city.",
         "city_products_for": "City production for",
+        "quick_fill_hint": "Recent combos — click to autofill",
+        "password_placeholder": "Access password",
+        "password_hint": "Password is required for saving and CSV actions.",
+        "password_required": "Enter the access password",
+        "password_invalid": "Invalid password",
+        "click_to_fill": "Click to send the row to the form",
     },
 }
 
@@ -178,6 +192,12 @@ def ensure_schema() -> None:
 ensure_schema()
 
 # ---------------------- utils ----------------------
+
+
+def password_matches(submitted: str | None) -> bool:
+    if ACCESS_PASSWORD:
+        return submitted == ACCESS_PASSWORD
+    return True
 
 
 def _as_utc(dt: datetime) -> datetime:
@@ -334,6 +354,9 @@ BASE_HTML = r"""
     tbody tr:hover {
       background: rgba(34, 197, 94, 0.08);
     }
+    tbody tr.entry-row {
+      cursor: pointer;
+    }
     .table-scroll {
       margin-top: 14px;
       border: 1px solid var(--border);
@@ -379,6 +402,9 @@ BASE_HTML = r"""
     }
     .topbar .row {
       align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
     .topbar form {
       margin: 0;
@@ -447,6 +473,64 @@ BASE_HTML = r"""
       transform: translateY(-1px);
       box-shadow: none;
       background: rgba(34, 197, 94, 0.28);
+    }
+    .percent-presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .percent-preset {
+      width: auto;
+      padding: 6px 12px;
+      font-size: 12px;
+      border-radius: 999px;
+      background: rgba(34, 197, 94, 0.12);
+      color: #bbf7d0;
+      border: 1px solid rgba(34, 197, 94, 0.28);
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.2s ease;
+    }
+    .percent-preset:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 18px rgba(34, 197, 94, 0.2);
+    }
+    .quick-fill {
+      margin-top: 16px;
+    }
+    .quick-fill[hidden] {
+      display: none;
+    }
+    .quick-fill-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .quick-fill-btn {
+      width: auto;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(59, 130, 246, 0.14);
+      color: #bfdbfe;
+      border: 1px solid rgba(59, 130, 246, 0.28);
+      cursor: pointer;
+      font-size: 12px;
+      transition: transform 0.15s ease, box-shadow 0.2s ease;
+    }
+    .quick-fill-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 18px rgba(59, 130, 246, 0.2);
+    }
+    .password-box {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 180px;
+    }
+    .password-hint {
+      font-size: 11px;
+      color: var(--muted);
     }
     .percent-display {
       min-width: 52px;
@@ -582,20 +666,22 @@ BASE_HTML = r"""
       <h1>{{ title }}</h1>
       <div class="row">
         <a class="link" href="{{ url_for('index', lang=toggle_lang) }}" onclick="document.cookie='lang={{ toggle_lang }};path=/';">{{ t['lang_toggle'] }}</a>
-        <span style="width:10px"></span>
-        <form id="import-form" hx-post="{{ url_for('import_csv_route') }}" hx-target="#entries, #routes" hx-select="#entries, #routes" hx-swap="outerHTML" hx-trigger="change from:#import-file" hx-encoding="multipart/form-data" hx-on::after-request="if(event.detail.successful){ this.reset(); }" hx-on::response-error="alert(event.detail.xhr.responseText || 'Import failed')">
+        <div class="password-box">
+          <input type="password" id="admin-password" placeholder="{{ t['password_placeholder'] }}" autocomplete="off" data-require-message="{{ t['password_required'] }}" />
+          <span class="password-hint">{{ t['password_hint'] }}</span>
+        </div>
+        <form id="import-form" data-require-message="{{ t['password_required'] }}" hx-post="{{ url_for('import_csv_route') }}" hx-target="#entries, #routes" hx-select="#entries, #routes" hx-swap="outerHTML" hx-trigger="change from:#import-file" hx-encoding="multipart/form-data" hx-on::after-request="if(event.detail.successful){ this.reset(); }" hx-on::response-error="alert(event.detail.xhr.responseText || 'Import failed')">
           <input id="import-file" type="file" name="file" accept=".csv" hidden />
           <button type="button" class="link-button" onclick="document.getElementById('import-file').click();">{{ t['import'] }}</button>
         </form>
-        <span style="width:10px"></span>
-        <a class="link" href="{{ url_for('export_csv') }}">{{ t['export'] }}</a>
+        <a class="link" id="export-link" data-base-url="{{ url_for('export_csv') }}" data-require-message="{{ t['password_required'] }}" href="{{ url_for('export_csv') }}">{{ t['export'] }}</a>
       </div>
     </div>
 
     <div class="grid">
       <div class="card">
         <h2>{{ t['add_record'] }}</h2>
-        <form id="add-form" hx-post="{{ url_for('add_entry', lang=lang) }}" hx-target="#entries, #routes" hx-select="#entries, #routes" hx-swap="outerHTML" hx-trigger="submit" hx-on::after-request="if(event.detail.successful){this.reset();}">
+        <form id="add-form" data-require-message="{{ t['password_required'] }}" hx-post="{{ url_for('add_entry', lang=lang) }}" hx-target="#entries, #routes" hx-select="#entries, #routes" hx-swap="outerHTML" hx-trigger="submit" hx-on::after-request="if(event.detail.successful){this.reset();}" hx-on::response-error="alert(event.detail.xhr.responseText || 'Save failed')">
           <label>{{ t['city'] }}</label>
           <input id="city" name="city" list="cities" placeholder="Berlin" autocomplete="off" required />
           <datalist id="cities">{% for c in cities %}<option value="{{ c }}">{% endfor %}</datalist>
@@ -603,6 +689,11 @@ BASE_HTML = r"""
           <label>{{ t['product'] }}</label>
           <input id="product" name="product" list="products" placeholder="Copper" autocomplete="off" required />
           <datalist id="products">{% for p in products %}<option value="{{ p }}">{% endfor %}</datalist>
+
+          <div id="quick-fill" class="quick-fill" hidden>
+            <span class="muted">{{ t['quick_fill_hint'] }}</span>
+            <div id="quick-fill-buttons" class="quick-fill-buttons"></div>
+          </div>
 
           <div class="row wrap">
             <div style="flex:1">
@@ -624,6 +715,11 @@ BASE_HTML = r"""
                 <input id="percent-slider" name="percent" type="range" min="30" max="160" step="1" value="100" />
                 <button type="button" class="percent-btn" data-percent-delta="1">+1%</button>
                 <span id="percent-display" class="muted percent-display">100%</span>
+              </div>
+              <div class="percent-presets">
+                <button type="button" class="percent-preset" data-percent-value="80">80%</button>
+                <button type="button" class="percent-preset" data-percent-value="100">100%</button>
+                <button type="button" class="percent-preset" data-percent-value="120">120%</button>
               </div>
             </div>
           </div>
@@ -726,6 +822,53 @@ bindTypeahead('product','products','product');
 bindTypeahead('lookup-product','lookup-products','product');
 bindTypeahead('production-city','production-cities','city');
 
+const adminPasswordInput = document.getElementById('admin-password');
+const importForm = document.getElementById('import-form');
+const exportLink = document.getElementById('export-link');
+const quickFillWrapper = document.getElementById('quick-fill');
+const quickFillButtons = document.getElementById('quick-fill-buttons');
+
+function passwordMessage(target){
+  return (target && target.dataset && target.dataset.requireMessage)
+    || (adminPasswordInput && adminPasswordInput.dataset && adminPasswordInput.dataset.requireMessage)
+    || 'Password required';
+}
+
+function attachPasswordGuard(form){
+  if(!form){ return; }
+  form.addEventListener('htmx:configRequest', (event) => {
+    const pwd = adminPasswordInput ? adminPasswordInput.value.trim() : '';
+    if(!pwd){
+      event.preventDefault();
+      alert(passwordMessage(form));
+      if(adminPasswordInput){ adminPasswordInput.focus(); }
+      return;
+    }
+    event.detail.parameters = event.detail.parameters || {};
+    event.detail.parameters.password = pwd;
+  });
+}
+
+if(exportLink){
+  exportLink.addEventListener('click', (event) => {
+    event.preventDefault();
+    const pwd = adminPasswordInput ? adminPasswordInput.value.trim() : '';
+    if(!pwd){
+      alert(passwordMessage(exportLink));
+      if(adminPasswordInput){ adminPasswordInput.focus(); }
+      return;
+    }
+    const base = exportLink.dataset.baseUrl || exportLink.getAttribute('href') || '/export.csv';
+    const url = new URL(base, window.location.origin);
+    const currentParams = new URLSearchParams(window.location.search);
+    if(currentParams.has('lang') && !url.searchParams.has('lang')){
+      url.searchParams.set('lang', currentParams.get('lang'));
+    }
+    url.searchParams.set('password', pwd);
+    window.location.href = url.toString();
+  });
+}
+
 // ---- Trend chart ----
 let chart;
 async function loadSeries(city, product){
@@ -764,6 +907,9 @@ function wireChartSelectors(){
 const percentSlider = document.getElementById('percent-slider');
 const percentDisplay = document.getElementById('percent-display');
 const addForm = document.getElementById('add-form');
+
+attachPasswordGuard(addForm);
+attachPasswordGuard(importForm);
 
 function updatePercentDisplay(){
   if(percentSlider && percentDisplay){
@@ -807,12 +953,108 @@ document.querySelectorAll('[data-percent-delta]').forEach(btn => {
   });
 });
 
+document.querySelectorAll('.percent-preset').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if(!percentSlider){ return; }
+    const value = Number(btn.dataset.percentValue);
+    if(Number.isNaN(value)){ return; }
+    const minAttr = percentSlider.getAttribute('min');
+    const maxAttr = percentSlider.getAttribute('max');
+    const min = minAttr !== null ? Number(minAttr) : null;
+    const max = maxAttr !== null ? Number(maxAttr) : null;
+    let next = value;
+    if(min !== null && !Number.isNaN(min)){ next = Math.max(min, next); }
+    if(max !== null && !Number.isNaN(max)){ next = Math.min(max, next); }
+    percentSlider.value = String(next);
+    percentSlider.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+});
+
 const cityInput = document.getElementById('city');
 const productInput = document.getElementById('product');
 const priceInput = addForm ? addForm.querySelector('input[name="price"]') : null;
 const trendSelect = addForm ? addForm.querySelector('select[name="trend"]') : null;
 const productionCheckbox = addForm ? addForm.querySelector('input[name="is_production_city"]') : null;
 let latestRequestId = 0;
+
+function applyEntryToForm(dataset){
+  if(cityInput){
+    cityInput.value = dataset.city || '';
+    cityInput.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  if(productInput){
+    productInput.value = dataset.product || '';
+    productInput.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  if(priceInput && dataset.price){
+    priceInput.value = dataset.price;
+  }
+  if(trendSelect && dataset.trend){
+    trendSelect.value = dataset.trend;
+  }
+  if(productionCheckbox){
+    productionCheckbox.checked = dataset.production === '1' || dataset.production === 'true';
+  }
+  if(percentSlider){
+    const raw = Number(dataset.percent);
+    if(!Number.isNaN(raw)){
+      const minAttr = percentSlider.getAttribute('min');
+      const maxAttr = percentSlider.getAttribute('max');
+      const min = minAttr !== null ? Number(minAttr) : null;
+      const max = maxAttr !== null ? Number(maxAttr) : null;
+      let next = raw;
+      if(min !== null && !Number.isNaN(min)){ next = Math.max(min, next); }
+      if(max !== null && !Number.isNaN(max)){ next = Math.min(max, next); }
+      percentSlider.value = String(next);
+    }
+    percentSlider.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  autofillLatestEntry();
+}
+
+function rebuildQuickFill(){
+  if(!quickFillWrapper || !quickFillButtons){ return; }
+  quickFillButtons.innerHTML = '';
+  const seen = new Set();
+  const rows = Array.from(document.querySelectorAll('#entries tr.entry-row'));
+  for(const row of rows){
+    const city = row.dataset.city || '';
+    const product = row.dataset.product || '';
+    if(!city || !product){ continue; }
+    const key = `${city}__${product}`;
+    if(seen.has(key)){ continue; }
+    seen.add(key);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'quick-fill-btn';
+    btn.textContent = `${city} · ${product}`;
+    btn.dataset.city = city;
+    btn.dataset.product = product;
+    btn.dataset.price = row.dataset.price || '';
+    btn.dataset.trend = row.dataset.trend || '';
+    btn.dataset.percent = row.dataset.percent || '';
+    btn.dataset.production = row.dataset.production || '';
+    btn.addEventListener('click', () => applyEntryToForm(btn.dataset));
+    quickFillButtons.appendChild(btn);
+    if(seen.size >= 6){ break; }
+  }
+  quickFillWrapper.hidden = seen.size === 0;
+}
+
+document.body.addEventListener('htmx:afterSwap', (event) => {
+  if(event.target && event.target.id === 'entries'){
+    rebuildQuickFill();
+  }
+});
+
+document.body.addEventListener('click', (event) => {
+  const row = event.target.closest ? event.target.closest('tr.entry-row') : null;
+  if(row && row.closest('#entries')){
+    applyEntryToForm(row.dataset);
+  }
+});
+
+rebuildQuickFill();
 
 async function autofillLatestEntry(){
   if(!cityInput || !productInput){ return; }
@@ -900,7 +1142,7 @@ ENTRIES_TABLE = r"""
         </thead>
         <tbody>
         {% for e in items %}
-          <tr>
+          <tr class="entry-row" title="{{ t['click_to_fill'] }}" data-city="{{ e['city'] }}" data-product="{{ e['product'] }}" data-price="{{ e['price'] }}" data-trend="{{ e['trend'] or 'flat' }}" data-percent="{{ '' if e['percent'] is none else e['percent'] }}" data-production="{{ 1 if e['is_production_city'] else 0 }}">
             <td class="nowrap">{{ e['created_at'][:19].replace('T',' ') }}</td>
             <td>{{ e['city'] }}</td>
             <td>{{ e['product'] }}</td>
@@ -1209,6 +1451,14 @@ def add_entry():
     def bad(msg: str):
         return make_response(msg, 400)
 
+    lang = get_lang()
+    password = (
+        (request.form.get("password") or "").strip()
+        or (request.headers.get("X-Access-Password") or "").strip()
+    )
+    if not password_matches(password):
+        return make_response(STRINGS[lang]["password_invalid"], 403)
+
     city = (request.form.get("city") or "").strip()
     product = (request.form.get("product") or "").strip()
     price_raw = (request.form.get("price") or "").replace(",", ".").strip()
@@ -1357,6 +1607,13 @@ def series_json():
 @app.post("/import.csv")
 def import_csv_route():
     lang = get_lang()
+    password = (
+        (request.form.get("password") or "").strip()
+        or (request.headers.get("X-Access-Password") or "").strip()
+    )
+    if not password_matches(password):
+        return make_response(STRINGS[lang]["password_invalid"], 403)
+
     uploaded = request.files.get("file")
     if not uploaded or uploaded.filename == "":
         return make_response("CSV file required", 400)
@@ -1435,6 +1692,14 @@ def import_csv_route():
 
 @app.get("/export.csv")
 def export_csv():
+    lang = get_lang()
+    password = (
+        (request.args.get("password") or "").strip()
+        or (request.headers.get("X-Access-Password") or "").strip()
+    )
+    if not password_matches(password):
+        return make_response(STRINGS[lang]["password_invalid"], 403)
+
     sql = "SELECT * FROM entries ORDER BY created_at DESC"
     with get_conn() as conn:
         rows = conn.execute(sql).fetchall()
