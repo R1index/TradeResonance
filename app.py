@@ -384,6 +384,12 @@ BASE_HTML = r"""
       cursor: pointer;
       border: none;
     }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
     button.secondary {
       background: rgba(15, 23, 42, 0.85);
       color: var(--text);
@@ -911,6 +917,8 @@ const quickFillWrapper = document.getElementById('quick-fill');
 const quickFillButtons = document.getElementById('quick-fill-buttons');
 const tabButtons = Array.from(document.querySelectorAll('[data-tab-target]'));
 const tabPanels = Array.from(document.querySelectorAll('.tab-panel'));
+const addForm = document.getElementById('add-form');
+const saveButton = addForm ? addForm.querySelector('button[type="submit"]') : null;
 
 function passwordMessage(target){
   return (target && target.dataset && target.dataset.requireMessage)
@@ -923,6 +931,9 @@ function syncPasswordFields(){
   document.querySelectorAll('input[data-password-field]').forEach((input) => {
     input.value = pwd;
   });
+  if(saveButton){
+    saveButton.disabled = !pwd;
+  }
 }
 
 function obtainPassword(target, options){
@@ -933,6 +944,7 @@ function obtainPassword(target, options){
       alert(passwordMessage(target));
     }
     if(adminPasswordInput){ adminPasswordInput.focus(); }
+    syncPasswordFields();
     return null;
   }
   if(target && typeof target.querySelector === 'function'){
@@ -1077,8 +1089,6 @@ function wireChartSelectors(){
 
 const percentSlider = document.getElementById('percent-slider');
 const percentDisplay = document.getElementById('percent-display');
-const addForm = document.getElementById('add-form');
-
 function sliderMetaFactory(){
   if(!percentSlider){
     return { min: null, max: null, defaultValue: null };
