@@ -105,6 +105,11 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "password_required": "Введите пароль доступа",
         "password_invalid": "Неверный пароль",
         "click_to_fill": "Кликните, чтобы подставить запись в форму",
+        "latest_autofill_label": "Автоподстановка",
+        "latest_autofill_loading": "Ищем последнюю запись...",
+        "latest_autofill_missing": "Совпадений пока нет",
+        "latest_autofill_from": "Запись от",
+        "latest_autofill_auto": "Цена обновлена автоматически",
     },
     "en": {
         "title": "Profit Routes",
@@ -157,6 +162,11 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "password_required": "Enter the access password",
         "password_invalid": "Invalid password",
         "click_to_fill": "Click to send the row to the form",
+        "latest_autofill_label": "Autofill",
+        "latest_autofill_loading": "Looking up the last entry...",
+        "latest_autofill_missing": "No matching entries yet",
+        "latest_autofill_from": "Entry from",
+        "latest_autofill_auto": "Price updated automatically",
     },
 }
 
@@ -549,6 +559,44 @@ BASE_HTML = r"""
       gap: 8px;
       margin-top: 8px;
     }
+    .latest-autofill {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(15, 22, 35, 0.65);
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .latest-autofill__label {
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      white-space: nowrap;
+      margin-top: 2px;
+    }
+    .latest-autofill__content {
+      font-size: 13px;
+      line-height: 1.4;
+      color: var(--muted);
+    }
+    .latest-autofill.success .latest-autofill__content {
+      color: #d6ecff;
+    }
+    .latest-autofill.loading .latest-autofill__content {
+      opacity: 0.8;
+    }
+    @keyframes pulse-highlight {
+      0% { box-shadow: 0 0 0 rgba(77, 160, 255, 0.0); }
+      30% { box-shadow: 0 0 0 6px rgba(77, 160, 255, 0.15); }
+      100% { box-shadow: 0 0 0 rgba(77, 160, 255, 0.0); }
+    }
+    .pulse-highlight {
+      animation: pulse-highlight 1.2s ease;
+    }
     .percent-preset {
       width: auto;
       padding: 6px 12px;
@@ -836,6 +884,21 @@ BASE_HTML = r"""
                   <button type="button" class="percent-preset" data-percent-value="100">100%</button>
                   <button type="button" class="percent-preset" data-percent-value="120">120%</button>
                 </div>
+                <div
+                  id="latest-autofill"
+                  class="latest-autofill"
+                  hidden
+                  data-loading="{{ t['latest_autofill_loading']|e }}"
+                  data-empty="{{ t['latest_autofill_missing']|e }}"
+                  data-from="{{ t['latest_autofill_from']|e }}"
+                  data-auto="{{ t['latest_autofill_auto']|e }}"
+                  data-trend-up="{{ t['trend_up']|e }}"
+                  data-trend-down="{{ t['trend_down']|e }}"
+                  data-trend-flat="{{ t['trend_flat']|e }}"
+                >
+                  <div class="latest-autofill__label">{{ t['latest_autofill_label'] }}</div>
+                  <div class="latest-autofill__content" id="latest-autofill-content"></div>
+                </div>
               </div>
             </div>
             <div class="trend-field">
@@ -948,6 +1011,9 @@ BASE_HTML = r"""
   </div>
 
 <script>
+(function(){
+'use strict';
+
 // ---- Typeahead for inputs using /suggest ----
 function bindTypeahead(inputId, datalistId, field){
   const inp = document.getElementById(inputId);
@@ -983,6 +1049,21 @@ const trendOptionLabels = addForm ? Array.from(addForm.querySelectorAll('[data-t
 const cityInput = document.getElementById('city');
 const productInput = document.getElementById('product');
 const productionCheckbox = addForm ? addForm.querySelector('input[name="is_production_city"]') : null;
+const latestBox = document.getElementById('latest-autofill');
+const latestContent = document.getElementById('latest-autofill-content');
+const latestTexts = latestBox
+  ? {
+      loading: latestBox.dataset.loading || '',
+      empty: latestBox.dataset.empty || '',
+      from: latestBox.dataset.from || '',
+      auto: latestBox.dataset.auto || '',
+      trends: {
+        up: latestBox.dataset.trendUp || '',
+        down: latestBox.dataset.trendDown || '',
+        flat: latestBox.dataset.trendFlat || '',
+      },
+    }
+  : null;
 
 function sanitizeNumeric(value){
   if(value === null || value === undefined){ return ''; }
@@ -996,6 +1077,112 @@ function passwordMessage(target){
   return (target && target.dataset && target.dataset.requireMessage)
     || (adminPasswordInput && adminPasswordInput.dataset && adminPasswordInput.dataset.requireMessage)
     || 'Password required';
+}
+
+function flashElement(el){
+  if(!el){ return; }
+  el.classList.remove('pulse-highlight');
+  void el.offsetWidth;
+  el.classList.add('pulse-highlight');
+  window.setTimeout(() => {
+    el.classList.remove('pulse-highlight');
+  }, 1300);
+}
+
+function safeNumber(value){
+  const num = Number(value);
+  return Number.isNaN(num) ? null : num;
+}
+
+function formatPrice(value){
+  const num = safeNumber(value);
+  if(num === null){ return ''; }
+  try {
+    return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 0 }).format(num);
+  } catch(err) {
+    return String(Math.round(num * 100) / 100);
+  }
+}
+
+function formatPercent(value){
+  const num = safeNumber(value);
+  if(num === null){ return ''; }
+  try {
+    return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(num)}%`;
+  } catch(err) {
+    return `${Math.round(num)}%`;
+  }
+}
+
+function formatTimestamp(iso){
+  if(!iso){ return ''; }
+  const date = new Date(iso);
+  if(Number.isNaN(date.getTime())){ return ''; }
+  try {
+    return date.toLocaleString(undefined, { hour12: false });
+  } catch(err) {
+    return date.toISOString().replace('T', ' ').slice(0, 16);
+  }
+}
+
+function describeLatestData(data){
+  if(!data || !latestTexts){ return ''; }
+  const pieces = [];
+  const priceText = formatPrice(data.price);
+  if(priceText){ pieces.push(priceText); }
+  const trendKey = data.trend === 'down' ? 'down' : data.trend === 'up' ? 'up' : 'flat';
+  const trendText = latestTexts.trends[trendKey] || '';
+  if(trendText){ pieces.push(trendText); }
+  if(data.percent !== null && data.percent !== undefined){
+    const percentText = formatPercent(data.percent);
+    if(percentText){ pieces.push(percentText); }
+  }
+  const timestamp = formatTimestamp(data.updated_at);
+  if(timestamp){
+    pieces.push(`${latestTexts.from} ${timestamp}`.trim());
+  }
+  const base = latestTexts.auto || '';
+  const details = pieces.filter(Boolean).join(' · ');
+  return details ? `${base} · ${details}` : base;
+}
+
+function setLatestState(state, text){
+  if(!latestBox || !latestContent){ return; }
+  latestBox.classList.remove('loading', 'success', 'empty');
+  if(state === 'idle'){
+    latestBox.hidden = true;
+    latestBox.dataset.state = 'idle';
+    latestContent.textContent = '';
+    return;
+  }
+  latestBox.hidden = false;
+  latestBox.dataset.state = state;
+  if(state === 'loading'){
+    latestBox.classList.add('loading');
+    latestContent.textContent = latestTexts ? latestTexts.loading : '';
+    return;
+  }
+  if(state === 'empty'){
+    latestBox.classList.add('empty');
+    latestContent.textContent = latestTexts ? latestTexts.empty : '';
+    return;
+  }
+  latestBox.classList.add('success');
+  latestContent.textContent = text || '';
+}
+
+function previewLatestFromDataset(dataset){
+  if(!dataset){ return; }
+  const payload = {
+    price: dataset.price,
+    trend: dataset.trend,
+    percent: dataset.percent,
+    updated_at: dataset.updated,
+  };
+  const text = describeLatestData(payload);
+  if(text){
+    setLatestState('success', text);
+  }
 }
 
 function syncPasswordFields(){
@@ -1244,6 +1431,10 @@ updatePercentDisplay();
 
 if(addForm){
   addForm.addEventListener('reset', () => {
+    setLatestState('idle');
+    lastLookupKey = '';
+    lastLookupResult = null;
+    pendingLookupKey = '';
     setTimeout(() => {
       setSliderValue(sliderMeta.defaultValue);
       setTrendValue(trendInput ? trendInput.defaultValue : 'flat');
@@ -1309,6 +1500,9 @@ if(trendToggleInputs.length){
 
 let latestRequestId = 0;
 let autofillTimer = null;
+let lastLookupKey = '';
+let lastLookupResult = null;
+let pendingLookupKey = '';
 
 function applyEntryToForm(dataset){
   if(cityInput){
@@ -1318,14 +1512,20 @@ function applyEntryToForm(dataset){
     productInput.value = dataset.product || '';
   }
   if(priceInput){
-    priceInput.value = sanitizeNumeric(dataset.price);
+    const sanitized = sanitizeNumeric(dataset.price);
+    priceInput.value = sanitized;
+    flashElement(priceInput);
   }
   setTrendValue(dataset.trend);
   if(productionCheckbox){
     productionCheckbox.checked = dataset.production === '1' || dataset.production === 'true';
   }
   setSliderValue(dataset.percent);
-  queueAutofillLatestEntry();
+  if(percentSlider){
+    flashElement(percentSlider);
+  }
+  previewLatestFromDataset(dataset);
+  queueAutofillLatestEntry(true);
 }
 document.body.addEventListener('htmx:afterSwap', (event) => {
   if(adminPasswordInput){
@@ -1340,59 +1540,139 @@ document.body.addEventListener('click', (event) => {
   }
 });
 
-async function autofillLatestEntry(){
-  if(!cityInput || !productInput){ return; }
-  const city = cityInput.value.trim();
-  const product = productInput.value.trim();
-  if(!city || !product){ return; }
+async function autofillLatestEntry(key, city, product){
   const requestId = ++latestRequestId;
+  pendingLookupKey = key;
   try {
     const params = new URLSearchParams({ city, product });
     const res = await fetch(`/latest-entry.json?${params.toString()}`);
-    if(!res.ok){ return; }
+    if(requestId !== latestRequestId || pendingLookupKey !== key){
+      return;
+    }
+    if(!res.ok){
+      throw new Error('lookup failed');
+    }
     const data = await res.json();
-    if(requestId !== latestRequestId){ return; }
-    if(data && data.found){
-      if(priceInput && data.price !== null && data.price !== undefined){
-        priceInput.value = sanitizeNumeric(data.price);
+    if(requestId !== latestRequestId || pendingLookupKey !== key){
+      return;
+    }
+    pendingLookupKey = '';
+    if(!data || !data.found){
+      lastLookupKey = key;
+      lastLookupResult = { found: false, text: '' };
+      setLatestState('empty');
+      return;
+    }
+    const description = describeLatestData(data);
+    lastLookupKey = key;
+    lastLookupResult = { found: true, data, text: description };
+    setLatestState('success', description);
+    if(priceInput && data.price !== null && data.price !== undefined){
+      const sanitized = sanitizeNumeric(data.price);
+      if(sanitized){
+        const before = priceInput.value;
+        priceInput.value = sanitized;
+        if(before !== sanitized){
+          flashElement(priceInput);
+        }
+        if(before.trim() === ''){
+          priceInput.focus();
+          if(typeof priceInput.select === 'function'){
+            priceInput.select();
+          }
+        }
       }
-      if(typeof data.trend === 'string'){
-        setTrendValue(data.trend);
-      }
-      if(productionCheckbox){
-        productionCheckbox.checked = Boolean(data.is_production_city);
-      }
-      setSliderValue(data.percent);
+    }
+    if(typeof data.trend === 'string'){
+      setTrendValue(data.trend);
+    }
+    if(productionCheckbox){
+      productionCheckbox.checked = Boolean(data.is_production_city);
+    }
+    const beforePercent = percentSlider ? percentSlider.value : null;
+    setSliderValue(data.percent, { fallback: sliderMeta.defaultValue });
+    if(percentSlider && beforePercent !== null && beforePercent !== percentSlider.value){
+      flashElement(percentSlider);
     }
   } catch(err) {
+    if(requestId === latestRequestId && pendingLookupKey === key){
+      setLatestState('empty');
+    }
     console.warn('latest entry lookup failed', err);
+  } finally {
+    if(pendingLookupKey === key){
+      pendingLookupKey = '';
+    }
   }
 }
 
-function queueAutofillLatestEntry(){
+function queueAutofillLatestEntry(force){
+  if(!cityInput || !productInput){ return; }
+  const city = cityInput.value.trim();
+  const product = productInput.value.trim();
+  if(!city || !product){
+    setLatestState('idle');
+    lastLookupKey = '';
+    lastLookupResult = null;
+    pendingLookupKey = '';
+    return;
+  }
+  const key = `${city.toLowerCase()}::${product.toLowerCase()}`;
+  if(!force && lastLookupKey === key && lastLookupResult){
+    if(lastLookupResult.found){
+      setLatestState('success', lastLookupResult.text);
+    } else {
+      setLatestState('empty');
+    }
+    return;
+  }
   if(autofillTimer){
     clearTimeout(autofillTimer);
   }
+  setLatestState('loading');
   autofillTimer = setTimeout(() => {
     autofillTimer = null;
-    autofillLatestEntry();
-  }, 120);
+    autofillLatestEntry(key, city, product);
+  }, force ? 60 : 160);
 }
 
 if(cityInput){
-  cityInput.addEventListener('input', queueAutofillLatestEntry);
-  cityInput.addEventListener('change', queueAutofillLatestEntry);
+  cityInput.addEventListener('input', () => queueAutofillLatestEntry(false));
+  cityInput.addEventListener('change', () => {
+    queueAutofillLatestEntry(true);
+    if(productInput && !productInput.value){
+      productInput.focus();
+    }
+  });
 }
 if(productInput){
-  productInput.addEventListener('input', queueAutofillLatestEntry);
-  productInput.addEventListener('change', queueAutofillLatestEntry);
+  productInput.addEventListener('input', () => queueAutofillLatestEntry(false));
+  productInput.addEventListener('change', () => {
+    queueAutofillLatestEntry(true);
+    if(priceInput && !priceInput.value){
+      priceInput.focus();
+      if(typeof priceInput.select === 'function'){
+        priceInput.select();
+      }
+    }
+  });
+}
+
+if(priceInput){
+  priceInput.addEventListener('blur', () => {
+    const sanitized = sanitizeNumeric(priceInput.value);
+    if(priceInput.value !== sanitized){
+      priceInput.value = sanitized;
+    }
+  });
 }
 
 if(cityInput && productInput && cityInput.value && productInput.value){
-  queueAutofillLatestEntry();
+  queueAutofillLatestEntry(true);
 }
 
 wireChartSelectors();
+})();
 </script>
 </body>
 </html>
@@ -1421,7 +1701,7 @@ ENTRIES_TABLE = r"""
         </thead>
         <tbody>
         {% for e in items %}
-          <tr class="entry-row" title="{{ t['click_to_fill'] }}" data-city="{{ e['city'] }}" data-product="{{ e['product'] }}" data-price="{{ e['price'] }}" data-trend="{{ e['trend'] or 'flat' }}" data-percent="{{ '' if e['percent'] is none else e['percent'] }}" data-production="{{ 1 if e['is_production_city'] else 0 }}">
+        <tr class="entry-row" title="{{ t['click_to_fill'] }}" data-city="{{ e['city'] }}" data-product="{{ e['product'] }}" data-price="{{ e['price'] }}" data-trend="{{ e['trend'] or 'flat' }}" data-percent="{{ '' if e['percent'] is none else e['percent'] }}" data-production="{{ 1 if e['is_production_city'] else 0 }}" data-updated="{{ e['created_at'] }}">
             <td class="nowrap">{{ e['created_at'][:19].replace('T',' ') }}</td>
             <td>{{ e['city'] }}</td>
             <td>{{ e['product'] }}</td>
