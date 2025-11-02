@@ -321,6 +321,15 @@ BASE_HTML = r"""
       text-align: center;
       box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.14);
     }
+    .clock-display[data-timezone]::after {
+      content: attr(data-timezone);
+      display: block;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      margin-top: 4px;
+      color: var(--muted);
+      opacity: 0.75;
+    }
     .topbar .clock-display {
       margin: 0 16px;
     }
@@ -1060,6 +1069,7 @@ const adminPasswordInput = document.getElementById('admin-password');
 const importForm = document.getElementById('import-form');
 const exportLink = document.getElementById('export-link');
 const clockDisplay = document.getElementById('live-clock');
+let clockState = null;
 const tabButtons = Array.from(document.querySelectorAll('[data-tab-target]'));
 const tabPanels = Array.from(document.querySelectorAll('.tab-panel'));
 const addForm = document.getElementById('add-form');
@@ -1111,17 +1121,85 @@ function flashElement(el){
   }, 1300);
 }
 
-function updateClock(){
+function padTime(value){
+  return String(value).padStart(2, '0');
+}
+
+function renderClock(){
   if(!clockDisplay){ return; }
-  const now = new Date();
-  try {
-    clockDisplay.textContent = now.toLocaleTimeString(undefined, { hour12: false });
-  } catch(err) {
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const seconds = String(now.getSeconds()).padStart(2, '0');
-    clockDisplay.textContent = `${hours}:${minutes}:${seconds}`;
+  if(!clockState){
+    clockDisplay.textContent = '--:--:--';
+    clockDisplay.removeAttribute('data-timezone');
+    clockDisplay.removeAttribute('title');
+    return;
   }
+  const { hours, minutes, seconds, timezone } = clockState;
+  clockDisplay.textContent = `${padTime(hours)}:${padTime(minutes)}:${padTime(seconds)}`;
+  if(timezone){
+    clockDisplay.setAttribute('data-timezone', timezone);
+    clockDisplay.setAttribute('title', timezone);
+  } else {
+    clockDisplay.removeAttribute('data-timezone');
+    clockDisplay.removeAttribute('title');
+  }
+}
+
+function tickClock(){
+  if(!clockState){ return; }
+  let { hours, minutes, seconds } = clockState;
+  seconds += 1;
+  if(seconds >= 60){
+    seconds = 0;
+    minutes += 1;
+    if(minutes >= 60){
+      minutes = 0;
+      hours = (hours + 1) % 24;
+    }
+  }
+  clockState.hours = hours;
+  clockState.minutes = minutes;
+  clockState.seconds = seconds;
+  renderClock();
+}
+
+async function syncClock(){
+  if(!clockDisplay){ return; }
+  try {
+    const response = await fetch('/db-time.json', { headers: { 'Accept': 'application/json' } });
+    if(!response.ok){ throw new Error('Failed to fetch db time'); }
+    const payload = await response.json();
+    const parts = (payload.time || '').split(':').map((part) => Number.parseInt(part, 10));
+    if(parts.length >= 3 && parts.every((value) => Number.isFinite(value))){
+      clockState = {
+        hours: ((parts[0] % 24) + 24) % 24,
+        minutes: ((parts[1] % 60) + 60) % 60,
+        seconds: ((parts[2] % 60) + 60) % 60,
+        timezone: payload.timezone || ''
+      };
+    } else if(payload.iso){
+      const isoDate = new Date(payload.iso);
+      if(!Number.isNaN(isoDate.getTime())){
+        const offsetSeconds = Number(payload.offset_seconds);
+        let reference = isoDate;
+        if(Number.isFinite(offsetSeconds)){
+          reference = new Date(isoDate.getTime() + offsetSeconds * 1000);
+        }
+        clockState = {
+          hours: reference.getUTCHours(),
+          minutes: reference.getUTCMinutes(),
+          seconds: reference.getUTCSeconds(),
+          timezone: payload.timezone || ''
+        };
+      } else {
+        clockState = null;
+      }
+    } else {
+      clockState = null;
+    }
+  } catch(err) {
+    clockState = null;
+  }
+  renderClock();
 }
 
 function safeNumber(value){
@@ -1347,8 +1425,9 @@ if(exportLink){
 }
 
 if(clockDisplay){
-  updateClock();
-  window.setInterval(updateClock, 1000);
+  syncClock();
+  window.setInterval(tickClock, 1000);
+  window.setInterval(syncClock, 60000);
 }
 
 // ---- Trend chart ----
@@ -2008,6 +2087,33 @@ def city_production_products(city: str) -> List[Dict[str, Any]]:
     return rows_to_dicts(rows)
 
 # ---------------------- Routes ----------------------
+
+@app.get("/db-time.json")
+def database_time():
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT now() AS db_now, to_char(now(), 'HH24:MI:SS') AS local_time, current_setting('TIMEZONE') AS tz"
+        ).fetchone()
+
+    if not row:
+        abort(500, "Database time unavailable")
+
+    row = dict(row)
+
+    db_now = row.get("db_now")
+    tz_name = row.get("tz") or ""
+    payload: Dict[str, Any] = {
+        "time": row.get("local_time"),
+        "timezone": tz_name,
+    }
+
+    if isinstance(db_now, datetime):
+        payload["iso"] = _as_utc(db_now).isoformat(timespec="seconds")
+        offset = db_now.utcoffset()
+        if offset is not None:
+            payload["offset_seconds"] = int(offset.total_seconds())
+
+    return jsonify(payload)
 
 @app.get("/")
 def index():
