@@ -370,6 +370,60 @@ BASE_HTML = r"""
     .row.wrap > * {
       flex: 1 1 220px;
     }
+    .slider-block {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(15, 23, 42, 0.4);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 14px;
+      padding: 12px 14px;
+    }
+    .slider-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      background: rgba(8, 13, 23, 0.85);
+      color: #e2e8f0;
+      font-size: 20px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s ease, transform 0.2s ease;
+      cursor: pointer;
+    }
+    .slider-btn:hover {
+      background: rgba(59, 130, 246, 0.18);
+      transform: translateY(-1px);
+    }
+    .slider-btn span {
+      line-height: 1;
+    }
+    .slider-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .slider-body input[type="range"] {
+      width: 100%;
+      accent-color: #60a5fa;
+    }
+    .slider-value {
+      font-size: 13px;
+      color: var(--muted);
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      letter-spacing: 0.04em;
+    }
     .muted {
       color: var(--muted);
       font-size: 12px;
@@ -509,9 +563,21 @@ BASE_HTML = r"""
                 <option value="down">{{ t['trend_down'] }}</option>
               </select>
             </div>
-            <div style="flex:1">
-              <label>{{ t['percent'] }}</label>
-              <input name="percent" inputmode="decimal" placeholder="3" />
+          </div>
+          <div class="spacer"></div>
+          <div class="slider-block">
+            <label for="percent-slider">{{ t['percent'] }}</label>
+            <div class="slider-row">
+              <button type="button" class="slider-btn" data-dir="-1" aria-label="-10%">
+                <span>-</span>
+              </button>
+              <div class="slider-body">
+                <input id="percent-slider" name="percent" type="range" min="30" max="160" step="1" value="100" />
+                <div class="slider-value"><span id="percent-value">100</span>%</div>
+              </div>
+              <button type="button" class="slider-btn" data-dir="1" aria-label="+10%">
+                <span>+</span>
+              </button>
             </div>
           </div>
           <div class="spacer"></div>
@@ -570,17 +636,6 @@ BASE_HTML = r"""
         <div id="product-lookup-results" class="muted">{{ t['product_lookup_hint'] }}</div>
       </div>
 
-      <div class="card" id="import-card">
-        <h2>{{ t['import'] }}</h2>
-        <form action="{{ url_for('import_csv', lang=lang) }}" method="post" enctype="multipart/form-data">
-          <label>{{ t['choose_file'] }}</label>
-          <input type="file" name="file" accept=".csv,text/csv" required />
-          <div class="actions">
-            <button type="submit">{{ t['upload'] }}</button>
-          </div>
-        </form>
-        <p class="muted-block">{{ t['export'] }} → entries.csv</p>
-      </div>
     </div>
   </div>
 
@@ -604,6 +659,39 @@ bindTypeahead('chart-product','chart-products','product');
 bindTypeahead('city','cities','city');
 bindTypeahead('product','products','product');
 bindTypeahead('lookup-product','lookup-products','product');
+
+// ---- Percent slider ----
+const percentSlider = document.getElementById('percent-slider');
+const percentValue = document.getElementById('percent-value');
+const sliderButtons = document.querySelectorAll('.slider-btn');
+const sliderStep = 10;
+
+function updatePercentValue(){
+  if(!percentSlider || !percentValue) return;
+  percentValue.textContent = percentSlider.value;
+}
+
+if(percentSlider && percentValue){
+  updatePercentValue();
+  percentSlider.addEventListener('input', updatePercentValue);
+  sliderButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const dir = parseInt(btn.dataset.dir || '0', 10);
+      const next = Math.max(parseInt(percentSlider.min, 10), Math.min(parseInt(percentSlider.max, 10), parseInt(percentSlider.value, 10) + dir * sliderStep));
+      percentSlider.value = String(next);
+      percentSlider.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  });
+  const addForm = document.getElementById('add-form');
+  if(addForm){
+    addForm.addEventListener('reset', () => {
+      setTimeout(() => {
+        percentSlider.value = percentSlider.getAttribute('value') || '100';
+        updatePercentValue();
+      }, 0);
+    });
+  }
+}
 
 // ---- Trend chart ----
 let chart;
