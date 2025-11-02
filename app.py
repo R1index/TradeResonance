@@ -5,9 +5,10 @@
 1) Город  2) Товар  3) Цена  4) Тренд  5) Процент
 + автодополнение городов/товаров, EN/RU локализация, график тренда (Chart.js).
 
-Стек: Flask + SQLite + HTMX + Chart.js (CDN) + Datalist typeahead.
+Стек: Flask + PostgreSQL (Railway) + HTMX + Chart.js (CDN) + Datalist typeahead.
 Запуск:
-    pip install flask python-dateutil
+    pip install flask python-dateutil psycopg[binary]
+    export DATABASE_URL=postgresql://user:pass@host:port/dbname
     python app.py
 Переменные:
     FLASK_ENV=development (по желанию)
@@ -16,17 +17,29 @@ from __future__ import annotations
 import csv
 import io
 import os
-import sqlite3
-from datetime import datetime
-from typing import List, Dict, Any
+from datetime import datetime, timezone
+from typing import List, Dict, Any, Iterable, Mapping
 
 from flask import (
     Flask, request, redirect, url_for, jsonify, make_response,
     render_template_string, abort
 )
 
+import psycopg
+from psycopg.rows import dict_row
+
 APP_TITLE = "Trade Resonance | Profit Routes"
-DB_PATH = os.environ.get("APP_DB", "data.sqlite")
+DATABASE_URL = (
+    os.environ.get("DATABASE_URL")
+    or os.environ.get("RAILWAY_DATABASE_URL")
+    or os.environ.get("POSTGRES_URL")
+)
+
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL (или совместимая переменная окружения) не задана. "
+        "Укажите строку подключения Railway PostgreSQL."
+    )
 
 app = Flask(__name__)
 
@@ -129,38 +142,56 @@ def get_lang() -> str:
 
 # ---------------------- DB helpers ----------------------
 
-def get_conn():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
 
-SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS entries (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    city TEXT NOT NULL,
-    product TEXT NOT NULL,
-    price REAL NOT NULL CHECK(price >= 0),
-    trend TEXT CHECK(trend IN ('up','down','flat')),
-    percent REAL,
-    is_production_city INTEGER NOT NULL DEFAULT 0 CHECK(is_production_city IN (0,1)),
-    created_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_entries_city_product ON entries(city, product);
-CREATE INDEX IF NOT EXISTS idx_entries_created ON entries(created_at);
-"""
+def get_conn():
+    return psycopg.connect(DATABASE_URL, autocommit=False, row_factory=dict_row)
+
+
+SCHEMA_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS entries (
+        id SERIAL PRIMARY KEY,
+        city TEXT NOT NULL,
+        product TEXT NOT NULL,
+        price DOUBLE PRECISION NOT NULL CHECK(price >= 0),
+        trend TEXT CHECK(trend IN ('up','down','flat')),
+        percent DOUBLE PRECISION,
+        is_production_city BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMPTZ NOT NULL
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_entries_city_product ON entries(city, product)",
+    "CREATE INDEX IF NOT EXISTS idx_entries_created ON entries(created_at)",
+)
 
 
 def ensure_schema() -> None:
-    with get_conn() as c:
-        c.executescript(SCHEMA_SQL)
-        cols = {row[1] for row in c.execute("PRAGMA table_info(entries)")}
-        if "is_production_city" not in cols:
-            c.execute(
-                "ALTER TABLE entries ADD COLUMN is_production_city INTEGER NOT NULL DEFAULT 0"
-            )
+    with get_conn() as conn:
+        for statement in SCHEMA_STATEMENTS:
+            conn.execute(statement)
 
 
 ensure_schema()
+
+# ---------------------- utils ----------------------
+
+
+def _as_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _normalize_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    result: Dict[str, Any] = dict(row)
+    for key, value in result.items():
+        if isinstance(value, datetime):
+            result[key] = _as_utc(value).isoformat(timespec="seconds")
+    return result
+
+
+def rows_to_dicts(rows: Iterable[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+    return [_normalize_row(r) for r in rows]
 
 # ---------------------- HTML (Jinja2) ----------------------
 
@@ -749,31 +780,32 @@ def distinct_values(field: str, limit: int | None = None) -> List[str]:
     sql = f"SELECT DISTINCT {field} FROM entries ORDER BY {field} ASC"
     params: tuple[Any, ...]
     if limit:
-        sql += " LIMIT ?"
+        sql += " LIMIT %s"
         params = (limit,)
     else:
         params = ()
-    with get_conn() as c:
-        cur = c.execute(sql, params)
-        return [row[0] for row in cur.fetchall()]
+    with get_conn() as conn:
+        cur = conn.execute(sql, params)
+        return [row[field] for row in cur.fetchall()]
 
 
-def latest_prices_view() -> List[sqlite3.Row]:
+def latest_prices_view() -> List[Dict[str, Any]]:
     sql = r"""
     WITH latest AS (
       SELECT e.*
       FROM entries e
       JOIN (
-        SELECT city, product, MAX(datetime(created_at)) AS mx
+        SELECT city, product, MAX(created_at) AS mx
         FROM entries
         GROUP BY city, product
       ) m
-      ON e.city = m.city AND e.product = m.product AND datetime(e.created_at) = m.mx
+      ON e.city = m.city AND e.product = m.product AND e.created_at = m.mx
     )
-    SELECT * FROM latest ORDER BY datetime(created_at) DESC LIMIT 250
+    SELECT * FROM latest ORDER BY created_at DESC LIMIT 250
     """
-    with get_conn() as c:
-        return c.execute(sql).fetchall()
+    with get_conn() as conn:
+        rows = conn.execute(sql).fetchall()
+    return rows_to_dicts(rows)
 
 
 def compute_routes(limit: int = 25) -> List[Dict[str, Any]]:
@@ -782,11 +814,11 @@ def compute_routes(limit: int = 25) -> List[Dict[str, Any]]:
       SELECT e.*
       FROM entries e
       JOIN (
-        SELECT city, product, MAX(datetime(created_at)) AS mx
+        SELECT city, product, MAX(created_at) AS mx
         FROM entries
         GROUP BY city, product
       ) m
-      ON e.city = m.city AND e.product = m.product AND datetime(e.created_at) = m.mx
+      ON e.city = m.city AND e.product = m.product AND e.created_at = m.mx
     )
     SELECT
       a.product AS product,
@@ -799,34 +831,35 @@ def compute_routes(limit: int = 25) -> List[Dict[str, Any]]:
     FROM latest a
     JOIN latest b
       ON a.product = b.product AND a.city <> b.city
-    WHERE b.price > a.price AND a.is_production_city = 1
+    WHERE b.price > a.price AND a.is_production_city IS TRUE
     ORDER BY profit_pct DESC, profit_abs DESC
-    LIMIT ?
+    LIMIT %s
     """
-    with get_conn() as c:
-        rows = c.execute(sql, (limit,)).fetchall()
-        return [dict(row) for row in rows]
+    with get_conn() as conn:
+        rows = conn.execute(sql, (limit,)).fetchall()
+    return [dict(row) for row in rows]
 
 
-def product_latest_prices(product: str, sort: str = "asc") -> List[sqlite3.Row]:
+def product_latest_prices(product: str, sort: str = "asc") -> List[Dict[str, Any]]:
     order = "DESC" if sort == "desc" else "ASC"
     sql = f"""
     WITH latest AS (
       SELECT e.*
       FROM entries e
       JOIN (
-        SELECT city, MAX(datetime(created_at)) AS mx
+        SELECT city, MAX(created_at) AS mx
         FROM entries
-        WHERE product = ?
+        WHERE product = %s
         GROUP BY city
       ) m
-      ON e.city = m.city AND datetime(e.created_at) = m.mx
-      WHERE e.product = ?
+      ON e.city = m.city AND e.created_at = m.mx
+      WHERE e.product = %s
     )
-    SELECT * FROM latest ORDER BY price {order}, datetime(created_at) DESC
+    SELECT * FROM latest ORDER BY price {order}, created_at DESC
     """
-    with get_conn() as c:
-        return c.execute(sql, (product, product)).fetchall()
+    with get_conn() as conn:
+        rows = conn.execute(sql, (product, product)).fetchall()
+    return rows_to_dicts(rows)
 
 # ---------------------- Routes ----------------------
 
@@ -877,12 +910,12 @@ def add_entry():
     if trend not in ("up", "down", "flat"):
         trend = "flat"
 
-    is_production_city = 1 if request.form.get("is_production_city") else 0
+    is_production_city = bool(request.form.get("is_production_city"))
 
-    created_at = datetime.utcnow().isoformat()
-    with get_conn() as c:
-        c.execute(
-            "INSERT INTO entries(city, product, price, trend, percent, is_production_city, created_at) VALUES (?,?,?,?,?,?,?)",
+    created_at = datetime.now(timezone.utc)
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO entries(city, product, price, trend, percent, is_production_city, created_at) VALUES (%s,%s,%s,%s,%s,%s,%s)",
             (city, product, price, trend, percent, is_production_city, created_at),
         )
 
@@ -948,7 +981,7 @@ def import_csv():
     def normalize_key(key: str | None) -> str:
         return (key or "").strip().lower()
 
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc)
     payload = []
     for row in reader:
         lowered = {normalize_key(k): (v.strip() if isinstance(v, str) else v) for k, v in row.items()}
@@ -979,30 +1012,31 @@ def import_csv():
             trend = "flat"
 
         if is_prod_raw in ("1", "true", "yes", "y", "да", "истина", "production", "prod"):
-            is_prod = 1
+            is_prod = True
         else:
             try:
-                is_prod = 1 if int(is_prod_raw) != 0 else 0
+                is_prod = bool(int(is_prod_raw))
             except ValueError:
-                is_prod = 0
+                is_prod = False
 
-        created_at = created_raw or now
+        created_at = now
         if created_raw:
             try:
-                datetime.fromisoformat(created_raw.replace("Z", "+00:00"))
+                parsed = datetime.fromisoformat(created_raw.replace("Z", "+00:00"))
             except ValueError:
                 try:
                     parsed = datetime.strptime(created_raw, "%Y-%m-%d %H:%M:%S")
-                    created_at = parsed.isoformat()
+                    parsed = parsed.replace(tzinfo=timezone.utc)
                 except ValueError:
-                    created_at = now
+                    parsed = now
+            created_at = _as_utc(parsed)
 
         payload.append((city, product_val, price, trend, percent, is_prod, created_at))
 
     if payload:
-        with get_conn() as c:
-            c.executemany(
-                "INSERT INTO entries(city, product, price, trend, percent, is_production_city, created_at) VALUES (?,?,?,?,?,?,?)",
+        with get_conn() as conn:
+            conn.executemany(
+                "INSERT INTO entries(city, product, price, trend, percent, is_production_city, created_at) VALUES (%s,%s,%s,%s,%s,%s,%s)",
                 payload,
             )
 
@@ -1023,14 +1057,14 @@ def suggest():
     sql = f"SELECT DISTINCT {field} FROM entries"
     params: tuple[Any, ...]
     if like:
-        sql += f" WHERE LOWER({field}) LIKE ?"
+        sql += f" WHERE LOWER({field}) LIKE %s"
         params = (like,)
     else:
         params = ()
     sql += f" ORDER BY {field} ASC LIMIT 20"
-    with get_conn() as c:
-        rows = c.execute(sql, params).fetchall()
-    return jsonify([row[0] for row in rows])
+    with get_conn() as conn:
+        rows = conn.execute(sql, params).fetchall()
+    return jsonify([row[field] for row in rows])
 
 @app.get("/series.json")
 def series_json():
@@ -1040,18 +1074,24 @@ def series_json():
         return jsonify([])
     sql = (
         "SELECT created_at AS ts, price, trend, percent FROM entries "
-        "WHERE city=? AND product=? ORDER BY datetime(created_at) ASC"
+        "WHERE city=%s AND product=%s ORDER BY created_at ASC"
     )
-    with get_conn() as c:
-        rows = c.execute(sql, (city, product)).fetchall()
-        data = [dict(r) for r in rows]
+    with get_conn() as conn:
+        rows = conn.execute(sql, (city, product)).fetchall()
+    data = []
+    for r in rows:
+        item = dict(r)
+        ts = item.get("ts")
+        if isinstance(ts, datetime):
+            item["ts"] = _as_utc(ts).isoformat(timespec="seconds")
+        data.append(item)
     return jsonify(data)
 
 @app.get("/export.csv")
 def export_csv():
-    sql = "SELECT * FROM entries ORDER BY datetime(created_at) DESC"
-    with get_conn() as c:
-        rows = c.execute(sql).fetchall()
+    sql = "SELECT * FROM entries ORDER BY created_at DESC"
+    with get_conn() as conn:
+        rows = conn.execute(sql).fetchall()
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow([
@@ -1065,15 +1105,22 @@ def export_csv():
         "is_production_city",
     ])
     for r in rows:
+        created_at = r["created_at"]
+        if isinstance(created_at, datetime):
+            created_at = _as_utc(created_at).isoformat(timespec="seconds")
+        is_prod = r["is_production_city"]
+        if isinstance(is_prod, bool):
+            is_prod = int(is_prod)
+        percent_val = r["percent"]
         writer.writerow([
             r["id"],
-            r["created_at"],
+            created_at,
             r["city"],
             r["product"],
             r["price"],
             r["trend"],
-            "" if r["percent"] is None else r["percent"],
-            r["is_production_city"],
+            "" if percent_val is None else percent_val,
+            is_prod,
         ])
     csv_data = buffer.getvalue()
     resp = make_response(csv_data)
