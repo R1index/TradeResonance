@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="{{ 'en' if lang=='en' else 'ru' }}" class="h-full">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ t('app_title') }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      // Tailwind config: enable dark mode via class
+      tailwind.config = { darkMode: 'class' };
+      // Theme bootstrap: use saved or system preference
+      (function(){
+        const saved = localStorage.getItem('theme');
+        if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='tw-app.css') }}">
+  </head>
+  <body class="min-h-full bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 transition-colors">
+    <!-- Toasts -->
+    <div id="toast-zone" class="fixed top-4 right-4 z-50 space-y-2"></div>
+    {% set flash_msg = (get_flashed_messages() or [])|first %}
+    <div data-flash='{{ {"message": flash_msg, "type": "success"} | tojson if flash_msg else "" }}' class="hidden"></div>
+
+    <!-- Header -->
+    <header class="border-b border-zinc-200 dark:border-zinc-800 bg-white/60 dark:bg-zinc-900/60 backdrop-blur shadow-sm">
+      <div class="mx-auto max-w-7xl px-3 sm:px-6 py-3 flex items-center justify-between">
+        <a href="{{ url_for('index', lang=lang) }}" class="flex items-center gap-2 font-semibold tracking-tight text-lg">
+          <span>🧭</span><span>{{ t('app_title') }}</span>
+        </a>
+        <nav class="hidden md:flex items-center gap-1">
+          <a class="px-3 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 {{ 'bg-zinc-100 dark:bg-zinc-800' if request.args.get('tab','prices')=='prices' else '' }}" href="{{ url_for('index', tab='prices', lang=lang) }}">{{ t('nav_prices') }}</a>
+          <a class="px-3 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 {{ 'bg-zinc-100 dark:bg-zinc-800' if request.args.get('tab')=='cities' else '' }}" href="{{ url_for('index', tab='cities', lang=lang) }}">{{ t('nav_cities') }}</a>
+          <a class="px-3 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 {{ 'bg-zinc-100 dark:bg-zinc-800' if request.args.get('tab')=='routes' else '' }}" href="{{ url_for('index', tab='routes', lang=lang) }}">{{ t('nav_routes') }}</a>
+          <a class="px-3 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" href="{{ url_for('new_entry', lang=lang) }}">{{ t('nav_add') }}</a>
+          <a class="px-3 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" href="{{ url_for('import_csv', lang=lang) }}">{{ t('nav_import') }}</a>
+        </nav>
+        <div class="flex items-center gap-2">
+          <div class="hidden sm:flex rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800">
+            <a class="px-3 py-1.5 {{ 'bg-zinc-200 dark:bg-zinc-800' if lang=='en' else '' }}" href="?lang=en">EN</a>
+            <a class="px-3 py-1.5 {{ 'bg-zinc-200 dark:bg-zinc-800' if lang=='ru' else '' }}" href="?lang=ru">RU</a>
+          </div>
+          <button id="themeToggle" class="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" title="Toggle theme">🌓</button>
+          <button class="md:hidden p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" id="menuBtn" aria-label="Menu">☰</button>
+        </div>
+      </div>
+      <!-- Mobile menu -->
+      <div id="mobileMenu" class="md:hidden hidden border-t border-zinc-200 dark:border-zinc-800">
+        <div class="mx-auto max-w-7xl px-3 sm:px-6 py-2 grid gap-2">
+          <a class="px-3 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" href="{{ url_for('index', tab='prices', lang=lang) }}">{{ t('nav_prices') }}</a>
+          <a class="px-3 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" href="{{ url_for('index', tab='cities', lang=lang) }}">{{ t('nav_cities') }}</a>
+          <a class="px-3 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" href="{{ url_for('index', tab='routes', lang=lang) }}">{{ t('nav_routes') }}</a>
+          <a class="px-3 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" href="{{ url_for('new_entry', lang=lang) }}">{{ t('nav_add') }}</a>
+          <a class="px-3 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" href="{{ url_for('import_csv', lang=lang) }}">{{ t('nav_import') }}</a>
+          <div class="flex gap-2">
+            <a class="flex-1 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 text-center" href="?lang=en">EN</a>
+            <a class="flex-1 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 text-center" href="?lang=ru">RU</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-7xl px-3 sm:px-6 py-6 space-y-6">
+      {% block content %}{% endblock %}
+    </main>
+
+    <script src="{{ url_for('static', filename='tw-app.js') }}"></script>
+  </body>
+</html>

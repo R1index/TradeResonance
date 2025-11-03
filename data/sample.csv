@@ -1,0 +1,243 @@
+id,created_at,city,product,price,trend,percent,is_production_city
+243,2025-11-03T14:15:36+00:00,Anita Energy Institute,Rechargeable Battery,288.0,up,100.0,1
+242,2025-11-03T14:15:16+00:00,Anita Energy Institute,Non-woven Fabric,584.0,down,106.0,1
+241,2025-11-03T14:05:23+00:00,Anita Energy Institute,Car Parts,878.0,down,106.0,0
+240,2025-11-03T14:04:34+00:00,Anita Energy Institute,Black Tea,1338.0,up,140.0,0
+239,2025-11-03T13:39:02+00:00,Shoggolith City,Ward Spring Water,52.0,up,104.0,1
+238,2025-11-03T13:38:26+00:00,Shoggolith City,Canned Fruits,104.0,up,99.0,1
+237,2025-11-03T13:37:58+00:00,Shoggolith City,Ward Roast Chicken,310.0,down,104.0,1
+236,2025-11-03T13:37:12+00:00,Shoggolith City,High-End Tableware,412.0,up,112.0,1
+235,2025-11-03T13:36:39+00:00,Shoggolith City,Bullet Accelerator,2211.0,up,103.0,1
+234,2025-11-03T13:36:18+00:00,Shoggolith City,Black Tea,516.0,up,75.0,1
+233,2025-11-03T13:35:08+00:00,Shoggolith City,Car Parts,670.0,down,93.0,1
+232,2025-11-03T07:08:54+00:00,Shoggolith City,Rechargeable Battery,371.0,up,115.0,0
+231,2025-11-03T07:08:31+00:00,Shoggolith City,Non-woven Fabric,549.0,up,89.0,0
+230,2025-11-03T07:08:07+00:00,Shoggolith City,Home Solar Panel Unit,1519.0,up,109.0,0
+229,2025-11-03T06:54:51+00:00,Anita Energy Institute,Rechargeable Battery,248.0,up,86.0,1
+228,2025-11-03T06:54:26+00:00,Anita Energy Institute,Non-woven Fabric,501.0,down,91.0,1
+227,2025-11-03T06:54:02+00:00,Anita Energy Institute,Lithium Battery,829.0,down,108.0,1
+226,2025-11-03T06:53:32+00:00,Anita Energy Institute,Home Solar Panel Unit,1071.0,up,93.0,1
+225,2025-11-03T06:48:26+00:00,Anita Energy Institute,Black Tea,1061.0,down,111.0,0
+224,2025-11-03T06:18:09+00:00,Shoggolith City,Ward Spring Water,45.0,up,90.0,1
+223,2025-11-03T06:17:44+00:00,Shoggolith City,Canned Fruits,110.0,down,105.0,1
+222,2025-11-03T06:17:21+00:00,Shoggolith City,Ward Roast Chicken,283.0,up,95.0,1
+221,2025-11-03T06:16:40+00:00,Shoggolith City,High-End Tableware,357.0,down,97.0,1
+220,2025-11-03T06:16:14+00:00,Shoggolith City,Black Tea,413.0,up,60.0,1
+219,2025-11-03T06:15:47+00:00,Shoggolith City,Car Parts,821.0,up,114.0,1
+218,2025-11-03T06:15:14+00:00,Shoggolith City,Bullet Accelerator,2297.0,up,107.0,1
+217,2025-11-03T03:33:27+00:00,Shoggolith City,Nuts,228.0,down,96.0,0
+216,2025-11-03T03:33:05+00:00,Shoggolith City,Aerospace Memento,914.0,down,106.0,0
+215,2025-11-03T03:25:52+00:00,Freeport VII,Sea Salt,92.0,up,105.0,1
+214,2025-11-03T03:25:27+00:00,Freeport VII,Beer,127.0,up,108.0,1
+213,2025-11-03T03:25:01+00:00,Freeport VII,Nuts,200.0,down,95.0,1
+212,2025-11-03T03:24:40+00:00,Freeport VII,Penaeus,670.0,down,114.0,1
+211,2025-11-03T03:23:56+00:00,Freeport VII,Aerospace Memento,761.0,down,98.0,1
+210,2025-11-03T03:22:51+00:00,Freeport VII,Aerospace Memento,763.0,up,100.0,1
+209,2025-11-03T03:22:29+00:00,Freeport VII,Artificial Crystal,1830.0,down,103.0,1
+208,2025-11-03T03:22:06+00:00,Freeport VII,Chaos Money Tree,5035.0,down,103.0,1
+207,2025-11-03T03:03:29+00:00,Freeport VII,Rechargeable Battery,323.0,up,105.0,0
+206,2025-11-03T03:03:09+00:00,Freeport VII,Non-woven Fabric,574.0,down,101.0,0
+205,2025-11-03T02:55:40+00:00,Anita Energy Institute,Home Solar Panel Unit,1140.0,down,99.0,1
+204,2025-11-03T02:55:10+00:00,Anita Energy Institute,Rechargeable Battery,248.0,down,86.0,1
+203,2025-11-03T02:54:47+00:00,Anita Energy Institute,Non-woven Fabric,568.0,down,103.0,1
+202,2025-11-03T02:54:17+00:00,Anita Energy Institute,Lithium Battery,876.0,up,114.0,1
+201,2025-11-03T02:53:33+00:00,Anita Energy Institute,Ward Roast Chicken,593.0,down,110.0,0
+200,2025-11-03T02:53:17+00:00,Anita Energy Institute,Black Tea,1252.0,down,131.0,0
+199,2025-11-03T02:52:33+00:00,Anita Energy Institute,Bullet Accelerator,2889.0,up,117.0,0
+198,2025-11-03T02:32:30+00:00,Shoggolith City,Rechargeable Battery,346.0,up,107.0,0
+197,2025-11-03T02:32:00+00:00,Shoggolith City,Non-woven Fabric,586.0,down,95.0,0
+196,2025-11-03T02:19:54+00:00,Anita Energy Institute,Non-woven Fabric,568.0,down,103.0,1
+195,2025-11-03T02:19:23+00:00,Anita Energy Institute,Rechargeable Battery,248.0,down,86.0,1
+194,2025-11-03T02:18:27+00:00,Anita Energy Institute,Ward Spring Water,73.0,up,91.0,0
+193,2025-11-03T02:18:02+00:00,Anita Energy Institute,Ward Roast Chicken,593.0,down,110.0,0
+192,2025-11-03T02:17:32+00:00,Anita Energy Institute,Black Tea,1300.0,up,137.0,0
+191,2025-11-03T02:17:05+00:00,Anita Energy Institute,Bullet Accelerator,2889.0,up,117.0,0
+190,2025-11-03T02:02:43+00:00,Shoggolith City,Ward Spring Water,42.0,down,84.0,1
+189,2025-11-03T02:01:52+00:00,Shoggolith City,Canned Fruits,104.0,up,99.0,1
+188,2025-11-03T02:01:23+00:00,Shoggolith City,Ward Roast Chicken,238.0,down,80.0,1
+187,2025-11-03T02:00:45+00:00,Shoggolith City,High-End Tableware,412.0,down,112.0,1
+186,2025-11-03T02:00:18+00:00,Shoggolith City,Black Tea,605.0,up,88.0,1
+185,2025-11-03T01:59:54+00:00,Shoggolith City,Car Parts,713.0,up,99.0,1
+184,2025-11-03T01:59:18+00:00,Shoggolith City,Bullet Accelerator,1868.0,down,87.0,1
+183,2025-11-03T01:43:26+00:00,Shoggolith City,Rechargeable Battery,339.0,up,105.0,0
+182,2025-11-03T01:43:03+00:00,Shoggolith City,Non-woven Fabric,605.0,down,98.0,0
+181,2025-11-03T01:27:00+00:00,Anita Energy Institute,Home Solar Panel Unit,1175.0,down,102.0,1
+180,2025-11-03T01:26:34+00:00,Anita Energy Institute,Lithium Battery,852.0,up,111.0,1
+179,2025-11-03T01:26:01+00:00,Anita Energy Institute,Non-woven Fabric,584.0,down,106.0,1
+178,2025-11-03T01:25:08+00:00,Anita Energy Institute,Rechargeable Battery,253.0,down,88.0,1
+177,2025-11-02T23:19:53+00:00,Anita Energy Institute,Home Solar Panel Unit,1175.0,down,102.0,1
+176,2025-11-02T23:19:29+00:00,Anita Energy Institute,Rechargeable Battery,265.0,down,92.0,1
+175,2025-11-02T23:18:53+00:00,Anita Energy Institute,Non-woven Fabric,617.0,down,112.0,1
+174,2025-11-02T23:18:29+00:00,Anita Energy Institute,Lithium Battery,806.0,up,105.0,1
+173,2025-11-02T23:17:39+00:00,Anita Energy Institute,Potatoes,104.0,up,120.0,0
+172,2025-11-02T23:17:06+00:00,Anita Energy Institute,Quartz Sand,113.0,down,113.0,0
+171,2025-11-02T23:16:27+00:00,Anita Energy Institute,Gasoline,693.0,down,103.0,0
+170,2025-11-02T23:16:07+00:00,Anita Energy Institute,Lead Ore,845.0,down,103.0,0
+169,2025-11-02T23:15:45+00:00,Anita Energy Institute,C4,1073.0,up,109.0,0
+168,2025-11-02T23:15:16+00:00,Anita Energy Institute,Fine Steel,1864.0,up,108.0,0
+167,2025-11-02T23:01:39+00:00,BCRL Outpost,Carmine May Military Food,177.0,up,100.0,1
+166,2025-11-02T23:00:47+00:00,BCRL Outpost,Gasoline,507.0,down,89.0,1
+165,2025-11-02T23:00:19+00:00,BCRL Outpost,Bullets,779.0,up,115.0,1
+164,2025-11-02T22:59:47+00:00,BCRL Outpost,C4,753.0,down,91.0,1
+163,2025-11-02T22:59:07+00:00,BCRL Outpost,Fine Steel,1356.0,down,99.0,1
+162,2025-11-02T22:58:22+00:00,BCRL Outpost,Bullet Accelerator,2383.0,up,111.0,1
+161,2025-11-02T22:11:33+00:00,Wilderness Station,Potatoes,58.0,up,95.0,1
+160,2025-11-02T22:11:03+00:00,Wilderness Station,Graphite,415.0,up,108.0,1
+159,2025-11-02T22:10:16+00:00,Wilderness Station,Lead Ore,671.0,down,99.0,1
+158,2025-11-02T22:09:48+00:00,Wilderness Station,Lead Ore,671.0,down,99.0,0
+157,2025-11-02T22:09:20+00:00,Wilderness Station,Turquoise,1270.0,up,111.0,1
+156,2025-11-02T22:08:25+00:00,Wilderness Station,Quartz Sand,247.0,down,93.0,0
+155,2025-11-02T22:07:53+00:00,Wilderness Station,Iron Ore,372.0,up,103.0,0
+154,2025-11-02T22:07:27+00:00,Wilderness Station,Car Parts,832.0,down,107.0,0
+153,2025-11-02T22:06:50+00:00,Wilderness Station,Agate,2129.0,down,109.0,0
+152,2025-11-02T21:59:08+00:00,ONEderland,Quartz Sand,221.0,down,95.0,1
+151,2025-11-02T21:58:40+00:00,ONEderland,Iron Ore,350.0,down,97.0,1
+150,2025-11-02T21:58:16+00:00,ONEderland,Black Slag,638.0,down,115.0,1
+149,2025-11-02T21:57:52+00:00,ONEderland,Agate,1590.0,up,92.0,1
+148,2025-11-02T21:57:26+00:00,ONEderland,Gold Sand,2727.0,down,102.0,1
+147,2025-11-02T21:56:37+00:00,ONEderland,Rechargeable Battery,400.0,up,113.0,0
+146,2025-11-02T21:56:07+00:00,ONEderland,Car Parts,721.0,down,91.0,0
+145,2025-11-02T21:55:37+00:00,ONEderland,Lithium Battery,954.0,up,101.0,0
+144,2025-11-02T21:34:51+00:00,Anita Energy Institute,Home Solar Panel Unit,1256.0,down,109.0,1
+143,2025-11-02T21:34:27+00:00,Anita Energy Institute,Rechargeable Battery,279.0,down,97.0,1
+142,2025-11-02T21:33:44+00:00,Anita Energy Institute,Non-woven Fabric,656.0,up,119.0,1
+141,2025-11-02T21:33:18+00:00,Anita Energy Institute,Lithium Battery,753.0,up,98.0,1
+140,2025-11-02T21:16:42+00:00,Anita Energy Institute,Car Parts,737.0,down,89.0,0
+139,2025-11-02T21:15:45+00:00,Anita Energy Institute,Aerospace Memento,808.0,down,74.0,0
+138,2025-11-02T21:07:21+00:00,Freeport VII,Chaos Money Tree,5230.0,up,107.0,1
+137,2025-11-02T21:06:52+00:00,Freeport VII,Artificial Crystal,1884.0,up,106.0,1
+136,2025-11-02T21:06:22+00:00,Freeport VII,Sea Salt,82.0,up,93.0,1
+135,2025-11-02T21:05:18+00:00,Freeport VII,Beer,114.0,up,97.0,1
+134,2025-11-02T21:02:08+00:00,Freeport VII,Nuts,204.0,up,97.0,1
+133,2025-11-02T21:01:32+00:00,Freeport VII,Penaeus,641.0,up,109.0,1
+132,2025-11-02T21:00:57+00:00,Freeport VII,Aerospace Memento,777.0,up,100.0,1
+131,2025-11-02T20:58:59+00:00,Freeport VII,Glow Sticks,428.0,up,91.0,0
+130,2025-11-02T20:57:01+00:00,Freeport VII,Car Parts,700.0,up,86.0,0
+129,2025-11-02T20:56:21+00:00,Freeport VII,Black Tea,1084.0,down,124.0,0
+128,2025-11-02T20:09:41+00:00,Shoggolith City,Ward Spring Water,49.0,down,98.0,1
+127,2025-11-02T20:09:04+00:00,Shoggolith City,Canned Fruits,91.0,up,87.0,1
+126,2025-11-02T20:08:22+00:00,Shoggolith City,Ward Roast Chicken,298.0,down,100.0,1
+125,2025-11-02T20:07:45+00:00,Shoggolith City,High-End Tableware,372.0,up,101.0,1
+124,2025-11-02T20:07:13+00:00,Shoggolith City,Black Tea,440.0,up,64.0,1
+123,2025-11-02T20:06:25+00:00,Shoggolith City,Car Parts,619.0,down,86.0,1
+122,2025-11-02T20:05:37+00:00,Shoggolith City,Bullet Accelerator,2448.0,down,114.0,1
+121,2025-11-02T19:39:56+00:00,Shoggolith City,Cassette,279.0,up,103.0,0
+120,2025-11-02T19:39:20+00:00,Shoggolith City,Glow Sticks,418.0,down,93.0,0
+119,2025-11-02T19:38:37+00:00,Shoggolith City,Videotape,548.0,up,101.0,0
+118,2025-11-02T19:34:27+00:00,CDCA Bureau,Gaming Console,3136.0,up,98.0,1
+117,2025-11-02T19:33:48+00:00,CDCA Bureau,Game Cartridge,616.0,down,95.0,1
+116,2025-11-02T19:33:05+00:00,CDCA Bureau,Cassette,251.0,down,98.0,1
+115,2025-11-02T19:31:33+00:00,CDCA Bureau,Toy Train,323.0,up,101.0,1
+114,2025-11-02T19:30:23+00:00,CDCA Bureau,Speaker,1066.0,down,111.0,1
+113,2025-11-02T19:27:25+00:00,CDCA Bureau,Glow Sticks,345.0,up,83.0,1
+112,2025-11-02T19:17:27+00:00,CDCA Bureau,Videotape,410.0,down,80.0,1
+111,2025-11-02T11:48:16+00:00,CDCA Bureau,Rechargeable Battery,354.0,up,104.0,0
+110,2025-11-02T11:17:53+00:00,Anita Energy Institute,Black Tea,1214.0,up,127.0,0
+109,2025-11-02T11:16:40+00:00,Anita Energy Institute,Bullet Accelerator,2815.0,up,114.0,0
+108,2025-11-02T10:56:42+00:00,Shoggolith City,Glow Sticks,449.0,up,100.0,0
+107,2025-11-02T10:56:22+00:00,Shoggolith City,Speaker,1058.0,down,102.0,0
+106,2025-11-02T10:49:06+00:00,CDCA Bureau,Gaming Console,3232.0,up,101.0,1
+105,2025-11-02T10:48:41+00:00,CDCA Bureau,Game Cartridge,713.0,up,110.0,1
+104,2025-11-02T10:47:45+00:00,CDCA Bureau,Cassette,266.0,up,104.0,1
+103,2025-11-02T10:47:12+00:00,CDCA Bureau,Toy Train,362.0,down,113.0,1
+102,2025-11-02T10:46:41+00:00,CDCA Bureau,Glow Sticks,412.0,down,99.0,1
+101,2025-11-02T10:46:19+00:00,CDCA Bureau,Videotape,532.0,down,104.0,1
+100,2025-11-02T10:45:55+00:00,CDCA Bureau,Speaker,874.0,up,91.0,1
+99,2025-11-02T10:44:07+00:00,CDCA Bureau,Rechargeable Battery,347.0,up,102.0,0
+98,2025-11-02T09:00:36+00:00,Anita Energy Institute,Home Solar Panel Unit,1210.0,down,105.0,1
+97,2025-11-02T09:00:06+00:00,Anita Energy Institute,Rechargeable Battery,251.0,down,87.0,1
+96,2025-11-02T08:58:09+00:00,Anita Energy Institute,Non-woven Fabric,645.0,up,117.0,1
+95,2025-11-02T08:57:34+00:00,Anita Energy Institute,Lithium Battery,845.0,up,110.0,1
+94,2025-11-02T08:55:48+00:00,Anita Energy Institute,Black Tea,1314.0,down,127.0,0
+93,2025-11-02T08:36:54+00:00,Shoggolith City,Ward Spring Water,51.0,up,102.0,1
+92,2025-11-02T08:36:01+00:00,Shoggolith City,Canned Fruits,105.0,down,100.0,1
+91,2025-11-02T08:35:27+00:00,Shoggolith City,Ward Roast Chicken,292.0,down,98.0,1
+90,2025-11-02T08:34:37+00:00,Shoggolith City,High-End Tableware,423.0,up,115.0,1
+89,2025-11-02T08:33:59+00:00,Shoggolith City,Black Tea,406.0,down,59.0,1
+88,2025-11-02T08:32:46+00:00,Shoggolith City,Car Parts,749.0,up,104.0,1
+87,2025-11-02T08:30:50+00:00,Shoggolith City,Bullet Accelerator,2176.0,up,106.0,1
+86,2025-11-02T08:24:59+00:00,Anita Energy Institute,Home Solar Panel Unit,1244.0,up,108.0,1
+85,2025-11-02T08:22:47+00:00,Anita Energy Institute,Home Solar Panel Unit,1244.0,up,108.0,1
+84,2025-11-02T07:27:21+00:00,Anita Energy Institute,Home Solar Panel Unit,1244.0,up,108.0,1
+83,2025-11-02T07:26:41+00:00,Anita Energy Institute,Rechargeable Battery,256.0,down,89.0,1
+82,2025-11-02T07:26:13+00:00,Anita Energy Institute,Non-woven Fabric,628.0,up,114.0,1
+81,2025-11-02T07:25:12+00:00,Anita Energy Institute,Lithium Battery,822.0,up,107.0,1
+80,2025-11-02T07:22:32+00:00,Anita Energy Institute,Beer,135.0,down,106.0,0
+79,2025-11-02T07:22:12+00:00,Anita Energy Institute,Penaeus,729.0,down,105.0,0
+78,2025-11-02T07:21:40+00:00,Anita Energy Institute,Car Parts,803.0,down,97.0,0
+77,2025-11-02T07:20:52+00:00,Anita Energy Institute,Black Tea,1310.0,down,137.0,0
+76,2025-11-02T07:12:12+00:00,Freeport VII,Chaos Money Tree,5523.0,up,113.0,1
+75,2025-11-02T07:10:42+00:00,Freeport VII,Artificial Crystal,2008.0,up,113.0,1
+74,2025-11-02T07:09:36+00:00,Freeport VII,Sea Salt,103.0,up,103.0,1
+73,2025-11-02T07:04:41+00:00,Freeport VII,Beer,103.0,up,87.0,1
+72,2025-11-02T07:03:31+00:00,Freeport VII,Nuts,225.0,down,107.0,1
+71,2025-11-02T07:02:49+00:00,Freeport VII,Penaeus,523.0,up,89.0,1
+70,2025-11-02T06:57:31+00:00,Freeport VII,Aerospace Memento,800.0,down,103.0,1
+69,2025-11-02T06:56:29+00:00,Freeport VII,Aerospace Memento,800.0,down,103.0,0
+68,2025-11-02T06:53:02+00:00,Freeport VII,Car Parts,651.0,down,80.0,0
+67,2025-11-02T06:52:11+00:00,Freeport VII,Black Tea,1189.0,up,136.0,0
+66,2025-11-02T06:51:15+00:00,Freeport VII,Bullet Accelerator,2860.0,up,120.0,0
+65,2025-11-02T06:39:23+00:00,Shoggolith City,Black Tea,509.0,down,73.0,1
+64,2025-11-02T06:38:28+00:00,Shoggolith City,Car Parts,706.0,up,98.0,1
+63,2025-11-02T06:37:46+00:00,Shoggolith City,Bullet Accelerator,2104.0,up,98.0,1
+62,2025-11-02T05:56:56+00:00,Shoggolith City,Reinforced Concrete Sleepers,612.0,up,105.0,0
+61,2025-11-02T05:56:19+00:00,Shoggolith City,Lithium Battery,903.0,down,105.0,0
+60,2025-11-02T05:49:24+00:00,Mander Mine,Placer,29.0,up,97.0,1
+59,2025-11-02T05:48:56+00:00,Mander Mine,Stone Materials,191.0,down,106.0,1
+58,2025-11-02T05:47:51+00:00,Mander Mine,Iron Ore,364.0,up,104.0,1
+56,2025-11-02T05:45:25+00:00,Mander Mine,Building Materials,455.0,up,101.0,1
+55,2025-11-02T05:44:42+00:00,Mander Mine,Reinforced Concrete Sleepers,486.0,up,90.0,1
+54,2025-11-02T05:43:56+00:00,Mander Mine,Brass,558.0,down,90.0,1
+53,2025-11-02T05:43:26+00:00,Mander Mine,Mander Toolbox,880.0,down,100.0,1
+52,2025-11-02T05:42:44+00:00,Mander Mine,Special Steel for Tracks,994.0,down,92.0,1
+51,2025-11-02T05:09:26+00:00,Mander Mine,Special Steel for Tracks,1015.0,down,94.0,1
+50,2025-11-02T04:55:09+00:00,Mander Mine,Quartz Sand,269.0,down,108.0,0
+49,2025-11-02T04:54:33+00:00,Mander Mine,Lithium Battery,867.0,down,94.0,0
+48,2025-11-02T04:53:54+00:00,Mander Mine,Agate,1941.0,up,104.0,0
+47,2025-11-02T04:41:33+00:00,ONEderland,Quartz Sand,189.0,down,81.0,1
+46,2025-11-02T04:40:48+00:00,ONEderland,Iron Ore,393.0,up,109.0,1
+45,2025-11-02T04:40:03+00:00,ONEderland,Black Slag,572.0,down,103.0,1
+44,2025-11-02T04:38:48+00:00,ONEderland,Agate,1538.0,down,89.0,1
+43,2025-11-02T04:38:05+00:00,ONEderland,Gold Sand,2835.0,down,105.0,1
+42,2025-11-02T04:34:59+00:00,ONEderland,Rechargeable Battery,382.0,down,108.0,0
+41,2025-11-02T04:34:14+00:00,ONEderland,Brass,665.0,down,104.0,0
+40,2025-11-02T04:33:19+00:00,ONEderland,Lithium Battery,898.0,down,95.0,0
+39,2025-11-02T04:32:25+00:00,ONEderland,Special Steel for Tracks,1353.0,up,116.0,0
+38,2025-11-02T04:05:41+00:00,Anita Energy Institute,Home Solar Panel Unit,1244.0,up,109.0,1
+37,2025-11-02T04:04:27+00:00,Anita Energy Institute,Rechargeable Battery,279.0,down,97.0,1
+36,2025-11-02T04:03:22+00:00,Anita Energy Institute,Non-woven Fabric,562.0,up,102.0,1
+35,2025-11-02T04:02:26+00:00,Anita Energy Institute,Lithium Battery,730.0,up,96.0,1
+34,2025-11-02T03:56:44+00:00,Anita Energy Institute,Placer,44.0,up,116.0,0
+33,2025-11-02T03:55:47+00:00,Anita Energy Institute,Iron Ore,409.0,down,99.0,0
+32,2025-11-02T03:53:34+00:00,Anita Energy Institute,Building Materials,554.0,up,100.0,0
+31,2025-11-02T03:53:03+00:00,Anita Energy Institute,Reinforced Concrete Sleepers,691.0,down,100.0,0
+30,2025-11-02T03:52:21+00:00,Anita Energy Institute,Brass,732.0,flat,100.0,0
+29,2025-11-02T03:50:57+00:00,Anita Energy Institute,Special Steel for Tracks,1244.0,down,90.0,0
+28,2025-11-02T03:01:40+00:00,Mander Mine,High-End Tableware,356.0,up,93.0,0
+27,2025-11-02T03:01:09+00:00,Mander Mine,Toy Train,391.0,down,108.0,0
+26,2025-11-02T03:00:48+00:00,Mander Mine,Mackerel,395.0,up,101.0,0
+25,2025-11-02T02:59:46+00:00,Mander Mine,Luggage,490.0,down,83.0,0
+24,2025-11-02T02:58:51+00:00,Mander Mine,Goat,556.0,down,94.0,0
+23,2025-11-02T02:58:34+00:00,Mander Mine,Non-woven Fabric,577.0,up,91.0,0
+22,2025-11-02T02:57:44+00:00,Mander Mine,Down,599.0,up,91.0,0
+21,2025-11-02T02:57:20+00:00,Mander Mine,Rigging,854.0,up,94.0,0
+20,2025-11-02T02:55:57+00:00,Mander Mine,Lithium Battery,922.0,down,100.0,0
+19,2025-11-02T02:55:30+00:00,Mander Mine,Aerospace Memento,971.0,down,105.0,0
+18,2025-11-02T02:54:53+00:00,Mander Mine,HP Silicon Steel,1016.0,down,101.0,0
+17,2025-11-02T02:54:23+00:00,Mander Mine,Goose Down,1095.0,up,104.0,0
+16,2025-11-02T02:54:02+00:00,Mander Mine,Fine Steel,1394.0,up,96.0,0
+15,2025-11-02T02:53:39+00:00,Mander Mine,Composite Steel Cable,1597.0,down,94.0,0
+14,2025-11-02T02:53:09+00:00,Mander Mine,Goose Down Quilt,1659.0,down,105.0,0
+13,2025-11-02T02:52:40+00:00,Mander Mine,Carbon Fiber,1804.0,up,112.0,0
+12,2025-11-02T02:52:08+00:00,Mander Mine,HTC Ceramic,1967.0,down,95.0,0
+11,2025-11-02T02:51:45+00:00,Mander Mine,Lapis Lazuli,1970.0,up,95.0,0
+10,2025-11-02T02:51:14+00:00,Mander Mine,Carbon Fiber Cord,2339.0,up,92.0,0
+9,2025-11-02T02:50:38+00:00,Mander Mine,Gaming Console,4232.0,down,116.0,0
+8,2025-11-02T02:26:21+00:00,Mander Mine,Placer,27.0,up,90.0,1
+7,2025-11-02T02:26:02+00:00,Mander Mine,Stone Materials,187.0,up,104.0,1
+6,2025-11-02T02:25:42+00:00,Mander Mine,Iron Ore,333.0,up,95.0,1
+5,2025-11-02T02:25:03+00:00,Mander Mine,Building Materials,414.0,up,92.0,1
+4,2025-11-02T02:24:32+00:00,Mander Mine,Reinforced Concrete Sleepers,475.0,down,88.0,1
+3,2025-11-02T02:23:35+00:00,Mander Mine,Brass,614.0,down,99.0,1
+2,2025-11-02T02:23:10+00:00,Mander Mine,Mander Toolbox,933.0,up,106.0,1
+1,2025-11-02T02:20:00+00:00,Mander Mine,Special Steel for Tracks,1080.0,down,100.0,1
