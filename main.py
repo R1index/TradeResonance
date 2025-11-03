@@ -1,12 +1,8 @@
-from app import create_app
+import os
+from app import create_app as _create_app  # берем фабрику из app/__init__.py
 
-def create_app():
-    return _create()
-
-def _create():
-    return create_app()
-
-app = create_app()  # ✅ нужно, чтобы gunicorn нашёл "app"
+app = _create_app()  # создаем WSGI-приложение для gunicorn
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    port = int(os.getenv("PORT", "8000"))
+    app.run(host="0.0.0.0", port=port, debug=True)
