@@ -1,0 +1,28 @@
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Город</th>
+      <th>Товар</th>
+      <th>Цена</th>
+      <th>Дата</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for it in items %}
+    <tr>
+      <td>{{ it.id }}</td>
+      <td>{{ it.city }}</td>
+      <td>{{ it.product }}</td>
+      <td>{{ it.price }}</td>
+      <td>{{ it.created_at }}</td>
+      <td>
+        <button hx-post="{{ url_for('prices.remove', price_id=it.id) }}" hx-target="#price-table" hx-swap="outerHTML">
+          Удалить
+        </button>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>

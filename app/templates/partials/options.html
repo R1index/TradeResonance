@@ -1,0 +1,5 @@
+<datalist id="{{ request.endpoint.endswith('products') and 'products' or 'cities' }}">
+  {% for item in items %}
+    <option value="{{ item }}"></option>
+  {% endfor %}
+</datalist>

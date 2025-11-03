@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Дашборд — TradeResonance{% endblock %}
+{% block content %}
+<div class="row">
+  <section>
+    <h3>Добавить цену</h3>
+    <form hx-post="{{ url_for('prices.create') }}" hx-target="#price-table" hx-swap="outerHTML">
+      <label>Город
+        <input name="city" list="cities" placeholder="Начните вводить..." autocomplete="off">
+        <datalist id="cities" hx-get="{{ url_for('prices.options_cities') }}" hx-trigger="load" hx-target="#cities" hx-swap="outerHTML"></datalist>
+      </label>
+      <label>Товар
+        <input name="product" list="products" placeholder="Начните вводить..." autocomplete="off">
+        <datalist id="products" hx-get="{{ url_for('prices.options_products') }}" hx-trigger="load" hx-target="#products" hx-swap="outerHTML"></datalist>
+      </label>
+      <label>Цена
+        <input type="number" name="price" step="0.01" min="0">
+      </label>
+      <button type="submit">Сохранить</button>
+    </form>
+  </section>
+
+  <section>
+    <h3>Средние цены</h3>
+    <canvas id="chart"></canvas>
+  </section>
+</div>
+
+<section>
+  <h3>Последние записи</h3>
+  <div id="price-table" hx-get="{{ url_for('prices.page') }}" hx-trigger="load"></div>
+</section>
+{% endblock %}

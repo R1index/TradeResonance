@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}TradeResonance{% endblock %}</title>
+
+  <!-- HTMX -->
+  <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <style>
+    .container { max-width: 1200px; margin: 0 auto; padding: 1rem; }
+    .muted { color: #888 }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 900px) { .row { grid-template-columns: 1fr; } }
+    table { width: 100%; }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <hgroup>
+      <h1>TradeResonance</h1>
+      <p class="muted">Flask + Railway PostgreSQL + HTMX + Chart.js + &lt;datalist&gt;</p>
+    </hgroup>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        {% include "partials/flash.html" %}
+      {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
