@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="card-title">{{ t('nav_cities') }}</h5>
+    {% if not cities %}
+      <p class="text-muted">{{ t('no_data') }}</p>
+    {% else %}
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr>
+            <th>{{ t('city') }}</th>
+            <th>{{ t('produces') }}</th>
+            <th>{{ t('avg_price') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in cities %}
+          <tr>
+            <td>{{ c.city }}</td>
+            <td>{% if c.produces %}{{ ', '.join(c.produces) }}{% else %}—{% endif %}</td>
+            <td>{{ '%.0f' % (c.avg_price or 0) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
