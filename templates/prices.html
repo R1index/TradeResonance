@@ -44,11 +44,6 @@
     <div class="md:col-span-5 flex gap-2">
       <button class="btn btn-outline" type="submit">{{ t('filters') }}</button>
       <a class="btn btn-outline" href="{{ url_for('index', tab='prices', lang=lang) }}">Reset</a>
-      <!-- Дублирующая кнопка экспорта рядом с фильтрами (опционально, можно убрать) -->
-      <a class="btn btn-outline"
-         href="{{ url_for('export_csv') }}?city={{ q_city }}&product={{ q_product }}&trend={{ q_trend }}&from={{ q_from }}&to={{ q_to }}&lang={{ lang }}">
-        Export CSV
-      </a>
     </div>
   </form>
 
