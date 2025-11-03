@@ -8,6 +8,8 @@ from typing import Optional, Dict, List
 from flask import Flask, request, redirect, url_for, render_template, flash, session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, text
+import csv, io
+from flask import Response
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
@@ -423,6 +425,63 @@ def import_csv():
         next_url = request.form.get('next') or url_for('index', lang=lang)
         return redirect(next_url)
     return render_template("import_form.html")
+    
+@app.route("/export.csv")
+def export_csv():
+    # te же фильтры, что и на вкладке "Цены"
+    q_city = (request.args.get("city") or "").strip()
+    q_product = (request.args.get("product") or "").strip()
+    q_trend = (request.args.get("trend") or "").strip()
+    q_from = (request.args.get("from") or "").strip()
+    q_to = (request.args.get("to") or "").strip()
+
+    query = Entry.query
+    if q_city:
+        query = query.filter(Entry.city.ilike(f"%{q_city}%"))
+    if q_product:
+        query = query.filter(Entry.product.ilike(f"%{q_product}%"))
+    if q_trend in ("up", "down"):
+        query = query.filter(Entry.trend == q_trend)
+
+    def parse_dt(s):
+        try:
+            return datetime.fromisoformat(s)
+        except Exception:
+            try:
+                return datetime.fromisoformat(s + "T00:00:00")
+            except Exception:
+                return None
+
+    dt_from = parse_dt(q_from) if q_from else None
+    dt_to = parse_dt(q_to) if q_to else None
+    if dt_from:
+        query = query.filter(Entry.created_at >= dt_from)
+    if dt_to:
+        query = query.filter(Entry.created_at <= dt_to)
+
+    rows = query.order_by(Entry.created_at.desc()).all()
+
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    # заголовки
+    w.writerow(["id","created_at","updated_at","city","product","price","trend","percent","is_production_city"])
+    for e in rows:
+        w.writerow([
+            e.id,
+            e.created_at.isoformat(),
+            (e.updated_at or e.created_at).isoformat(),
+            e.city,
+            e.product,
+            f"{e.price:.0f}",
+            e.trend,
+            f"{e.percent:.0f}",
+            "true" if e.is_production_city else "false"
+        ])
+
+    resp = Response(buf.getvalue(), mimetype="text/csv; charset=utf-8")
+    resp.headers["Content-Disposition"] = "attachment; filename=entries.csv"
+    return resp
+    
 
 @app.route("/admin/dedupe")
 def admin_dedupe():
