@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="card-title">{{ title }}</h5>
+    <form method="post">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">{{ t('city') }}</label>
+          <input name="city" class="form-control" value="{{ e.city if e else '' }}" list="citiesList" required>
+          <datalist id="citiesList">{% for c in cities_list %}<option value="{{ c }}">{% endfor %}</datalist>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{{ t('product') }}</label>
+          <input name="product" class="form-control" value="{{ e.product if e else '' }}" list="productsList" required>
+          <datalist id="productsList">{% for p in products_list %}<option value="{{ p }}">{% endfor %}</datalist>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">{{ t('price') }}</label>
+          <input type="number" step="1" name="price" class="form-control" value="{{ e.price if e else '' }}" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">{{ t('percent') }} %</label>
+          <input type="number" step="1" name="percent" class="form-control" value="{{ e.percent if e else 0 }}" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">{{ t('trend') }}</label>
+          <select name="trend" class="form-select" required>
+            {% for opt in ['up','down'] %}
+            <option value="{{ opt }}" {% if e and e.trend==opt %}selected{% endif %}>{{ t(opt) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3 d-flex align-items-end">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="is_prod" name="is_production_city" {% if e and e.is_production_city %}checked{% endif %}>
+            <label class="form-check-label" for="is_prod">{{ t('is_prod_city') }}</label>
+          </div>
+        </div>
+      </div>
+      <div class="mt-3">
+        <button class="btn btn-primary" type="submit">{{ t('save') if e else t('create') }}</button>
+        <a class="btn btn-secondary" href="{{ url_for('index', lang=lang) }}">{{ t('back') }}</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

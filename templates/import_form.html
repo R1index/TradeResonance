@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="card-title">{{ t('upload_csv') }}</h5>
+    <form method="post" enctype="multipart/form-data">
+      <div class="mb-3">
+        <input class="form-control" type="file" name="file" accept=".csv" required>
+      </div>
+      <button class="btn btn-primary" type="submit">{{ t('import') }}</button>
+    </form>
+    <p class="text-muted mt-3">Columns expected: id(optional), created_at(optional), city, product, price, trend, percent, is_production_city</p>
+  </div>
+</div>
+{% endblock %}

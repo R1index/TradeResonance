@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="card-title">{{ t('nav_routes') }}</h5>
+    {% if not routes %}
+      <p class="text-muted">{{ t('no_data') }}</p>
+    {% else %}
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr>
+            <th>{{ t('product') }}</th>
+            <th>{{ t('route_buy') }}</th>
+            <th>{{ t('price') }}</th>
+            <th>{{ t('route_sell') }}</th>
+            <th>{{ t('price') }}</th>
+            <th>{{ t('spread') }}</th>
+            <th>{{ t('profit') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in routes %}
+          <tr>
+            <td>{{ r.product }}</td>
+            <td>{{ r.buy_city }}</td>
+            <td>{{ '%.0f' % r.buy_price }}</td>
+            <td>{{ r.sell_city }}</td>
+            <td>{{ '%.0f' % r.sell_price }}</td>
+            <td>{{ '%.1f' % r.spread_percent }}%</td>
+            <td>{{ '%.0f' % r.profit }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
