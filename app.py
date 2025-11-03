@@ -347,16 +347,27 @@ def edit_entry(entry_id):
     lang = get_lang()
     e = Entry.query.get_or_404(entry_id)
     if request.method == "POST":
-        e.city = request.form.get("city", e.city).strip()
-        e.product = request.form.get("product", e.product).strip()
-        e.price = float(request.form.get("price", e.price))
+        # Разрешаем менять только эти поля
+        try:
+            e.price = float(request.form.get("price", e.price))
+        except Exception:
+            pass
+    
         e.trend = (request.form.get("trend") or e.trend).strip()
-        e.percent = float(request.form.get("percent", e.percent))
-        e.is_production_city = parse_bool(request.form.get("is_production_city"))
+    
+        try:
+            e.percent = float(request.form.get("percent", e.percent))
+        except Exception:
+            pass
+    
+        # 🔒 ВАЖНО: не менять флаг, если поле не пришло (в форме при редактировании у чекбокса нет name)
+        if "is_production_city" in request.form:
+            e.is_production_city = bool(request.form.get("is_production_city"))
+    
         db.session.commit()
         flash(t("updated"))
         dedupe_entries()
-        next_url = request.form.get('next') or url_for('index', lang=lang)
+        next_url = request.form.get("next") or url_for("index", lang=lang)
         return redirect(next_url)
     cities_list = [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()]
     products_list = [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()]
