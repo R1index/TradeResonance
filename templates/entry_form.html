@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card p-4">
+  <h1 class="text-xl font-semibold mb-3">{{ title }}</h1>
+  <form method="post">
+    <input type="hidden" name="next" value="{{ next_url or request.referrer }}"> class="grid grid-cols-1 md:grid-cols-4 gap-3">
+    <div class="md:col-span-2">
+      <label class="label">{{ t('city') }}</label>
+      <input name="city" class="input" value="{{ e.city if e else '' }}" list="citiesList" required>
+      <datalist id="citiesList">{% for c in cities_list %}<option value="{{ c }}">{% endfor %}</datalist>
+    </div>
+    <div class="md:col-span-2">
+      <label class="label">{{ t('product') }}</label>
+      <input name="product" class="input" value="{{ e.product if e else '' }}" list="productsList" required>
+      <datalist id="productsList">{% for p in products_list %}<option value="{{ p }}">{% endfor %}</datalist>
+    </div>
+    <div>
+      <label class="label">{{ t('price') }}</label>
+      <input type="number" step="1" name="price" class="input" value="{{ e.price if e else '' }}" required>
+    </div>
+    <div>
+      <label class="label">{{ t('percent') }} %</label>
+      <input type="number" step="1" name="percent" class="input" value="{{ e.percent if e else 0 }}" required>
+    </div>
+    <div>
+      <label class="label">{{ t('trend') }}</label>
+      <select name="trend" class="select" required>
+        {% for opt in ['up','down'] %}
+        <option value="{{ opt }}" {% if e and e.trend==opt %}selected{% endif %}>{{ t(opt) }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="flex items-end">
+      <label class="inline-flex items-center gap-2">
+        <input type="checkbox" class="h-4 w-4" name="is_production_city" {% if e and e.is_production_city %}checked{% endif %}>
+        <span class="label">{{ t('is_prod_city') }}</span>
+      </label>
+    </div>
+    <div class="md:col-span-4 flex gap-2 pt-2">
+      <button class="btn btn-primary" type="submit">{{ t('save') if e else t('create') }}</button>
+      <a class="btn btn-outline" href="{{ next_url or request.referrer or url_for('index', lang=lang) }}">← {{ t('back') }}</a>
+    </div>
+  </form>
+</section>
+{% endblock %}
