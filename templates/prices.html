@@ -3,7 +3,14 @@
 <section class="card p-4">
   <div class="flex items-center justify-between mb-4">
     <h1 class="text-xl font-semibold">{{ t('nav_prices') }}</h1>
-    <a href="{{ url_for('new_entry', lang=lang) }}" class="btn btn-primary">{{ t('nav_add') }}</a>
+    <div class="flex gap-2">
+      <!-- Экспорт CSV с учётом текущих фильтров -->
+      <a class="btn btn-outline"
+         href="{{ url_for('export_csv') }}?city={{ q_city }}&product={{ q_product }}&trend={{ q_trend }}&from={{ q_from }}&to={{ q_to }}&lang={{ lang }}">
+        Export CSV
+      </a>
+      <a href="{{ url_for('new_entry', lang=lang) }}" class="btn btn-primary">{{ t('nav_add') }}</a>
+    </div>
   </div>
 
   <form class="grid grid-cols-1 md:grid-cols-5 gap-3 mb-3" method="get">
@@ -37,6 +44,11 @@
     <div class="md:col-span-5 flex gap-2">
       <button class="btn btn-outline" type="submit">{{ t('filters') }}</button>
       <a class="btn btn-outline" href="{{ url_for('index', tab='prices', lang=lang) }}">Reset</a>
+      <!-- Дублирующая кнопка экспорта рядом с фильтрами (опционально, можно убрать) -->
+      <a class="btn btn-outline"
+         href="{{ url_for('export_csv') }}?city={{ q_city }}&product={{ q_product }}&trend={{ q_trend }}&from={{ q_from }}&to={{ q_to }}&lang={{ lang }}">
+        Export CSV
+      </a>
     </div>
   </form>
 
