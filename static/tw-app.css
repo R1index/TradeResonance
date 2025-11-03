@@ -1,0 +1,88 @@
+/* tw-app.css — pure CSS (no Tailwind @apply), works with CDN build */
+:root{
+  --bg:#f6f7f9; --bg-dark:#0b0c0f;
+  --card:#fff; --card-dark:#0f1115;
+  --text:#111827; --text-dark:#f3f4f6;
+  --muted:#6b7280; --muted-dark:#9ca3af;
+  --border:#e5e7eb; --border-dark:#1f2937;
+  --primary:#2563eb; --primary-600:#1d4ed8;
+  --emerald:#10b981; --rose:#ef4444;
+}
+
+html.dark body{ background:var(--bg-dark); color:var(--text-dark); }
+body{ background:var(--bg); color:var(--text); }
+
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:16px;
+  box-shadow:0 6px 18px rgba(0,0,0,.06);
+}
+html.dark .card{
+  background:var(--card-dark);
+  border-color:var(--border-dark);
+  box-shadow:0 10px 24px rgba(0,0,0,.3);
+}
+
+.badge{
+  display:inline-flex; align-items:center; gap:.25rem;
+  padding:.2rem .5rem; font-size:.75rem; font-weight:600;
+  border-radius:999px; background:#e5e7eb; color:#374151;
+}
+html.dark .badge{ background:#374151; color:#e5e7eb; }
+
+.badge-green{ background:rgba(16,185,129,.15); color:#059669; }
+.badge-red{ background:rgba(239,68,68,.15); color:#dc2626; }
+
+.btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  padding:.5rem .9rem; border-radius:12px;
+  border:1px solid var(--border); background:#fff; color:#111827;
+  font-weight:600; text-decoration:none; cursor:pointer;
+  transition:background .15s ease, border-color .15s ease, transform .05s ease;
+}
+.btn:hover{ background:#f3f4f6; }
+.btn:active{ transform:scale(.98); }
+html.dark .btn{ background:#111318; border-color:#2b3038; color:#e5e7eb; }
+html.dark .btn:hover{ background:#1a1d23; }
+
+.btn-primary{
+  background:var(--primary); border-color:var(--primary); color:#fff;
+}
+.btn-primary:hover{ background:var(--primary-600); border-color:var(--primary-600); }
+
+.btn-outline{
+  background:transparent; border-color:#cbd5e1; color:#111827;
+}
+html.dark .btn-outline{ border-color:#374151; color:#e5e7eb; }
+.btn-outline:hover{ background:#eef2ff; }
+html.dark .btn-outline:hover{ background:#111827; }
+
+.input, .select{
+  width:100%; padding:.55rem .75rem; border-radius:12px;
+  border:1px solid #cbd5e1; background:#fff; color:#111827;
+}
+html.dark .input, html.dark .select{ background:#0f1115; color:#e5e7eb; border-color:#30343b; }
+.label{ font-size:.85rem; font-weight:600; color:#6b7280; }
+html.dark .label{ color:#9ca3af; }
+
+/* Table to cards on mobile */
+@media (max-width: 768px){
+  .table-card thead{ display:none; }
+  .table-card tr{ display:grid; grid-template-columns:1fr; border:1px solid var(--border); border-radius:14px; padding:.5rem .75rem; margin-bottom:.75rem; }
+  html.dark .table-card tr{ border-color:var(--border-dark); }
+  .table-card td{ display:grid; grid-template-columns:38% 62%; gap:.5rem; padding:.25rem 0; }
+  .table-card td::before{ content:attr(data-th); font-weight:700; color:#6b7280; }
+}
+/* Simple util */
+.shadow-soft{ box-shadow:0 6px 18px rgba(0,0,0,.06); }
+html.dark .shadow-soft{ box-shadow:0 8px 24px rgba(0,0,0,.32); }
+
+/* Header nav active tabs */
+.tab{
+  padding:.35rem .7rem; border-radius:10px; text-decoration:none; font-weight:600;
+}
+.tab:hover{ background:#f3f4f6; }
+html.dark .tab:hover{ background:#1a1d23; }
+.tab-active{ background:#eef2ff; }
+html.dark .tab-active{ background:#1a1d23; }

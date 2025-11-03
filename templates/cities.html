@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card p-4">
+  <div class="flex items-center justify-between mb-3">
+    <h1 class="text-xl font-semibold">{{ t('nav_cities') }}</h1>
+    <span class="badge">{{ city_list|length }} cities</span>
+  </div>
+
+  {% if not city_list %}
+    <p class="text-zinc-500">{{ t('no_data') }}</p>
+  {% else %}
+  <div class="space-y-2">
+    {% for c in city_list %}
+    <details class="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-soft">
+      <summary class="cursor-pointer list-none px-4 py-3 flex items-center justify-between">
+        <span class="font-medium">{{ c.city }}</span>
+        <span class="badge">{{ c.entries|length }} items</span>
+      </summary>
+      <div class="px-4 pb-4">
+        <div class="overflow-x-auto">
+          <table class="min-w-full table-card">
+            <thead class="text-left text-sm text-zinc-600 dark:text-zinc-400">
+              <tr>
+                <th class="py-2">{{ t('product') }}</th>
+                <th class="py-2">{{ t('price') }}</th>
+                <th class="py-2">{{ t('trend') }}</th>
+                <th class="py-2">{{ t('percent') }} %</th>
+                <th class="py-2">{{ t('is_prod_city') }}</th>
+                <th class="py-2">{{ t('actions') }}</th>
+              </tr>
+            </thead>
+            <tbody class="text-sm">
+              {% for e in c.entries %}
+              <tr class="border-b border-zinc-200 dark:border-zinc-800">
+                <td data-th="{{ t('product') }}" class="py-2">{{ e.product }}</td>
+                <td data-th="{{ t('price') }}" class="py-2">{{ '%.0f' % e.price }}</td>
+                <td data-th="{{ t('trend') }}" class="py-2">{% if e.trend=="up" %}<span class="badge badge-green">{{ t("up") }}</span>{% else %}<span class="badge badge-red">{{ t("down") }}</span>{% endif %}</td>
+                <td data-th="{{ t('percent') }} %" class="py-2">{{ '%.0f' % e.percent }}</td>
+                <td data-th="{{ t('is_prod_city') }}" class="py-2">{{ t('yes') if e.is_production_city else t('no') }}</td>
+                <td data-th="{{ t('actions') }}" class="py-2">
+                  <a class="btn btn-outline" href="{{ url_for('edit_entry', entry_id=e.id, lang=lang) }}">{{ t('edit') }}</a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

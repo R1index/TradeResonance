@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card p-4">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-xl font-semibold">{{ t('nav_prices') }}</h1>
+    <a href="{{ url_for('new_entry', lang=lang) }}" class="btn btn-primary">{{ t('nav_add') }}</a>
+  </div>
+
+  <!-- Filters -->
+  <form class="grid grid-cols-1 md:grid-cols-5 gap-3 mb-3" method="get">
+    <input type="hidden" name="tab" value="prices">
+    <div>
+      <label class="label">{{ t('city') }}</label>
+      <input class="input" name="city" placeholder="{{ t('city') }}" value="{{ q_city }}" list="citiesList">
+      <datalist id="citiesList">{% for c in cities_list %}<option value="{{ c }}">{% endfor %}</datalist>
+    </div>
+    <div>
+      <label class="label">{{ t('product') }}</label>
+      <input class="input" name="product" placeholder="{{ t('product') }}" value="{{ q_product }}" list="productsList">
+      <datalist id="productsList">{% for p in products_list %}<option value="{{ p }}">{% endfor %}</datalist>
+    </div>
+    <div>
+      <label class="label">{{ t('trend') }}</label>
+      <select class="select" name="trend">
+        <option value="">{{ t('trend') }}</option>
+        <option value="up" {% if q_trend=='up' %}selected{% endif %}>{{ t('up') }}</option>
+        <option value="down" {% if q_trend=='down' %}selected{% endif %}>{{ t('down') }}</option>
+      </select>
+    </div>
+    <div>
+      <label class="label">From</label>
+      <input type="datetime-local" class="input" name="from" value="{{ q_from }}">
+    </div>
+    <div>
+      <label class="label">To</label>
+      <input type="datetime-local" class="input" name="to" value="{{ q_to }}">
+    </div>
+    <div class="md:col-span-5 flex gap-2">
+      <button class="btn btn-outline" type="submit">{{ t('filters') }}</button>
+      <a class="btn btn-outline" href="{{ url_for('index', tab='prices', lang=lang) }}">Reset</a>
+    </div>
+  </form>
+
+  {% if not entries %}
+    <p class="text-zinc-500">{{ t('no_data') }}</p>
+  {% else %}
+  <div class="overflow-x-auto">
+    <table class="min-w-full table-card">
+      <thead class="text-left text-sm text-zinc-600 dark:text-zinc-400">
+        <tr>
+          <th class="py-2">ID</th>
+          <th class="py-2">{{ t('city') }}</th>
+          <th class="py-2">{{ t('product') }}</th>
+          <th class="py-2">{{ t('price') }}</th>
+          <th class="py-2">{{ t('trend') }}</th>
+          <th class="py-2">{{ t('percent') }} %</th>
+          <th class="py-2">{{ t('is_prod_city') }}</th>
+          <th class="py-2">Created</th>
+          <th class="py-2">Updated</th>
+          <th class="py-2">{{ t('actions') }}</th>
+        </tr>
+      </thead>
+      <tbody class="text-sm">
+        {% for e in entries %}
+        <tr class="border-b border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50/60 dark:hover:bg-zinc-800/50">
+          <td data-th="ID" class="py-2">{{ e.id }}</td>
+          <td data-th="{{ t('city') }}" class="py-2">{{ e.city }}</td>
+          <td data-th="{{ t('product') }}" class="py-2">{{ e.product }}</td>
+          <td data-th="{{ t('price') }}" class="py-2">{{ '%.0f' % e.price }}</td>
+          <td data-th="{{ t('trend') }}" class="py-2">{% if e.trend=="up" %}<span class="badge badge-green">{{ t("up") }}</span>{% else %}<span class="badge badge-red">{{ t("down") }}</span>{% endif %}</td>
+          <td data-th="{{ t('percent') }} %" class="py-2">{{ '%.0f' % e.percent }}</td>
+          <td data-th="{{ t('is_prod_city') }}" class="py-2">{{ t('yes') if e.is_production_city else t('no') }}</td>
+          <td data-th="Created" class="py-2">{{ e.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+          <td data-th="Updated" class="py-2">{{ (e.updated_at or e.created_at).strftime("%Y-%m-%d %H:%M") }}</td>
+          <td data-th="{{ t('actions') }}" class="py-2">
+            <a class="btn btn-outline" href="{{ url_for('edit_entry', entry_id=e.id, lang=lang) }}">{{ t('edit') }}</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

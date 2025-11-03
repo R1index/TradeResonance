@@ -1,0 +1,140 @@
+/* app.css
+ * Responsive UI overhaul with light/dark theme, mobile-friendly tables,
+ * and subtle animations. Uses prefers-color-scheme.
+ */
+
+/* CSS Variables for theming */
+:root {
+  --bg: #f7f7f9;
+  --card: #ffffff;
+  --text: #1a1b1e;
+  --muted: #6c757d;
+  --border: #e5e7eb;
+  --accent: #0d6efd;
+  --success: #198754;
+  --danger: #dc3545;
+  --shadow: 0 6px 18px rgba(0,0,0,.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f0f12;
+    --card: #15171b;
+    --text: #f2f3f5;
+    --muted: #a6aab2;
+    --border: #272a2f;
+    --accent: #5aa2ff;
+    --success: #44d19f;
+    --danger: #ff6b6b;
+    --shadow: 0 10px 24px rgba(0,0,0,.35);
+  }
+}
+
+html, body {
+  background: var(--bg) !important;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Card polish */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  border-radius: 16px;
+}
+
+.navbar {
+  border-bottom: 1px solid var(--border);
+}
+
+/* Buttons: comfortable touch targets on small screens */
+@media (max-width: 576px) {
+  .btn {
+    padding: .7rem 1rem;
+    font-size: 1rem;
+    border-radius: 12px;
+  }
+}
+
+/* Tables -> Cards on mobile (accessible labels via data-th) */
+.table.responsive-table {
+  width: 100%;
+}
+@media (max-width: 768px) {
+  .table.responsive-table thead {
+    display: none;
+  }
+  .table.responsive-table, 
+  .table.responsive-table tbody, 
+  .table.responsive-table tr, 
+  .table.responsive-table td {
+    display: block;
+    width: 100%;
+  }
+  .table.responsive-table tr {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: .75rem;
+    padding: .5rem .75rem;
+    box-shadow: var(--shadow);
+  }
+  .table.responsive-table td {
+    border: none;
+    display: grid;
+    grid-template-columns: 40% 60%;
+    gap: .5rem;
+    padding: .3rem 0;
+  }
+  .table.responsive-table td::before {
+    content: attr(data-th);
+    font-weight: 600;
+    color: var(--muted);
+  }
+}
+
+/* Smooth page fade-in */
+.page-enter {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.page-enter.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity .25s ease, transform .25s ease;
+}
+
+/* Subtle hover states */
+.table tr:hover {
+  background: rgba(13,110,253,.04);
+}
+a:hover { opacity: .9; }
+
+/* Toast container position */
+#toast-zone {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1080;
+}
+
+/* Form spacing & inputs */
+.form-control, .form-select {
+  border-radius: 12px;
+}
+.form-label {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* Offcanvas width tweak */
+.offcanvas {
+  width: 280px;
+}
+
+.badge-muted {
+  background: var(--border);
+  color: var(--muted);
+}
