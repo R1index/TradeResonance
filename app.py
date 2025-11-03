@@ -20,6 +20,10 @@ elif DATABASE_URL.startswith("postgresql://"):
 
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_pre_ping": True,   # проверяет соединение перед запросом
+    "pool_recycle": 300,     # переоткрывает коннект каждые 5 минут
+}
 db = SQLAlchemy(app)
 
 STRINGS: Dict[str, Dict[str, str]] = {
