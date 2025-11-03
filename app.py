@@ -42,6 +42,7 @@ DATABASE_URL = (
 )
 
 ACCESS_PASSWORD = os.environ.get("ACCESS_PASSWORD", "reso2025")
+CATALOG_PASSWORD = os.environ.get("CATALOG_PASSWORD", "trade2025")
 
 if not DATABASE_URL:
     raise RuntimeError(
@@ -104,6 +105,25 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "password_hint": "Пароль нужен для сохранения и работы с CSV.",
         "password_required": "Введите пароль доступа",
         "password_invalid": "Неверный пароль",
+        "catalog_tab": "Справочники",
+        "catalog_title": "Справочники",
+        "catalog_intro": "Добавляйте или редактируйте города и товары.",
+        "catalog_password_placeholder": "Пароль справочников",
+        "catalog_password_hint": "Пароль для справочников: trade2025.",
+        "catalog_password_required": "Введите пароль справочников",
+        "catalog_password_invalid": "Неверный пароль справочников",
+        "catalog_cities": "Города",
+        "catalog_products": "Товары",
+        "catalog_add": "Добавить",
+        "catalog_save": "Сохранить",
+        "catalog_new_city": "Новый город",
+        "catalog_new_product": "Новый товар",
+        "catalog_empty": "Пока нет записей.",
+        "catalog_exists": "Такая запись уже есть",
+        "catalog_name_required": "Введите название",
+        "catalog_not_found": "Запись не найдена",
+        "catalog_city_missing": "Город отсутствует в справочнике",
+        "catalog_product_missing": "Товар отсутствует в справочнике",
         "click_to_fill": "Кликните, чтобы подставить запись в форму",
         "latest_autofill_label": "Автоподстановка",
         "latest_autofill_loading": "Ищем последнюю запись...",
@@ -161,6 +181,25 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "password_hint": "Password is required for saving and CSV actions.",
         "password_required": "Enter the access password",
         "password_invalid": "Invalid password",
+        "catalog_tab": "Catalogs",
+        "catalog_title": "Catalogs",
+        "catalog_intro": "Add or edit cities and products.",
+        "catalog_password_placeholder": "Catalog password",
+        "catalog_password_hint": "Catalog password: trade2025.",
+        "catalog_password_required": "Enter catalog password",
+        "catalog_password_invalid": "Invalid catalog password",
+        "catalog_cities": "Cities",
+        "catalog_products": "Products",
+        "catalog_add": "Add",
+        "catalog_save": "Save",
+        "catalog_new_city": "New city",
+        "catalog_new_product": "New product",
+        "catalog_empty": "No entries yet.",
+        "catalog_exists": "Entry already exists",
+        "catalog_name_required": "Enter a name",
+        "catalog_not_found": "Entry not found",
+        "catalog_city_missing": "City is missing from catalog",
+        "catalog_product_missing": "Product is missing from catalog",
         "click_to_fill": "Click to send the row to the form",
         "latest_autofill_label": "Autofill",
         "latest_autofill_loading": "Looking up the last entry...",
@@ -196,6 +235,24 @@ SCHEMA_STATEMENTS = (
     """,
     "CREATE INDEX IF NOT EXISTS idx_entries_city_product ON entries(city, product)",
     "CREATE INDEX IF NOT EXISTS idx_entries_created ON entries(created_at)",
+    """
+    CREATE TABLE IF NOT EXISTS cities (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS products (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+    """,
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_cities_name_lower ON cities(LOWER(name))",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_products_name_lower ON products(LOWER(name))",
 )
 
 
@@ -206,6 +263,33 @@ def ensure_schema() -> None:
 
 
 ensure_schema()
+
+
+def normalize_catalog_name(value: str | None) -> str:
+    return (value or "").strip()
+
+
+def seed_catalog_tables() -> None:
+    with get_conn() as conn:
+        for field, table in (("city", "cities"), ("product", "products")):
+            rows = conn.execute(f"SELECT DISTINCT {field} FROM entries").fetchall()
+            for row in rows:
+                name = normalize_catalog_name(row.get(field))
+                if not name:
+                    continue
+                exists = conn.execute(
+                    f"SELECT 1 FROM {table} WHERE LOWER(name) = %s",
+                    (name.lower(),),
+                ).fetchone()
+                if exists:
+                    continue
+                conn.execute(
+                    f"INSERT INTO {table}(name) VALUES (%s)",
+                    (name,),
+                )
+
+
+seed_catalog_tables()
 
 # ---------------------- utils ----------------------
 
@@ -234,6 +318,29 @@ def ensure_password(lang: str) -> Response | None:
 
     if not password_matches(submitted_password()):
         return make_response(STRINGS[lang]["password_invalid"], 403)
+    return None
+
+
+def catalog_password_matches(submitted: str | None) -> bool:
+    if CATALOG_PASSWORD:
+        return submitted == CATALOG_PASSWORD
+    return True
+
+
+def submitted_catalog_password() -> str:
+    candidates = (
+        request.values.get("catalog_password"),
+        request.headers.get("X-Catalog-Password"),
+    )
+    for value in candidates:
+        if value:
+            return value.strip()
+    return ""
+
+
+def ensure_catalog_password(lang: str) -> Response | None:
+    if not catalog_password_matches(submitted_catalog_password()):
+        return make_response(STRINGS[lang]["catalog_password_invalid"], 403)
     return None
 
 
@@ -498,6 +605,46 @@ BASE_HTML = r"""
     }
     .tab-panel.active {
       display: block;
+    }
+    .catalog-grid {
+      display: grid;
+      gap: 20px;
+      margin-top: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+    .catalog-column h3 {
+      margin: 16px 0 12px;
+    }
+    .catalog-form,
+    .catalog-item-form {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+    .catalog-form input[type="text"],
+    .catalog-item-form input[type="text"] {
+      flex: 1;
+      min-width: 0;
+    }
+    .catalog-list {
+      margin-top: 8px;
+    }
+    .catalog-list ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .catalog-list li {
+      background: rgba(148, 163, 184, 0.08);
+      border-radius: 10px;
+      padding: 8px;
+    }
+    .catalog-list .catalog-item-form {
+      margin: 0;
     }
     .card {
       background: var(--card);
@@ -1139,6 +1286,7 @@ BASE_HTML = r"""
       <button class="tab-button" id="tab-btn-trend" data-tab-target="tab-trend" role="tab" aria-controls="tab-trend" aria-selected="false" tabindex="-1">{{ t['trend_chart'] }}</button>
       <button class="tab-button" id="tab-btn-products" data-tab-target="tab-products" role="tab" aria-controls="tab-products" aria-selected="false" tabindex="-1">{{ t['product_lookup'] }}</button>
       <button class="tab-button" id="tab-btn-city" data-tab-target="tab-city" role="tab" aria-controls="tab-city" aria-selected="false" tabindex="-1">{{ t['city_products'] }}</button>
+      <button class="tab-button" id="tab-btn-catalog" data-tab-target="tab-catalog" role="tab" aria-controls="tab-catalog" aria-selected="false" tabindex="-1">{{ t['catalog_tab'] }}</button>
     </div>
 
     <div class="tab-panels">
@@ -1296,6 +1444,37 @@ BASE_HTML = r"""
           <div id="city-production-results" class="muted">{{ t['city_products_hint'] }}</div>
         </div>
       </section>
+
+      <section class="tab-panel" id="tab-catalog" role="tabpanel" aria-labelledby="tab-btn-catalog">
+        <div class="card" id="catalog-card">
+          <h2>{{ t['catalog_title'] }}</h2>
+          <p class="muted">{{ t['catalog_intro'] }}</p>
+          <div class="password-box">
+            <input type="password" id="catalog-password" placeholder="{{ t['catalog_password_placeholder'] }}" autocomplete="off" data-catalog-require-message="{{ t['catalog_password_required'] }}" />
+            <span class="password-hint">{{ t['catalog_password_hint'] }}</span>
+          </div>
+          <div class="catalog-grid">
+            <div class="catalog-column">
+              <h3>{{ t['catalog_cities'] }}</h3>
+              <form class="catalog-form" id="catalog-city-add" data-catalog-form="true" data-catalog-require-message="{{ t['catalog_password_required'] }}" hx-post="{{ url_for('catalog_create', field='city', lang=lang) }}" hx-target="#catalog-city-list" hx-swap="outerHTML" hx-on::response-error="alert(event.detail.xhr.responseText || 'Error')">
+                <input type="hidden" name="catalog_password" data-catalog-password-field="true" />
+                <input type="text" name="name" placeholder="{{ t['catalog_new_city'] }}" autocomplete="off" required />
+                <button type="submit">{{ t['catalog_add'] }}</button>
+              </form>
+              {{ catalog_city_list|safe }}
+            </div>
+            <div class="catalog-column">
+              <h3>{{ t['catalog_products'] }}</h3>
+              <form class="catalog-form" id="catalog-product-add" data-catalog-form="true" data-catalog-require-message="{{ t['catalog_password_required'] }}" hx-post="{{ url_for('catalog_create', field='product', lang=lang) }}" hx-target="#catalog-product-list" hx-swap="outerHTML" hx-on::response-error="alert(event.detail.xhr.responseText || 'Error')">
+                <input type="hidden" name="catalog_password" data-catalog-password-field="true" />
+                <input type="text" name="name" placeholder="{{ t['catalog_new_product'] }}" autocomplete="off" required />
+                <button type="submit">{{ t['catalog_add'] }}</button>
+              </form>
+              {{ catalog_product_list|safe }}
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 
@@ -1360,6 +1539,7 @@ if(navToggle && navMenu){
 }
 
 const adminPasswordInput = document.getElementById('admin-password');
+const catalogPasswordInput = document.getElementById('catalog-password');
 const importForm = document.getElementById('import-form');
 const exportLink = document.getElementById('export-link');
 const clockDisplay = document.getElementById('live-clock');
@@ -1402,6 +1582,12 @@ function sanitizeNumeric(value){
 function passwordMessage(target){
   return (target && target.dataset && target.dataset.requireMessage)
     || (adminPasswordInput && adminPasswordInput.dataset && adminPasswordInput.dataset.requireMessage)
+    || 'Password required';
+}
+
+function catalogPasswordMessage(target){
+  return (target && target.dataset && target.dataset.catalogRequireMessage)
+    || (catalogPasswordInput && catalogPasswordInput.dataset && catalogPasswordInput.dataset.catalogRequireMessage)
     || 'Password required';
 }
 
@@ -1602,6 +1788,13 @@ function syncPasswordFields(){
   }
 }
 
+function syncCatalogPasswordFields(){
+  const pwd = catalogPasswordInput ? catalogPasswordInput.value.trim() : '';
+  document.querySelectorAll('input[data-catalog-password-field]').forEach((input) => {
+    input.value = pwd;
+  });
+}
+
 function obtainPassword(target, options){
   const opts = Object.assign({ silent: false }, options || {});
   const pwd = adminPasswordInput ? adminPasswordInput.value.trim() : '';
@@ -1618,6 +1811,25 @@ function obtainPassword(target, options){
     if(hidden){ hidden.value = pwd; }
   }
   syncPasswordFields();
+  return pwd;
+}
+
+function obtainCatalogPassword(target, options){
+  const opts = Object.assign({ silent: false }, options || {});
+  const pwd = catalogPasswordInput ? catalogPasswordInput.value.trim() : '';
+  if(!pwd){
+    if(!opts.silent){
+      alert(catalogPasswordMessage(target));
+    }
+    if(catalogPasswordInput){ catalogPasswordInput.focus(); }
+    syncCatalogPasswordFields();
+    return null;
+  }
+  if(target && typeof target.querySelector === 'function'){
+    const hidden = target.querySelector('input[data-catalog-password-field]');
+    if(hidden){ hidden.value = pwd; }
+  }
+  syncCatalogPasswordFields();
   return pwd;
 }
 
@@ -1643,6 +1855,31 @@ function attachPasswordGuard(form){
     event.detail.parameters.password = pwd;
     event.detail.headers = event.detail.headers || {};
     event.detail.headers['X-Access-Password'] = pwd;
+  });
+}
+
+function attachCatalogPasswordGuard(form){
+  if(!form){ return; }
+  form.addEventListener('submit', (event) => {
+    if(!obtainCatalogPassword(form)){
+      form.dataset.catalogWarned = '1';
+      event.preventDefault();
+    } else {
+      form.dataset.catalogWarned = '';
+    }
+  });
+  form.addEventListener('htmx:configRequest', (event) => {
+    const silent = form.dataset.catalogWarned === '1';
+    form.dataset.catalogWarned = '';
+    const pwd = obtainCatalogPassword(form, { silent });
+    if(!pwd){
+      event.preventDefault();
+      return;
+    }
+    event.detail.parameters = event.detail.parameters || {};
+    event.detail.parameters.catalog_password = pwd;
+    event.detail.headers = event.detail.headers || {};
+    event.detail.headers['X-Catalog-Password'] = pwd;
   });
 }
 
@@ -1700,6 +1937,11 @@ function activateTab(id){
 if(adminPasswordInput){
   adminPasswordInput.addEventListener('input', syncPasswordFields);
   syncPasswordFields();
+}
+
+if(catalogPasswordInput){
+  catalogPasswordInput.addEventListener('input', syncCatalogPasswordFields);
+  syncCatalogPasswordFields();
 }
 
 if(exportLink){
@@ -1788,6 +2030,7 @@ const sliderMeta = sliderMetaFactory();
 
 attachPasswordGuard(addForm);
 attachPasswordGuard(importForm);
+document.querySelectorAll('[data-catalog-form]').forEach(attachCatalogPasswordGuard);
 
 function updatePercentDisplay(){
   if(percentSlider && percentDisplay){
@@ -1971,6 +2214,12 @@ function applyEntryToForm(dataset){
 document.body.addEventListener('htmx:afterSwap', (event) => {
   if(adminPasswordInput){
     syncPasswordFields();
+  }
+  if(catalogPasswordInput){
+    syncCatalogPasswordFields();
+  }
+  if(event && event.target && typeof event.target.querySelectorAll === 'function'){
+    event.target.querySelectorAll('[data-catalog-form]').forEach(attachCatalogPasswordGuard);
   }
 });
 
@@ -2292,11 +2541,130 @@ CITY_PRODUCTS_TABLE = r"""
 </div>
 """
 
+CATALOG_LIST = r"""
+<div class="catalog-list" id="catalog-{{ field }}-list">
+  {% if items %}
+  <ul>
+    {% for item in items %}
+    <li>
+      <form class="catalog-item-form" data-catalog-form="true" data-catalog-require-message="{{ t['catalog_password_required'] }}" hx-post="{{ url_for('catalog_update', field=field, item_id=item['id'], lang=lang) }}" hx-target="#catalog-{{ field }}-list" hx-swap="outerHTML" hx-on::response-error="alert(event.detail.xhr.responseText || 'Error')">
+        <input type="hidden" name="catalog_password" data-catalog-password-field="true" />
+        <input type="text" name="name" value="{{ item['name'] }}" autocomplete="off" required />
+        <button type="submit">{{ t['catalog_save'] }}</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+    <p class="muted">{{ t['catalog_empty'] }}</p>
+  {% endif %}
+</div>
+"""
+
 # ---------------------- Queries & logic ----------------------
+
+
+class CatalogError(Exception):
+    """Base exception for catalog operations."""
+
+
+class CatalogExistsError(CatalogError):
+    """Raised when attempting to create a duplicate entry."""
+
+
+class CatalogNotFoundError(CatalogError):
+    """Raised when a catalog entry is missing."""
+
+
+def catalog_table_for(field: str) -> str:
+    if field == "city":
+        return "cities"
+    if field == "product":
+        return "products"
+    raise ValueError(f"Unsupported catalog field: {field}")
+
+
+def validate_catalog_field(field: str) -> str:
+    if field not in ("city", "product"):
+        abort(404)
+    return field
+
+
+def fetch_catalog_items(field: str) -> List[Dict[str, Any]]:
+    table = catalog_table_for(field)
+    with get_conn() as conn:
+        rows = conn.execute(f"SELECT id, name FROM {table} ORDER BY name ASC").fetchall()
+    return rows_to_dicts(rows)
+
+
+def catalog_value_exists(field: str, value: str) -> bool:
+    table = catalog_table_for(field)
+    with get_conn() as conn:
+        row = conn.execute(
+            f"SELECT 1 FROM {table} WHERE LOWER(name) = %s",
+            (value.lower(),),
+        ).fetchone()
+    return bool(row)
+
+
+def create_catalog_item(field: str, name: str) -> None:
+    normalized = normalize_catalog_name(name)
+    if not normalized:
+        raise CatalogError("empty")
+    table = catalog_table_for(field)
+    with get_conn() as conn:
+        exists = conn.execute(
+            f"SELECT 1 FROM {table} WHERE LOWER(name) = %s",
+            (normalized.lower(),),
+        ).fetchone()
+        if exists:
+            raise CatalogExistsError(normalized)
+        conn.execute(
+            f"INSERT INTO {table}(name) VALUES (%s)",
+            (normalized,),
+        )
+
+
+def update_catalog_item(field: str, item_id: int, name: str) -> None:
+    normalized = normalize_catalog_name(name)
+    if not normalized:
+        raise CatalogError("empty")
+    table = catalog_table_for(field)
+    column = field
+    with get_conn() as conn:
+        current = conn.execute(
+            f"SELECT name FROM {table} WHERE id = %s",
+            (item_id,),
+        ).fetchone()
+        if not current:
+            raise CatalogNotFoundError(str(item_id))
+        existing = conn.execute(
+            f"SELECT 1 FROM {table} WHERE LOWER(name) = %s AND id <> %s",
+            (normalized.lower(), item_id),
+        ).fetchone()
+        if existing:
+            raise CatalogExistsError(normalized)
+        old_name = current["name"]
+        if old_name == normalized:
+            conn.execute(
+                f"UPDATE {table} SET updated_at = now() WHERE id = %s",
+                (item_id,),
+            )
+            return
+        conn.execute(
+            f"UPDATE {table} SET name = %s, updated_at = now() WHERE id = %s",
+            (normalized, item_id),
+        )
+        conn.execute(
+            f"UPDATE entries SET {column} = %s WHERE {column} = %s",
+            (normalized, old_name),
+        )
+
 
 def distinct_values(field: str, limit: int | None = None) -> List[str]:
     assert field in ("city", "product")
-    sql = f"SELECT DISTINCT {field} FROM entries ORDER BY {field} ASC"
+    table = catalog_table_for(field)
+    sql = f"SELECT name FROM {table} ORDER BY name ASC"
     params: tuple[Any, ...]
     if limit:
         sql += " LIMIT %s"
@@ -2305,7 +2673,7 @@ def distinct_values(field: str, limit: int | None = None) -> List[str]:
         params = ()
     with get_conn() as conn:
         cur = conn.execute(sql, params)
-        return [row[field] for row in cur.fetchall()]
+        return [row["name"] for row in cur.fetchall()]
 
 
 def latest_entry_for(city: str, product: str) -> Dict[str, Any] | None:
@@ -2445,6 +2813,10 @@ def index():
     # Начальные значения в datalist: по 50 штук
     cities = distinct_values("city", limit=50)
     products = distinct_values("product", limit=50)
+    catalog_cities = fetch_catalog_items("city")
+    catalog_products = fetch_catalog_items("product")
+    catalog_city_list = render_fragment(CATALOG_LIST, lang=lang, field="city", items=catalog_cities)
+    catalog_product_list = render_fragment(CATALOG_LIST, lang=lang, field="product", items=catalog_products)
     resp = make_response(
         render_fragment(
             BASE_HTML,
@@ -2454,6 +2826,10 @@ def index():
             toggle_lang=toggle_lang,
             cities=cities,
             products=products,
+            catalog_cities=catalog_cities,
+            catalog_products=catalog_products,
+            catalog_city_list=catalog_city_list,
+            catalog_product_list=catalog_product_list,
         )
     )
     resp.set_cookie('lang', lang, max_age=60*60*24*365)
@@ -2522,6 +2898,11 @@ def add_entry():
         trend = "flat"
 
     is_production_city = bool(request.form.get("is_production_city"))
+
+    if not catalog_value_exists("city", city):
+        return bad(STRINGS[lang]["catalog_city_missing"])
+    if not catalog_value_exists("product", product):
+        return bad(STRINGS[lang]["catalog_product_missing"])
 
     created_at = datetime.now(timezone.utc)
     with get_conn() as conn:
@@ -2605,17 +2986,18 @@ def suggest():
     if field not in ("city", "product"):
         abort(400)
     like = f"%{q.lower()}%" if q else None
-    sql = f"SELECT DISTINCT {field} FROM entries"
+    table = catalog_table_for(field)
+    sql = f"SELECT name FROM {table}"
     params: tuple[Any, ...]
     if like:
-        sql += f" WHERE LOWER({field}) LIKE %s"
+        sql += " WHERE LOWER(name) LIKE %s"
         params = (like,)
     else:
         params = ()
-    sql += f" ORDER BY {field} ASC LIMIT 20"
+    sql += " ORDER BY name ASC LIMIT 20"
     with get_conn() as conn:
         rows = conn.execute(sql, params).fetchall()
-    return jsonify([row[field] for row in rows])
+    return jsonify([row["name"] for row in rows])
 
 @app.get("/series.json")
 def series_json():
@@ -2637,6 +3019,51 @@ def series_json():
             item["ts"] = _as_utc(ts).isoformat(timespec="seconds")
         data.append(item)
     return jsonify(data)
+
+
+def _render_catalog_response(field: str, lang: str) -> str:
+    items = fetch_catalog_items(field)
+    return render_fragment(CATALOG_LIST, lang=lang, field=field, items=items)
+
+
+@app.post("/catalog/<field>")
+def catalog_create(field: str):
+    lang = get_lang()
+    field = validate_catalog_field(field)
+    guard = ensure_catalog_password(lang)
+    if guard is not None:
+        return guard
+
+    name = request.form.get("name")
+    try:
+        create_catalog_item(field, name or "")
+    except CatalogExistsError:
+        return make_response(STRINGS[lang]["catalog_exists"], 400)
+    except CatalogError:
+        return make_response(STRINGS[lang]["catalog_name_required"], 400)
+
+    return _render_catalog_response(field, lang)
+
+
+@app.post("/catalog/<field>/<int:item_id>")
+def catalog_update(field: str, item_id: int):
+    lang = get_lang()
+    field = validate_catalog_field(field)
+    guard = ensure_catalog_password(lang)
+    if guard is not None:
+        return guard
+
+    name = request.form.get("name")
+    try:
+        update_catalog_item(field, item_id, name or "")
+    except CatalogExistsError:
+        return make_response(STRINGS[lang]["catalog_exists"], 400)
+    except CatalogNotFoundError:
+        return make_response(STRINGS[lang]["catalog_not_found"], 404)
+    except CatalogError:
+        return make_response(STRINGS[lang]["catalog_name_required"], 400)
+
+    return _render_catalog_response(field, lang)
 
 
 @app.post("/import.csv")
@@ -2662,6 +3089,9 @@ def import_csv_route():
     if reader.fieldnames is None:
         return make_response("Missing CSV header", 400)
 
+    available_cities = {item["name"].lower() for item in fetch_catalog_items("city")}
+    available_products = {item["name"].lower() for item in fetch_catalog_items("product")}
+
     rows: List[tuple[Any, ...]] = []
     for row in reader:
         city = (row.get("city") or "").strip()
@@ -2669,6 +3099,10 @@ def import_csv_route():
         price_raw = str(row.get("price") or "").replace(",", ".").strip()
         if not city or not product or not price_raw:
             continue
+        if city.lower() not in available_cities:
+            return make_response(f"{STRINGS[lang]['catalog_city_missing']}: {city}", 400)
+        if product.lower() not in available_products:
+            return make_response(f"{STRINGS[lang]['catalog_product_missing']}: {product}", 400)
         try:
             price = float(price_raw)
         except ValueError:
