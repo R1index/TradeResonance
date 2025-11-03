@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="card-title">{{ t('nav_cities') }}</h5>
+
+    {% if not city_list %}
+      <p class="text-muted">{{ t('no_data') }}</p>
+    {% else %}
+    <div class="accordion" id="citiesAccordion">
+      {% for c in city_list %}
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="heading-{{ loop.index }}">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ loop.index }}" aria-expanded="false" aria-controls="collapse-{{ loop.index }}">
+            {{ c.city }} — {{ c.entries|length }} items
+          </button>
+        </h2>
+        <div id="collapse-{{ loop.index }}" class="accordion-collapse collapse" aria-labelledby="heading-{{ loop.index }}" data-bs-parent="#citiesAccordion">
+          <div class="accordion-body">
+            <div class="table-responsive">
+              <table class="table table-sm table-striped align-middle">
+                <thead>
+                  <tr>
+                    <th>{{ t('product') }}</th>
+                    <th>{{ t('price') }}</th>
+                    <th>{{ t('trend') }}</th>
+                    <th>{{ t('percent') }} %</th>
+                    <th>{{ t('is_prod_city') }}</th>
+                    <th>{{ t('actions') }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for e in c.entries %}
+                  <tr>
+                    <td>{{ e.product }}</td>
+                    <td>{{ '%.0f' % e.price }}</td>
+                    <td>{{ t(e.trend) }}</td>
+                    <td>{{ '%.0f' % e.percent }}</td>
+                    <td>{{ t('yes') if e.is_production_city else t('no') }}</td>
+                    <td>
+                      <a class="btn btn-sm btn-primary" href="{{ url_for('edit_entry', entry_id=e.id, lang=lang) }}">{{ t('edit') }}</a>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
