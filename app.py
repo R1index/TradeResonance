@@ -24,8 +24,8 @@ elif DATABASE_URL.startswith("postgresql://"):
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_pre_ping": True,   # проверяет соединение перед запросом
-    "pool_recycle": 300,     # переоткрывает коннект каждые 5 минут
+    "pool_pre_ping": True,
+    "pool_recycle": 300,
 }
 db = SQLAlchemy(app)
 
@@ -219,8 +219,8 @@ def index():
     lang = get_lang()
     tab = request.args.get("tab", "prices")
 
+    # ---------------- PRICES ----------------
     if tab == "prices":
-        # ── Фильтры (без дат) ─────────────────────────────────────────────
         q_city    = (request.args.get("city") or "").strip()
         q_product = (request.args.get("product") or "").strip()
         q_trend   = (request.args.get("trend") or "").strip()
@@ -230,11 +230,7 @@ def index():
         q_percent_min = request.args.get("percent_min", type=float)
         q_percent_max = request.args.get("percent_max", type=float)
 
-        # Производственный город: any|yes|no
         q_prod = (request.args.get("prod") or "any").strip().lower()
-
-        # Сортировка
-        # price_asc|price_desc|percent_asc|percent_desc|updated_asc|updated_desc
         q_sort = (request.args.get("sort") or "updated_desc").strip().lower()
 
         query = Entry.query
@@ -279,33 +275,30 @@ def index():
             entries=entries,
             cities_list=cities_list,
             products_list=products_list,
-            # текущие значения фильтров
             q_city=q_city, q_product=q_product, q_trend=q_trend,
             q_price_min=q_price_min, q_price_max=q_price_max,
             q_percent_min=q_percent_min, q_percent_max=q_percent_max,
             q_prod=q_prod, q_sort=q_sort,
         )
 
+    # ---------------- CITIES ----------------
     if tab == "cities":
-        # Переключатель: any | only_prod | only_nonprod
         pf = (request.args.get("pf") or "any").strip().lower()
         if pf not in ("any", "only_prod", "only_nonprod"):
             pf = "any"
-    
-        # Берём только последние записи по (city, product)
+
         rows = (
             db.session.query(Entry)
             .order_by(Entry.city.asc(), Entry.product.asc(),
-                      Entry.created_at.desc())
+                      Entry.updated_at.desc().nullslast(), Entry.created_at.desc())
             .all()
         )
-        latest: dict[tuple[str, str], Entry] = {}
+        latest: Dict[tuple, Entry] = {}
         for e in rows:
             key = (e.city, e.product)
             if key not in latest:
                 latest[key] = e
-    
-        # Группируем по городу и применяем фильтр производственности
+
         by_city: Dict[str, List[Entry]] = {}
         for (city, product), e in latest.items():
             if pf == "only_prod" and not e.is_production_city:
@@ -313,46 +306,57 @@ def index():
             if pf == "only_nonprod" and e.is_production_city:
                 continue
             by_city.setdefault(city, []).append(e)
-    
-        # Сортировка внутри города по имени товара (и свежести как tie-breaker)
+
         for city in by_city:
-            by_city[city].sort(key=lambda x: (x.product.lower(), -x.created_at.timestamp()))
-    
-        # Список городов (только те, где после фильтра есть товары)
+            by_city[city].sort(key=lambda x: (x.product.lower(), -((x.updated_at or x.created_at).timestamp())))
+
         city_list = [
             {"city": c, "entries": by_city[c]}
-            for c in sorted([c for c in by_city.keys()], key=lambda x: x.lower())
+            for c in sorted(by_city.keys(), key=lambda x: x.lower())
             if by_city[c]
         ]
-    
-        # для автодополнений, если нужно где-то в шаблоне
+
         cities_list = [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()]
         products_list = [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()]
-    
+
         return render_template(
             "cities.html",
             city_list=city_list,
             cities_list=cities_list,
             products_list=products_list,
-            pf=pf,  # <<< передаём выбранный режим
+            pf=pf,
         )
 
-    # routes (latest per city for product; buy!=sell city)
-    products = [p for (p,) in db.session.query(Entry.product).distinct().all()]
+    # ---------------- ROUTES ----------------
+    # Фильтр по товару (подстрока, без регистра) + автодополнение
+    q_product = (request.args.get("product") or "").strip()
+
+    products_list = [p for (p,) in db.session.query(Entry.product)
+                     .distinct().order_by(Entry.product.asc()).all()]
+
+    prod_query = db.session.query(Entry.product)
+    if q_product:
+        prod_query = prod_query.filter(Entry.product.ilike(f"%{q_product}%"))
+    products_to_process = [p for (p,) in prod_query.distinct()
+                           .order_by(Entry.product.asc()).all()]
+
     routes = []
-    for prod in products:
+    for prod in products_to_process:
         rows = (
             db.session.query(Entry)
             .filter(Entry.product == prod)
-            .order_by(Entry.city.asc(), Entry.created_at.desc())
+            .order_by(Entry.city.asc(),
+                      Entry.updated_at.desc().nullslast(),
+                      Entry.created_at.desc())
             .all()
         )
-        latest_per_city = {}
+        latest_per_city: Dict[str, Entry] = {}
         for e in rows:
             if e.city not in latest_per_city:
                 latest_per_city[e.city] = e
         if len(latest_per_city) < 2:
             continue
+
         items = list(latest_per_city.items())
         buy_city, buy_entry = min(items, key=lambda kv: kv[1].price)
         sell_city, sell_entry = max(items, key=lambda kv: kv[1].price)
@@ -381,8 +385,12 @@ def index():
             "profit": float(sell_entry.price - buy_entry.price),
             "route_updated": route_updated,
         })
+
     routes.sort(key=lambda r: r["profit"], reverse=True)
-    return render_template("routes.html", routes=routes)
+    return render_template("routes.html",
+                           routes=routes,
+                           products_list=products_list,
+                           q_product=q_product)
 
 @app.route("/entries/new", methods=["GET", "POST"])
 def new_entry():
@@ -395,12 +403,14 @@ def new_entry():
         if admin_pass != ADMIN_PASSWORD:
             flash(t("wrong_password"))
             return redirect(url_for("new_entry", lang=lang))
+
         city = request.form.get("city", "").strip()
         product = request.form.get("product", "").strip()
         price = float(request.form.get("price"))
         trend_v = (request.form.get("trend") or "up").strip()
         percent_v = float(request.form.get("percent") or 0)
         is_prod = parse_bool(request.form.get("is_production_city"))
+
         existing = Entry.query.filter_by(city=city, product=product).first()
         if existing:
             existing.price = price
@@ -414,12 +424,13 @@ def new_entry():
             db.session.add(e)
             db.session.commit()
             flash(t("saved"))
+
         dedupe_entries()
         next_url = request.form.get('next') or url_for('index', lang=lang)
         return redirect(next_url)
+
     cities_list = [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()]
     products_list = [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()]
-    # учитываем ?next=... если пришёл (например, из routes)
     next_url = safe_next(request.args.get("next")) or safe_next(request.referrer)
     return render_template('entry_form.html', e=None, title=t('new_entry'),
                            cities_list=cities_list, products_list=products_list, next_url=next_url)
@@ -442,7 +453,7 @@ def edit_entry(entry_id):
         except Exception:
             pass
 
-        # 🔒 Не менять флаг при редактировании (в форме у чекбокса нет name)
+        # Не трогаем is_production_city при редактировании (в форме он disabled)
         if "is_production_city" in request.form:
             e.is_production_city = bool(request.form.get("is_production_city"))
 
@@ -454,7 +465,6 @@ def edit_entry(entry_id):
 
     cities_list = [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()]
     products_list = [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()]
-    # учитываем ?next=... если пришёл (например, из routes)
     next_url = safe_next(request.args.get("next")) or safe_next(request.referrer)
     return render_template('entry_form.html', e=e, title=t('edit_entry'),
                            cities_list=cities_list, products_list=products_list, next_url=next_url)
@@ -474,7 +484,7 @@ def import_csv():
         if not file:
             flash("No file provided")
             return redirect(url_for("import_csv", lang=lang))
-        import csv
+
         from io import StringIO
         textbuf = file.read().decode("utf-8")
         reader = csv.DictReader(StringIO(textbuf))
@@ -511,7 +521,6 @@ def import_csv():
 
 @app.route("/export.csv")
 def export_csv():
-    # (экспорт можно оставить как есть, он не влияет на Routes)
     q_city = (request.args.get("city") or "").strip()
     q_product = (request.args.get("product") or "").strip()
     q_trend = (request.args.get("trend") or "").strip()
@@ -577,3 +586,4 @@ def health():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=True)
+
