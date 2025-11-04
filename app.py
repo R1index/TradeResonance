@@ -8,6 +8,7 @@ from sqlalchemy import func, text, select, literal, and_, or_
 import sqlalchemy as sa
 import csv, io
 from flask import Response
+from urllib.parse import urlparse
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
@@ -203,6 +204,7 @@ def approve_pending(p: "PendingEntry"):
     db.session.delete(p)
     db.session.commit()
     dedupe_entries()
+
 def dedupe_entries():
     # Сохраняем самую «свежую» запись на (city, product), объединяя флаг производства
     rows = (
@@ -230,29 +232,33 @@ with app.app_context():
     dedupe_entries()
     # индексы для оконных запросов/сортировок
     try:
-        db.session.execute(text(
-            "CREATE UNIQUE INDEX IF NOT EXISTS uq_entries_city_product ON entries (city, product)"
-        ))
-        db.session.execute(text(
-            "CREATE INDEX IF NOT EXISTS ix_entries_product_updated ON entries (product, updated_at DESC, created_at DESC)"
-        ))
-        db.session.execute(text(
-            "CREATE INDEX IF NOT EXISTS ix_entries_city_updated ON entries (city, updated_at DESC, created_at DESC)"
-        ))
+        # Создаем индексы только если они еще не существуют
+        if DATABASE_URL.startswith("sqlite"):
+            db.session.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_entries_product_updated ON entries (product, updated_at DESC, created_at DESC)"
+            ))
+            db.session.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_entries_city_updated ON entries (city, updated_at DESC, created_at DESC)"
+            ))
         db.session.commit()
-    except Exception:
+    except Exception as e:
+        print(f"Index creation warning: {e}")
         db.session.rollback()
 
-from urllib.parse import urlparse
 def safe_next(url):
-    if not url: return None
-    netloc = urlparse(url).netloc
-    if netloc and netloc != request.host: return None
+    if not url: 
+        return None
+    parsed = urlparse(url)
+    # Сравниваем только hostname без порта
+    if parsed.netloc and parsed.netloc.split(':')[0] != request.host.split(':')[0]:
+        return None
     return url
 
 def parse_bool(val: Optional[str]) -> bool:
-    if isinstance(val, bool): return val
-    if val is None: return False
+    if isinstance(val, bool): 
+        return val
+    if val is None: 
+        return False
     return str(val).lower() in {"1","true","on","yes","y","да"}
 
 @app.context_processor
@@ -268,14 +274,12 @@ def latest_entries_subq():
         order_by=sa.desc(ts)
     ).label("rn")
 
-    # Используем SQLAlchemy 2.0 style select()
     base = sa.select(
         Entry.id, Entry.city, Entry.product, Entry.price,
         Entry.trend, Entry.percent, Entry.is_production_city,
         Entry.created_at, Entry.updated_at, ts, rn
     ).subquery()
 
-    # select(*cols) вместо select([cols...])
     cols = [c for c in base.c if c.key != "rn"]
     return sa.select(*cols).where(base.c.rn == 1).subquery()
 
@@ -355,7 +359,7 @@ def index():
         )
 
     # ---------- CITIES ----------
-    if tab == "cities":
+    elif tab == "cities":
         pf = (request.args.get("pf") or "any").strip().lower()
         if pf not in ("any", "only_prod", "only_nonprod"):
             pf = "any"
@@ -386,77 +390,87 @@ def index():
         )
 
     # ---------- ROUTES ----------
-    q_product = (request.args.get("product") or "").strip()
+    elif tab == "routes":
+        q_product = (request.args.get("product") or "").strip()
 
-    # подвыборка «последних» записей
-    L = latest_entries_subq()
+        # подвыборка «последних» записей
+        L = latest_entries_subq()
 
-    # автодополнение по существующим продуктам (только из «последних»)
-    products_list = cached_list(
-        "products_latest",
-        lambda: [p for (p,) in db.session.query(L.c.product).distinct().order_by(L.c.product.asc()).all()]
-    )
-
-    base = db.session.query(
-        L.c.id, L.c.product, L.c.city, L.c.price, L.c.trend, L.c.percent,
-        L.c.created_at, L.c.updated_at
-    )
-    if q_product:
-        base = base.filter(L.c.product.ilike(f"%{q_product}%"))
-
-    # ранжируем цены по продукту (asc/desc) одной CTE
-    ts = func.coalesce(L.c.updated_at, L.c.created_at)
-    ranked = base.add_columns(
-        func.row_number().over(partition_by=L.c.product, order_by=L.c.price.asc()).label("rnk_buy"),
-        func.row_number().over(partition_by=L.c.product, order_by=L.c.price.desc()).label("rnk_sell"),
-        ts.label("ts")
-    ).cte("ranked")
-
-    buy = select(ranked).where(ranked.c.rnk_buy == 1).subquery()
-    sell = select(ranked).where(ranked.c.rnk_sell == 1).subquery()
-
-    pair = (
-        db.session.query(
-            buy.c.product.label("product"),
-            buy.c.city.label("buy_city"),  buy.c.price.label("buy_price"),
-            buy.c.id.label("buy_entry_id"), buy.c.trend.label("buy_trend"),
-            buy.c.percent.label("buy_percent"), buy.c.updated_at.label("buy_updated"),
-
-            sell.c.city.label("sell_city"), sell.c.price.label("sell_price"),
-            sell.c.id.label("sell_entry_id"), sell.c.trend.label("sell_trend"),
-            sell.c.percent.label("sell_percent"), sell.c.updated_at.label("sell_updated"),
+        # автодополнение по существующим продуктам (только из «последних»)
+        products_list = cached_list(
+            "products_latest",
+            lambda: [p for (p,) in db.session.query(L.c.product).distinct().order_by(L.c.product.asc()).all()]
         )
-        .join(sell, sell.c.product == buy.c.product)
-        .filter(sell.c.price > buy.c.price)
-        .filter(sell.c.city != buy.c.city)
-        .order_by((sell.c.price - buy.c.price).desc())
-    ).all()
 
-    routes = []
-    for r in pair:
-        spread = float((r.sell_price - r.buy_price) / r.buy_price * 100.0)
-        route_updated = max(r.buy_updated or r.buy_updated, r.sell_updated or r.sell_updated)
-        routes.append({
-            "product": r.product,
-            "buy_city": r.buy_city, "buy_price": float(r.buy_price),
-            "buy_entry_id": int(r.buy_entry_id), "buy_trend": r.buy_trend,
-            "buy_percent": float(r.buy_percent) if r.buy_percent is not None else None,
-            "buy_updated": r.buy_updated,
+        base = db.session.query(
+            L.c.id, L.c.product, L.c.city, L.c.price, L.c.trend, L.c.percent,
+            L.c.created_at, L.c.updated_at
+        )
+        if q_product:
+            base = base.filter(L.c.product.ilike(f"%{q_product}%"))
 
-            "sell_city": r.sell_city, "sell_price": float(r.sell_price),
-            "sell_entry_id": int(r.sell_entry_id), "sell_trend": r.sell_trend,
-            "sell_percent": float(r.sell_percent) if r.sell_percent is not None else None,
-            "sell_updated": r.sell_updated,
+        # ранжируем цены по продукту (asc/desc) одной CTE
+        ts = func.coalesce(L.c.updated_at, L.c.created_at)
+        ranked = base.add_columns(
+            func.row_number().over(partition_by=L.c.product, order_by=L.c.price.asc()).label("rnk_buy"),
+            func.row_number().over(partition_by=L.c.product, order_by=L.c.price.desc()).label("rnk_sell"),
+            ts.label("ts")
+        ).cte("ranked")
 
-            "spread_percent": spread,
-            "profit": float(r.sell_price - r.buy_price),
-            "route_updated": route_updated,
-        })
+        buy = select(ranked).where(ranked.c.rnk_buy == 1).subquery()
+        sell = select(ranked).where(ranked.c.rnk_sell == 1).subquery()
 
-    return render_template("routes.html",
-                           routes=routes,
-                           products_list=products_list,
-                           q_product=q_product)
+        pair = (
+            db.session.query(
+                buy.c.product.label("product"),
+                buy.c.city.label("buy_city"),  buy.c.price.label("buy_price"),
+                buy.c.id.label("buy_entry_id"), buy.c.trend.label("buy_trend"),
+                buy.c.percent.label("buy_percent"), buy.c.updated_at.label("buy_updated"),
+                buy.c.created_at.label("buy_created"),
+
+                sell.c.city.label("sell_city"), sell.c.price.label("sell_price"),
+                sell.c.id.label("sell_entry_id"), sell.c.trend.label("sell_trend"),
+                sell.c.percent.label("sell_percent"), sell.c.updated_at.label("sell_updated"),
+                sell.c.created_at.label("sell_created"),
+            )
+            .join(sell, sell.c.product == buy.c.product)
+            .filter(sell.c.price > buy.c.price)
+            .filter(sell.c.city != buy.c.city)
+            .order_by((sell.c.price - buy.c.price).desc())
+        ).all()
+
+        routes = []
+        for r in pair:
+            spread = float((r.sell_price - r.buy_price) / r.buy_price * 100.0)
+            # Исправлено: используем правильные переменные
+            buy_updated = r.buy_updated or r.buy_created
+            sell_updated = r.sell_updated or r.sell_created
+            route_updated = max(buy_updated, sell_updated)
+            
+            routes.append({
+                "product": r.product,
+                "buy_city": r.buy_city, "buy_price": float(r.buy_price),
+                "buy_entry_id": int(r.buy_entry_id), "buy_trend": r.buy_trend,
+                "buy_percent": float(r.buy_percent) if r.buy_percent is not None else None,
+                "buy_updated": buy_updated,
+
+                "sell_city": r.sell_city, "sell_price": float(r.sell_price),
+                "sell_entry_id": int(r.sell_entry_id), "sell_trend": r.sell_trend,
+                "sell_percent": float(r.sell_percent) if r.sell_percent is not None else None,
+                "sell_updated": sell_updated,
+
+                "spread_percent": spread,
+                "profit": float(r.sell_price - r.buy_price),
+                "route_updated": route_updated,
+            })
+
+        return render_template("routes.html",
+                               routes=routes,
+                               products_list=products_list,
+                               q_product=q_product)
+    
+    # Если tab не распознан, перенаправляем на prices
+    return redirect(url_for("index", tab="prices", lang=lang))
 
 # ---------------- entries ----------------
 
@@ -470,11 +484,15 @@ def new_entry():
     if request.method == "POST" and request.form.get("_action") == "submit_request":
         city = (request.form.get("city") or "").strip()
         product = (request.form.get("product") or "").strip()
-        try: price = float(request.form.get("price") or 0)
-        except: price = 0.0
+        try: 
+            price = float(request.form.get("price") or 0)
+        except: 
+            price = 0.0
         trend_v = (request.form.get("trend") or "up").strip()
-        try: percent_v = float(request.form.get("percent") or 0)
-        except: percent_v = 0.0
+        try: 
+            percent_v = float(request.form.get("percent") or 0)
+        except: 
+            percent_v = 0.0
         is_prod = parse_bool(request.form.get("is_production_city"))
         if not city or not product or price <= 0:
             flash(t("no_data"))
@@ -503,23 +521,30 @@ def new_entry():
                     approve_pending(p)
                     flash(t("approved"))
                 else:
-                    db.session.delete(p); db.session.commit(); flash(t("rejected"))
+                    db.session.delete(p)
+                    db.session.commit()
+                    flash(t("rejected"))
 
     pending = PendingEntry.query.order_by(PendingEntry.submitted_at.desc()).all()
 
     return render_template("entry_form.html", e=None, title=t("new_entry"),
                            cities_list=cities_list, products_list=products_list,
                            pending=pending, next_url=None)
+
 @app.route("/entries/<int:entry_id>/edit", methods=["GET", "POST"])
 def edit_entry(entry_id):
     lang = get_lang()
     e = Entry.query.get_or_404(entry_id)
     if request.method == "POST":
-        try: e.price = float(request.form.get("price", e.price))
-        except: pass
+        try: 
+            e.price = float(request.form.get("price", e.price))
+        except: 
+            pass
         e.trend = (request.form.get("trend") or e.trend).strip()
-        try: e.percent = float(request.form.get("percent", e.percent))
-        except: pass
+        try: 
+            e.percent = float(request.form.get("percent", e.percent))
+        except: 
+            pass
         # is_production_city в форме disabled — не трогаем
         db.session.commit()
         flash(t("updated"))
@@ -540,12 +565,15 @@ def import_csv():
     if request.method == "POST":
         admin_pass = request.form.get("admin_pass", "")
         if not admin_pass:
-            flash(t("required_password")); return redirect(url_for("import_csv", lang=lang))
+            flash(t("required_password"))
+            return redirect(url_for("import_csv", lang=lang))
         if admin_pass != ADMIN_PASSWORD:
-            flash(t("wrong_password")); return redirect(url_for("import_csv", lang=lang))
+            flash(t("wrong_password"))
+            return redirect(url_for("import_csv", lang=lang))
         file = request.files.get("file")
         if not file:
-            flash("No file provided"); return redirect(url_for("import_csv", lang=lang))
+            flash("No file provided")
+            return redirect(url_for("import_csv", lang=lang))
 
         from io import StringIO
         textbuf = file.read().decode("utf-8")
@@ -573,7 +601,8 @@ def import_csv():
                               trend=trend_v, percent=percent_v, is_production_city=is_prod)
                     db.session.add(e)
                 count += 1
-            except Exception:
+            except Exception as ex:
+                print(f"Import error: {ex}")
                 db.session.rollback()
         db.session.commit()
         dedupe_entries()
@@ -591,20 +620,28 @@ def export_csv():
     q_to = (request.args.get("to") or "").strip()
 
     query = Entry.query
-    if q_city: query = query.filter(Entry.city.ilike(f"%{q_city}%"))
-    if q_product: query = query.filter(Entry.product.ilike(f"%{q_product}%"))
-    if q_trend in ("up","down"): query = query.filter(Entry.trend == q_trend)
+    if q_city: 
+        query = query.filter(Entry.city.ilike(f"%{q_city}%"))
+    if q_product: 
+        query = query.filter(Entry.product.ilike(f"%{q_product}%"))
+    if q_trend in ("up","down"): 
+        query = query.filter(Entry.trend == q_trend)
 
     def parse_dt(s):
-        try: return datetime.fromisoformat(s)
+        try: 
+            return datetime.fromisoformat(s)
         except Exception:
-            try: return datetime.fromisoformat(s + "T00:00:00")
-            except Exception: return None
+            try: 
+                return datetime.fromisoformat(s + "T00:00:00")
+            except Exception: 
+                return None
 
     dt_from = parse_dt(q_from) if q_from else None
     dt_to = parse_dt(q_to) if q_to else None
-    if dt_from: query = query.filter(Entry.created_at >= dt_from)
-    if dt_to:   query = query.filter(Entry.created_at <= dt_to)
+    if dt_from: 
+        query = query.filter(Entry.created_at >= dt_from)
+    if dt_to:   
+        query = query.filter(Entry.created_at <= dt_to)
 
     rows = query.order_by(Entry.created_at.desc()).all()
 
@@ -624,12 +661,23 @@ def export_csv():
 
 @app.route("/admin/dedupe")
 def admin_dedupe():
-    dedupe_entries(); flash("Deduplicated")
+    dedupe_entries()
+    flash("Deduplicated")
     return redirect(url_for("index", lang=get_lang()))
 
 @app.route("/health")
 def health():
     return {"status":"ok"}
+
+# Обработчики ошибок
+@app.errorhandler(404)
+def not_found(error):
+    return render_template('404.html'), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    db.session.rollback()
+    return render_template('500.html'), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
