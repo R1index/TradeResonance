@@ -93,11 +93,11 @@
     </div>
   </form>
 
-  <!-- Список заявок (для админа) -->
+  <!-- Список заявок (для админа, одно поле пароля) -->
   <div class="mt-8">
     <h2 class="text-lg font-semibold mb-2">{{ t('pending_requests') }}</h2>
     {% if pending and pending|length %}
-      <div class="space-y-2">
+      <div class="space-y-2" id="pendingList">
         {% for p in pending %}
           <div class="border rounded p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div class="text-sm">
@@ -107,20 +107,52 @@
               <div class="opacity-70">#{{ p.id }} · {{ p.submitted_at }}</div>
             </div>
             <div class="flex items-center gap-2">
-              <form method="post" class="flex items-center gap-2">
+              <form method="post" class="approveForm flex items-center gap-2">
                 <input type="hidden" name="_action" value="approve">
                 <input type="hidden" name="pending_id" value="{{ p.id }}">
-                <input type="password" name="admin_pass" class="input" placeholder="{{ t('admin_password') }}" required autocomplete="off" style="width: 12rem;">
                 <button class="btn btn-primary" type="submit">{{ t('approve') }}</button>
               </form>
-              <form method="post" class="flex items-center gap-2">
+              <form method="post" class="rejectForm flex items-center gap-2">
                 <input type="hidden" name="_action" value="reject">
                 <input type="hidden" name="pending_id" value="{{ p.id }}">
-                <input type="password" name="admin_pass" class="input" placeholder="{{ t('admin_password') }}" required autocomplete="off" style="width: 12rem;">
                 <button class="btn btn-outline" type="submit">{{ t('reject') }}</button>
               </form>
             </div>
           </div>
+        {% endfor %}
+      </div>
+
+      <!-- Общее поле пароля -->
+      <div class="mt-4 flex items-center gap-3">
+        <input type="password" id="adminPassGlobal" class="input" placeholder="{{ t('admin_password') }}" autocomplete="off" style="width: 14rem;">
+        <span class="opacity-70 text-sm">{{ t('need_password_for_action') }}</span>
+      </div>
+
+      <script>
+        (function(){
+          const passInput = document.getElementById('adminPassGlobal');
+          document.querySelectorAll('#pendingList form').forEach(f => {
+            f.addEventListener('submit', ev => {
+              if (!passInput.value.trim()) {
+                ev.preventDefault();
+                alert('{{ t("need_password_for_action") }}');
+                passInput.focus();
+                return false;
+              }
+              // добавляем скрытое поле с паролем перед отправкой
+              const hidden = document.createElement('input');
+              hidden.type = 'hidden';
+              hidden.name = 'admin_pass';
+              hidden.value = passInput.value;
+              f.appendChild(hidden);
+            });
+          });
+        })();
+      </script>
+    {% else %}
+      <p class="opacity-70">{{ t('no_data') }}</p>
+    {% endif %}
+  </div>
         {% endfor %}
       </div>
     {% else %}
