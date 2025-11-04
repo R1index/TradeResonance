@@ -75,6 +75,15 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "password": "Password",
         "wrong_password": "Wrong password",
         "required_password": "Password is required",
+    
+        "pending_requests": "Pending requests",
+        "request_submitted": "Request submitted for review",
+        "approve": "Approve",
+        "reject": "Reject",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "admin_password": "Admin password",
+        "need_password_for_action": "Admin password required for this action",
     },
     "ru": {
         "app_title": "Трейд Хелпер",
@@ -123,6 +132,15 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "password": "Пароль",
         "wrong_password": "Неверный пароль",
         "required_password": "Требуется пароль",
+    
+        "pending_requests": "Заявки на добавление",
+        "request_submitted": "Заявка отправлена на рассмотрение",
+        "approve": "Одобрить",
+        "reject": "Отклонить",
+        "approved": "Одобрено",
+        "rejected": "Отклонено",
+        "admin_password": "Пароль админа",
+        "need_password_for_action": "Для этого действия нужен пароль админа",
     }
 }
 
@@ -152,6 +170,39 @@ class Entry(db.Model):
         return self.updated_at or self.created_at
 
 # ------- индексы и дедуп --------
+
+class PendingEntry(db.Model):
+    __tablename__ = "pending_entries"
+    id = db.Column(db.Integer, primary_key=True)
+    submitted_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    city = db.Column(db.String(120), nullable=False, index=True)
+    product = db.Column(db.String(120), nullable=False, index=True)
+    price = db.Column(db.Float, nullable=False)
+    trend = db.Column(db.String(10), nullable=False)  # "up" | "down"
+    percent = db.Column(db.Float, nullable=False, default=0.0)
+    is_production_city = db.Column(db.Boolean, nullable=False, default=False)
+    submit_ip = db.Column(db.String(64))
+
+def approve_pending(p: "PendingEntry"):
+    existing = Entry.query.filter_by(city=p.city, product=p.product).first()
+    if existing:
+        existing.price = p.price
+        existing.trend = p.trend
+        existing.percent = p.percent
+        existing.is_production_city = existing.is_production_city or p.is_production_city
+    else:
+        e = Entry(
+            city=p.city,
+            product=p.product,
+            price=p.price,
+            trend=p.trend,
+            percent=p.percent,
+            is_production_city=p.is_production_city
+        )
+        db.session.add(e)
+    db.session.delete(p)
+    db.session.commit()
+    dedupe_entries()
 def dedupe_entries():
     # Сохраняем самую «свежую» запись на (city, product), объединяя флаг производства
     rows = (
@@ -408,24 +459,15 @@ def index():
                            q_product=q_product)
 
 # ---------------- entries ----------------
+
 @app.route("/entries/new", methods=["GET", "POST"])
 def new_entry():
     lang = get_lang()
     cities_list = cached_list("cities", lambda: [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()])
     products_list = cached_list("products", lambda: [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()])
 
-    if request.method == "POST":
-        admin_pass = (request.form.get("admin_pass") or "").strip()
-        if not admin_pass:
-            flash(t("required_password"))
-            return render_template("entry_form.html", e=None, title=t("new_entry"),
-                                   cities_list=cities_list, products_list=products_list, next_url=None)
-
-        if admin_pass != ADMIN_PASSWORD:
-            flash(t("wrong_password"))
-            return render_template("entry_form.html", e=None, title=t("new_entry"),
-                                   cities_list=cities_list, products_list=products_list, next_url=None)
-
+    # создание заявки без пароля
+    if request.method == "POST" and request.form.get("_action") == "submit_request":
         city = (request.form.get("city") or "").strip()
         product = (request.form.get("product") or "").strip()
         try: price = float(request.form.get("price") or 0)
@@ -434,34 +476,40 @@ def new_entry():
         try: percent_v = float(request.form.get("percent") or 0)
         except: percent_v = 0.0
         is_prod = parse_bool(request.form.get("is_production_city"))
-
         if not city or not product or price <= 0:
             flash(t("no_data"))
-            return render_template("entry_form.html", e=None, title=t("new_entry"),
-                                   cities_list=cities_list, products_list=products_list, next_url=None)
-
-        existing = Entry.query.filter_by(city=city, product=product).first()
-        if existing:
-            existing.price = price
-            existing.trend = trend_v
-            existing.percent = percent_v
-            existing.is_production_city = existing.is_production_city or is_prod
-            db.session.commit()
-            flash(t("updated"))
         else:
-            e = Entry(city=city, product=product, price=price, trend=trend_v,
-                      percent=percent_v, is_production_city=is_prod)
-            db.session.add(e)
+            p = PendingEntry(
+                city=city, product=product, price=price,
+                trend=trend_v, percent=percent_v,
+                is_production_city=is_prod, submit_ip=request.remote_addr
+            )
+            db.session.add(p)
             db.session.commit()
-            flash(t("saved"))
-        dedupe_entries()
-        # остаёмся на форме
-        return render_template("entry_form.html", e=None, title=t("new_entry"),
-                               cities_list=cities_list, products_list=products_list, next_url=None)
+            flash(t("request_submitted"))
+
+    # админ действия над заявками
+    if request.method == "POST" and request.form.get("_action") in {"approve", "reject"}:
+        admin_pass = (request.form.get("admin_pass") or "").strip()
+        if not admin_pass:
+            flash(t("need_password_for_action"))
+        elif admin_pass != ADMIN_PASSWORD:
+            flash(t("wrong_password"))
+        else:
+            pid = request.form.get("pending_id", type=int)
+            p = PendingEntry.query.get(pid)
+            if p:
+                if request.form.get("_action") == "approve":
+                    approve_pending(p)
+                    flash(t("approved"))
+                else:
+                    db.session.delete(p); db.session.commit(); flash(t("rejected"))
+
+    pending = PendingEntry.query.order_by(PendingEntry.submitted_at.desc()).all()
 
     return render_template("entry_form.html", e=None, title=t("new_entry"),
-                           cities_list=cities_list, products_list=products_list, next_url=None)
-
+                           cities_list=cities_list, products_list=products_list,
+                           pending=pending, next_url=None)
 @app.route("/entries/<int:entry_id>/edit", methods=["GET", "POST"])
 def edit_entry(entry_id):
     lang = get_lang()
