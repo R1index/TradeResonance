@@ -1,9 +1,23 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="card p-4">
-  <div class="flex items-center justify-between mb-4">
+  <div class="flex items-start justify-between gap-3 mb-4">
     <h1 class="text-xl font-semibold">{{ t('nav_routes') }}</h1>
-    <span class="text-sm text-zinc-500">{{ routes|length }} routes</span>
+
+    <!-- Форма фильтра по товару -->
+    <form method="get" class="flex items-end gap-2">
+      <input type="hidden" name="tab" value="routes">
+      <div>
+        <label class="label">{{ t('product') }}</label>
+        <input class="input" name="product" placeholder="{{ t('product') }}"
+               value="{{ q_product or '' }}" list="productsList">
+        <datalist id="productsList">
+          {% for p in products_list %}<option value="{{ p }}">{% endfor %}
+        </datalist>
+      </div>
+      <button class="btn btn-outline" type="submit">{{ t('filters') }}</button>
+      <a class="btn btn-outline" href="{{ url_for('index', tab='routes', lang=lang) }}">Reset</a>
+    </form>
   </div>
 
   {% if not routes %}
