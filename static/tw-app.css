@@ -1,44 +1,114 @@
-/* tw-app.css (no @apply) */
+/* ==== Theme tokens ===================================================== */
 :root{
-  --bg:#f6f7f9; --bg-dark:#0b0c0f;
-  --card:#fff; --card-dark:#0f1115;
-  --text:#111827; --text-dark:#f3f4f6;
-  --muted:#6b7280; --muted-dark:#9ca3af;
-  --border:#e5e7eb; --border-dark:#1f2937;
-  --primary:#2563eb; --primary-600:#1d4ed8;
+  /* light */
+  --card: rgb(255 255 255);
+  --surface: rgb(250 250 250);
+  --border: rgb(228 228 231);
+  --text: rgb(24 24 27);
+  --muted: rgb(113 113 122);
+
+  /* dark */
+  --card-dark: rgb(24 24 27);
+  --surface-dark: rgb(17 17 19);
+  --border-dark: rgb(39 39 42);
+  --text-dark: rgb(244 244 245);
+  --muted-dark: rgb(161 161 170);
+
+  --chip-green: 22 163 74;  /*  rgb() без оболочки  => используем как rgba(var(--chip-green), .15)  */
+  --chip-red:   220 38 38;
 }
-html.dark body{ background:var(--bg-dark); color:var(--text-dark); }
-body{ background:var(--bg); color:var(--text); }
 
-.card{ background:var(--card); border:1px solid var(--border); border-radius:16px; box-shadow:0 6px 18px rgba(0,0,0,.06); }
-html.dark .card{ background:var(--card-dark); border-color:var(--border-dark); box-shadow:0 10px 24px rgba(0,0,0,.32); }
+/* ==== Layout basics, so body inherits via theme ======================= */
+body{
+  background: var(--surface);
+  color: var(--text);
+}
+html.dark body{
+  background: var(--surface-dark);
+  color: var(--text-dark);
+}
 
-.tab{ padding:.4rem .8rem; border-radius:10px; text-decoration:none; font-weight:600; color:inherit; }
-.tab:hover{ background:#f3f4f6; } html.dark .tab:hover{ background:#1a1d23; }
-.tab-active{ background:#eef2ff; } html.dark .tab-active{ background:#1a1d23; }
+/* ==== Header (blur + border via tokens) =============================== */
+.header-blur{
+  background: color-mix(in oklab, var(--card) 92%, transparent);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+}
+html.dark .header-blur{
+  background: color-mix(in oklab, var(--card-dark) 92%, transparent);
+  border-bottom-color: var(--border-dark);
+}
 
-.btn{ display:inline-flex; align-items:center; justify-content:center; padding:.55rem .9rem; border-radius:12px; border:1px solid #cbd5e1; background:#fff; color:#111827; font-weight:600; text-decoration:none; cursor:pointer; transition:background .15s, border-color .15s, transform .05s; }
-.btn:hover{ background:#f3f4f6; }
-.btn:active{ transform:scale(.98); }
-html.dark .btn{ background:#111318; border-color:#2b3038; color:#e5e7eb; }
-html.dark .btn:hover{ background:#1a1d23; }
-.btn-primary{ background:var(--primary); border-color:var(--primary); color:#fff; }
-.btn-primary:hover{ background:var(--primary-600); border-color:var(--primary-600); }
-.btn-outline{ background:transparent; }
+/* ==== Cards, tables, inputs ========================================== */
+.card{
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+html.dark .card{
+  background: var(--card-dark);
+  border-color: var(--border-dark);
+}
 
-.input,.select{ width:100%; padding:.55rem .75rem; border-radius:12px; border:1px solid #cbd5e1; background:#fff; color:#111827; }
-html.dark .input, html.dark .select{ background:#0f1115; color:#e5e7eb; border-color:#30343b; }
-.label{ font-size:.85rem; font-weight:600; color:#6b7280; } html.dark .label{ color:#9ca3af; }
+.table-card{
+  width:100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--card);
+}
+html.dark .table-card{ background: var(--card-dark); }
+.table-card thead th{
+  color: var(--muted);
+  font-weight: 600;
+}
+html.dark .table-card thead th{
+  color: var(--muted-dark);
+}
+.table-card tbody tr{ border-bottom: 1px solid var(--border); }
+html.dark .table-card tbody tr{ border-bottom-color: var(--border-dark); }
+.table-card td, .table-card th{
+  background: transparent;
+  color: inherit;
+}
 
-.badge{ display:inline-flex; align-items:center; gap:.25rem; padding:.2rem .5rem; font-size:.75rem; font-weight:700; border-radius:999px; background:#e5e7eb; color:#374151; }
-html.dark .badge{ background:#374151; color:#e5e7eb; }
-.badge-green{ background:rgba(16,185,129,.15); color:#059669; }
-.badge-red{ background:rgba(239,68,68,.15); color:#dc2626; }
+.input, .select{
+  background: var(--card) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+}
+html.dark .input, html.dark .select{
+  background: var(--card-dark) !important;
+  color: var(--text-dark) !important;
+  border-color: var(--border-dark) !important;
+}
+.input::placeholder, .select::placeholder{
+  color: var(--muted);
+}
+html.dark .input::placeholder, html.dark .select::placeholder{
+  color: var(--muted-dark);
+}
 
-@media (max-width: 768px){
-  .table-card thead{ display:none; }
-  .table-card tr{ display:grid; grid-template-columns:1fr; border:1px solid var(--border); border-radius:14px; padding:.5rem .75rem; margin-bottom:.75rem; }
-  html.dark .table-card tr{ border-color:var(--border-dark); }
-  .table-card td{ display:grid; grid-template-columns:38% 62%; gap:.5rem; padding:.25rem 0; }
-  .table-card td::before{ content:attr(data-th); font-weight:700; color:#6b7280; }
+/* ==== Buttons / tabs ================================================== */
+.btn, .btn-outline, .tab{ color: inherit; }
+.btn-outline{
+  background: transparent;
+  border: 1px solid var(--border);
+}
+html.dark .btn-outline{ border-color: var(--border-dark); }
+
+.tab-active{ background: rgba(0,0,0,.04); }
+html.dark .tab-active{ background: rgba(255,255,255,.06); }
+
+/* ==== Badges for trends =============================================== */
+.badge{
+  display:inline-flex; align-items:center; gap:.375rem;
+  padding:.125rem .5rem; border-radius:999px; font-size:.75rem; line-height:1rem;
+}
+.badge-green{
+  background-color: rgba(var(--chip-green), .15);
+  color: rgb(var(--chip-green));
+}
+.badge-red{
+  background-color: rgba(var(--chip-red), .15);
+  color: rgb(var(--chip-red));
 }
