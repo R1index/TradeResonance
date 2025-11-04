@@ -2,13 +2,22 @@
 {% block content %}
 <section class="card p-4">
   <h1 class="text-xl font-semibold mb-3">{{ title }}</h1>
+
+  {# липкие значения при создании #}
+  {% set P = prefill or {} %}
+
   <form method="post" class="grid grid-cols-1 md:grid-cols-4 gap-3">
     <input type="hidden" name="next" value="{{ next_url or request.referrer }}">
 
     <!-- Город -->
     <div class="md:col-span-2">
       <label class="label">{{ t('city') }}</label>
-      <input name="city" class="input" value="{{ e.city if e else '' }}" list="citiesList" {% if e %}disabled{% else %}required{% endif %}>
+      <input
+        name="city"
+        class="input"
+        value="{{ e.city if e else (P.city or '') }}"
+        list="citiesList"
+        {% if e %}disabled{% else %}required{% endif %}>
       <datalist id="citiesList">
         {% for c in cities_list %}<option value="{{ c }}">{% endfor %}
       </datalist>
@@ -17,7 +26,12 @@
     <!-- Товар -->
     <div class="md:col-span-2">
       <label class="label">{{ t('product') }}</label>
-      <input name="product" class="input" value="{{ e.product if e else '' }}" list="productsList" {% if e %}disabled{% else %}required{% endif %}>
+      <input
+        name="product"
+        class="input"
+        value="{{ e.product if e else (P.product or '') }}"
+        list="productsList"
+        {% if e %}disabled{% else %}required{% endif %}>
       <datalist id="productsList">
         {% for p in products_list %}<option value="{{ p }}">{% endfor %}
       </datalist>
@@ -31,7 +45,8 @@
           {{ 'Clear' if lang=='en' else 'Очистить' }}
         </button>
       </div>
-      <input id="priceField" type="number" step="1" name="price" class="input" value="{{ e.price if e else '' }}" required>
+      <input id="priceField" type="number" step="1" name="price" class="input"
+             value="{{ e.price if e else (P.price or '') }}" required>
     </div>
 
     <!-- Процент + Очистить -->
@@ -42,7 +57,8 @@
           {{ 'Clear' if lang=='en' else 'Очистить' }}
         </button>
       </div>
-      <input id="percentField" type="number" step="1" name="percent" class="input" value="{{ e.percent if e else 0 }}" required>
+      <input id="percentField" type="number" step="1" name="percent" class="input"
+             value="{{ e.percent if e else (P.percent or 0) }}" required>
     </div>
 
     <!-- Тренд + стрелки -->
@@ -54,9 +70,10 @@
           <button type="button" class="btn btn-outline px-2 py-1 text-xs" data-trend="down" title="{{ t('down') }}">▼</button>
         </div>
       </div>
+      {% set trend_val = e.trend if e else (P.trend or 'up') %}
       <select id="trendSelect" name="trend" class="select" required>
         {% for opt in ['up','down'] %}
-        <option value="{{ opt }}" {% if e and e.trend==opt %}selected{% endif %}>{{ t(opt) }}</option>
+        <option value="{{ opt }}" {% if trend_val==opt %}selected{% endif %}>{{ t(opt) }}</option>
         {% endfor %}
       </select>
     </div>
@@ -65,21 +82,24 @@
     <div class="flex items-end">
       <label class="inline-flex items-center gap-2">
         {% if not e %}
-          <!-- Создание: поле активно -->
-          <input type="checkbox" class="h-4 w-4" name="is_production_city" {% if e and e.is_production_city %}checked{% endif %}>
+          <!-- Создание: поле активно и берёт значение из P -->
+          <input type="checkbox" class="h-4 w-4" name="is_production_city"
+                 {% if P.is_production_city %}checked{% endif %}>
         {% else %}
-          <!-- Редактирование: отображаем, но без name -->
+          <!-- Редактирование: отображаем без name (чтобы бэкенд не менял флаг) -->
           <input type="checkbox" class="h-4 w-4" {% if e.is_production_city %}checked{% endif %} disabled>
         {% endif %}
         <span class="label">{{ t('is_prod_city') }}</span>
       </label>
     </div>
 
-    <!-- Пароль (только при создании) -->
+    <!-- Пароль (только при создании, не очищается) -->
     {% if not e %}
     <div>
       <label class="label">{{ t('password') }}</label>
-      <input type="password" name="admin_pass" class="input" placeholder="{{ t('password') }}" required>
+      <input type="password" name="admin_pass" class="input"
+             placeholder="{{ t('password') }}" required
+             value="{{ P.admin_pass or '' }}">
     </div>
     {% endif %}
 
@@ -96,10 +116,9 @@
       // Очистка полей
       document.querySelectorAll('[data-clear]').forEach(btn=>{
         btn.addEventListener('click', ()=>{
-          const sel = btn.getAttribute('data-clear');
-          const el = document.querySelector(sel);
+          const el = document.querySelector(btn.getAttribute('data-clear'));
           if (el) { el.value = ''; el.focus(); }
-        })
+        });
       });
       // Тренд ↑/↓
       const trendSel = document.getElementById('trendSelect');
@@ -107,7 +126,7 @@
         btn.addEventListener('click', ()=>{
           const val = btn.getAttribute('data-trend');
           if (trendSel) { trendSel.value = val; trendSel.dispatchEvent(new Event('change')); }
-        })
+        });
       });
     })();
   </script>
