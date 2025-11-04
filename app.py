@@ -222,33 +222,72 @@ def index():
     tab = request.args.get("tab", "prices")
 
     if tab == "prices":
-        # Filters
-        q_city = request.args.get("city", "").strip()
-        q_product = request.args.get("product", "").strip()
-        q_trend = request.args.get("trend", "").strip()
-        q_from = request.args.get("from", "").strip()
-        q_to = request.args.get("to", "").strip()
-
+        # ── Фильтры (без дат) ─────────────────────────────────────────────
+        q_city    = (request.args.get("city") or "").strip()
+        q_product = (request.args.get("product") or "").strip()
+        q_trend   = (request.args.get("trend") or "").strip()
+    
+        q_price_min   = request.args.get("price_min", type=float)
+        q_price_max   = request.args.get("price_max", type=float)
+        q_percent_min = request.args.get("percent_min", type=float)
+        q_percent_max = request.args.get("percent_max", type=float)
+    
+        # Производственный город: any|yes|no
+        q_prod = (request.args.get("prod") or "any").strip().lower()
+    
+        # Сортировка
+        # price_asc|price_desc|percent_asc|percent_desc|updated_asc|updated_desc
+        q_sort = (request.args.get("sort") or "updated_desc").strip().lower()
+    
         query = Entry.query
-        if q_city: query = query.filter(Entry.city.ilike(f"%{q_city}%"))
-        if q_product: query = query.filter(Entry.product.ilike(f"%{q_product}%"))
-        if q_trend in ("up","down"): query = query.filter(Entry.trend==q_trend)
-
-        def parse_dt(s):
-            try: return datetime.fromisoformat(s)
-            except Exception:
-                try: return datetime.fromisoformat(s + "T00:00:00")
-                except Exception: return None
-        dt_from = parse_dt(q_from) if q_from else None
-        dt_to = parse_dt(q_to) if q_to else None
-        if dt_from: query = query.filter(Entry.created_at >= dt_from)
-        if dt_to: query = query.filter(Entry.created_at <= dt_to)
-
-        entries = query.order_by(Entry.created_at.desc()).limit(1000).all()
+        if q_city:
+            query = query.filter(Entry.city.ilike(f"%{q_city}%"))
+        if q_product:
+            query = query.filter(Entry.product.ilike(f"%{q_product}%"))
+        if q_trend in ("up", "down"):
+            query = query.filter(Entry.trend == q_trend)
+    
+        if q_price_min is not None:
+            query = query.filter(Entry.price >= q_price_min)
+        if q_price_max is not None:
+            query = query.filter(Entry.price <= q_price_max)
+        if q_percent_min is not None:
+            query = query.filter(Entry.percent >= q_percent_min)
+        if q_percent_max is not None:
+            query = query.filter(Entry.percent <= q_percent_max)
+    
+        if q_prod == "yes":
+            query = query.filter(Entry.is_production_city.is_(True))
+        elif q_prod == "no":
+            query = query.filter(Entry.is_production_city.is_(False))
+    
+        sort_map = {
+            "price_asc": Entry.price.asc(),
+            "price_desc": Entry.price.desc(),
+            "percent_asc": Entry.percent.asc(),
+            "percent_desc": Entry.percent.desc(),
+            "updated_asc": Entry.updated_at.asc().nullslast(),
+            "updated_desc": Entry.updated_at.desc().nullslast(),
+        }
+        query = query.order_by(sort_map.get(q_sort, sort_map["updated_desc"]))
+    
+        entries = query.limit(1000).all()
+    
         cities_list = [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()]
         products_list = [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()]
-        return render_template("prices.html", entries=entries, cities_list=cities_list, products_list=products_list,
-                               q_city=q_city, q_product=q_product, q_trend=q_trend, q_from=q_from, q_to=q_to)
+    
+        return render_template(
+            "prices.html",
+            entries=entries,
+            cities_list=cities_list,
+            products_list=products_list,
+            # передаём текущие значения фильтров в шаблон
+            q_city=q_city, q_product=q_product, q_trend=q_trend,
+            q_price_min=q_price_min, q_price_max=q_price_max,
+            q_percent_min=q_percent_min, q_percent_max=q_percent_max,
+            q_prod=q_prod, q_sort=q_sort,
+        )
+
 
     if tab == "cities":
         rows = (
