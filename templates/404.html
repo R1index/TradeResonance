@@ -1,0 +1,19 @@
+<html lang="{{ lang }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t('app_title') }} - 404</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; text-align: center; }
+        .error-code { font-size: 72px; color: #666; margin: 50px 0 20px; }
+        .error-message { font-size: 24px; color: #333; margin-bottom: 30px; }
+        .back-link { display: inline-block; padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="error-code">404</div>
+    <div class="error-message">{{ t('no_data') }}</div>
+    <p>Страница не найдена</p>
+    <a href="{{ url_for('index') }}" class="back-link">{{ t('back') }}</a>
+</body>
+</html>
