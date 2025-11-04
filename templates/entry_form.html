@@ -2,7 +2,8 @@
 {% block content %}
 <section class="card p-4">
   <h1 class="text-xl font-semibold mb-3">{{ title }}</h1>
-  <form method="post" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+
+  <form method="post" class="grid grid-cols-1 md:grid-cols-4 gap-3" id="entryForm">
     <input type="hidden" name="next" value="{{ next_url or request.referrer }}">
 
     <!-- Город -->
@@ -11,8 +12,8 @@
       <input
         name="city"
         class="input"
-        value="{{ e.city if e else request.form.get('city', '') }}"
         list="citiesList"
+        value="{% if e %}{{ e.city }}{% else %}{{ request.form.get('city','') or request.args.get('city','') }}{% endif %}"
         {% if e %}disabled{% else %}required{% endif %}>
       <datalist id="citiesList">
         {% for c in cities_list %}<option value="{{ c }}">{% endfor %}
@@ -25,15 +26,15 @@
       <input
         name="product"
         class="input"
-        value="{{ e.product if e else '' }}"
         list="productsList"
+        value="{% if e %}{{ e.product }}{% else %}{{ request.form.get('product','') }}{% endif %}"
         {% if e %}disabled{% else %}required{% endif %}>
       <datalist id="productsList">
         {% for p in products_list %}<option value="{{ p }}">{% endfor %}
       </datalist>
     </div>
 
-    <!-- Цена -->
+    <!-- Цена + Очистить -->
     <div>
       <div class="flex items-center justify-between">
         <label class="label">{{ t('price') }}</label>
@@ -42,10 +43,10 @@
         </button>
       </div>
       <input id="priceField" type="number" step="1" name="price" class="input"
-             value="{{ e.price if e else '' }}" required>
+             value="{% if e %}{{ e.price }}{% else %}{{ request.form.get('price','') }}{% endif %}" required>
     </div>
 
-    <!-- Процент -->
+    <!-- Процент + Очистить -->
     <div>
       <div class="flex items-center justify-between">
         <label class="label">{{ t('percent') }} %</label>
@@ -54,10 +55,10 @@
         </button>
       </div>
       <input id="percentField" type="number" step="1" name="percent" class="input"
-             value="{{ e.percent if e else 0 }}" required>
+             value="{% if e %}{{ e.percent|int }}{% else %}{{ request.form.get('percent','0') }}{% endif %}" required>
     </div>
 
-    <!-- Тренд -->
+    <!-- Тренд + стрелки -->
     <div>
       <div class="flex items-center justify-between">
         <label class="label">{{ t('trend') }}</label>
@@ -68,7 +69,10 @@
       </div>
       <select id="trendSelect" name="trend" class="select" required>
         {% for opt in ['up','down'] %}
-        <option value="{{ opt }}" {% if e and e.trend==opt %}selected{% endif %}>{{ t(opt) }}</option>
+        <option value="{{ opt }}"
+          {% if e and e.trend==opt %}selected{% elif not e and request.form.get('trend','up')==opt %}selected{% endif %}>
+          {{ t(opt) }}
+        </option>
         {% endfor %}
       </select>
     </div>
@@ -77,7 +81,8 @@
     <div class="flex items-end">
       <label class="inline-flex items-center gap-2">
         {% if not e %}
-          <input type="checkbox" class="h-4 w-4" name="is_production_city" {% if e and e.is_production_city %}checked{% endif %}>
+          <input type="checkbox" class="h-4 w-4" name="is_production_city"
+                 {% if request.form.get('is_production_city') or (e and e.is_production_city) %}checked{% endif %}>
         {% else %}
           <input type="checkbox" class="h-4 w-4" {% if e.is_production_city %}checked{% endif %} disabled>
         {% endif %}
@@ -85,13 +90,13 @@
       </label>
     </div>
 
-    <!-- Пароль -->
+    <!-- Пароль (только при создании) -->
     {% if not e %}
     <div>
       <label class="label">{{ t('password') }}</label>
-      <input type="password" name="admin_pass" class="input"
+      <input type="password" name="admin_pass" class="input" autocomplete="off"
              placeholder="{{ t('password') }}" required
-             value="{{ request.form.get('admin_pass', '') }}">
+             value="{{ request.form.get('admin_pass','') or request.args.get('admin_pass','') }}">
     </div>
     {% endif %}
 
@@ -103,34 +108,75 @@
   </form>
 
   <script>
-    (function(){
-      // Очистка полей вручную
-      document.querySelectorAll('[data-clear]').forEach(btn=>{
-        btn.addEventListener('click', ()=>{
+    (function () {
+      const form = document.getElementById('entryForm');
+      const isEdit = {{ 'true' if e else 'false' }};
+      const cityInput = form.querySelector('input[name="city"]');
+      const passInput = form.querySelector('input[name="admin_pass"]');
+
+      // локальные ключи (переживаем редирект)
+      const K_CITY = 'th_city';
+      const K_PASS = 'th_admin';
+
+      // Восстанавливаем (если это создание и поля пустые)
+      if (!isEdit) {
+        if (cityInput && !cityInput.value) {
+          const v = sessionStorage.getItem(K_CITY);
+          if (v) cityInput.value = v;
+        }
+        if (passInput && !passInput.value) {
+          const v = sessionStorage.getItem(K_PASS);
+          if (v) passInput.value = v;
+        }
+      }
+
+      // Сохраняем перед submit (только создание)
+      form.addEventListener('submit', () => {
+        if (!isEdit) {
+          if (cityInput) sessionStorage.setItem(K_CITY, cityInput.value || '');
+          if (passInput) sessionStorage.setItem(K_PASS, passInput.value || '');
+        }
+      });
+
+      // Очистка по кнопкам
+      document.querySelectorAll('[data-clear]').forEach(btn => {
+        btn.addEventListener('click', () => {
           const el = document.querySelector(btn.getAttribute('data-clear'));
           if (el) { el.value = ''; el.focus(); }
         });
       });
 
-      // Переключатель тренда
+      // Стрелки тренда
       const trendSel = document.getElementById('trendSelect');
-      document.querySelectorAll('[data-trend]').forEach(btn=>{
-        btn.addEventListener('click', ()=>{
+      document.querySelectorAll('[data-trend]').forEach(btn => {
+        btn.addEventListener('click', () => {
           const val = btn.getAttribute('data-trend');
           if (trendSel) { trendSel.value = val; trendSel.dispatchEvent(new Event('change')); }
         });
       });
 
-      // После успешного добавления — очистка формы, кроме города и пароля
-      const flash = {{ get_flashed_messages()|tojson }};
-      if (flash && flash.length && flash[0].includes('{{ t("saved") }}')) {
-        const city = document.querySelector('input[name=city]');
-        const pass = document.querySelector('input[name=admin_pass]');
-        const cityVal = city ? city.value : '';
-        const passVal = pass ? pass.value : '';
-        document.querySelector('form').reset();
-        if (city) city.value = cityVal;
-        if (pass) pass.value = passVal;
+      // Если пришли после успешного создания — очистим всё, кроме City и Password.
+      // Сервер после сохранения делает PRG-редирект обратно на /entries/new.
+      // Факт «успеха» распознаём по query-параметру success=1 (задать в контроллере) ИЛИ по флешу.
+      const flashHolder = document.querySelector('[data-flash]');
+      const flashDataRaw = flashHolder ? flashHolder.getAttribute('data-flash') : '';
+      let isSuccess = false;
+      try {
+        const f = flashDataRaw ? JSON.parse(flashDataRaw) : null;
+        isSuccess = !!(f && f.message && (f.message.includes('{{ t("saved") }}') || f.message.includes('{{ t("updated") }}')));
+      } catch {}
+
+      if (!isEdit && isSuccess) {
+        // очистим все поля формы…
+        form.reset();
+        // …кроме города и пароля (берём из sessionStorage)
+        if (cityInput) cityInput.value = sessionStorage.getItem(K_CITY) || cityInput.value;
+        if (passInput) passInput.value = sessionStorage.getItem(K_PASS) || passInput.value;
+        // и вернём тренд к up
+        if (trendSel) trendSel.value = 'up';
+        // фокус на цену
+        const price = document.getElementById('priceField');
+        if (price) price.focus();
       }
     })();
   </script>
