@@ -5,9 +5,10 @@
     <h1 class="text-xl font-semibold">{{ t('nav_cities') }}</h1>
 
     <!-- Переключатель фильтра -->
-    <form method="get" class="flex items-center gap-2">
+    <form method="get" class="flex items-center gap-2" id="pfForm">
       <input type="hidden" name="tab" value="cities">
-      <select name="pf" class="select">
+      <input type="hidden" name="lang" value="{{ lang }}">
+      <select name="pf" class="select" id="pfSelect" aria-label="Products filter">
         <option value="any" {% if pf=='any' %}selected{% endif %}>
           {{ 'All products' if lang=='en' else 'Все товары' }}
         </option>
@@ -18,10 +19,16 @@
           {{ 'Only non-producing' if lang=='en' else 'Только не производит' }}
         </option>
       </select>
-      <button class="btn btn-outline" type="submit">
-        {{ t('filters') }}
-      </button>
+      <button class="btn btn-outline" type="submit">{{ t('filters') }}</button>
     </form>
+    <script>
+      // автоприменение фильтра при смене селекта
+      document.addEventListener('DOMContentLoaded', function () {
+        const s = document.getElementById('pfSelect');
+        const f = document.getElementById('pfForm');
+        if (s && f) s.addEventListener('change', () => f.submit());
+      });
+    </script>
   </div>
 
   {% if not city_list %}
@@ -29,55 +36,62 @@
   {% else %}
   <div class="space-y-2">
     {% for c in city_list %}
-    <details class="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
-      <summary class="cursor-pointer list-none px-4 py-3 flex items-center justify-between">
-        <span class="font-medium">{{ c.city }}</span>
-        <span class="badge">{{ c.entries|length }} {{ 'items' if lang=='en' else 'тов.' }}</span>
-      </summary>
-      <div class="px-4 pb-4">
-        <div class="overflow-x-auto">
-          <table class="min-w-full table-card">
-            <thead class="text-left text-sm text-zinc-600 dark:text-zinc-400">
-              <tr>
-                <th class="py-2">{{ t('product') }}</th>
-                <th class="py-2">{{ t('price') }}</th>
-                <th class="py-2">{{ t('trend') }}</th>
-                <th class="py-2">{{ t('percent') }} %</th>
-                <th class="py-2">{{ t('is_prod_city') }}</th>
-                <th class="py-2">{{ t('actions') }}</th>
-              </tr>
-            </thead>
-            <tbody class="text-sm">
-              {% for e in c.entries %}
-              <tr class="border-b border-zinc-200 dark:border-zinc-800">
-                <td data-th="{{ t('product') }}" class="py-2">{{ e.product }}</td>
-                <td data-th="{{ t('price') }}" class="py-2">{{ '%.0f' % e.price }}</td>
-                <td data-th="{{ t('trend') }}" class="py-2">
-                  {% if e.trend=='up' %}
-                    <span class="badge badge-green">{{ t('up') }}</span>
-                  {% else %}
-                    <span class="badge badge-red">{{ t('down') }}</span>
-                  {% endif %}
-                </td>
-                <td data-th="{{ t('percent') }} %" class="py-2">{{ '%.0f' % e.percent }}</td>
-                <td data-th="{{ t('is_prod_city') }}" class="py-2">
-                  {{ t('yes') if e.is_production_city else t('no') }}
-                </td>
-                <td data-th="{{ t('actions') }}" class="py-2">
-                  <a class="btn btn-outline"
-                     href="{{ url_for('edit_entry', entry_id=e.id, lang=lang, next=request.full_path) }}">
-                    {{ t('edit') }}
-                  </a>
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+      {% if c.entries and c.entries|length > 0 %}
+      <details class="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+        <summary class="cursor-pointer list-none px-4 py-3 flex items-center justify-between">
+          <span class="font-medium">{{ c.city }}</span>
+          <span class="badge">{{ c.entries|length }} {{ 'items' if lang=='en' else 'тов.' }}</span>
+        </summary>
+        <div class="px-4 pb-4">
+          <div class="overflow-x-auto">
+            <table class="min-w-full table-card">
+              <thead class="text-left text-sm text-zinc-600 dark:text-zinc-400">
+                <tr>
+                  <th class="py-2">{{ t('product') }}</th>
+                  <th class="py-2">{{ t('price') }}</th>
+                  <th class="py-2">{{ t('trend') }}</th>
+                  <th class="py-2">{{ t('percent') }} %</th>
+                  <th class="py-2">{{ t('is_prod_city') }}</th>
+                  <th class="py-2">{{ t('actions') }}</th>
+                </tr>
+              </thead>
+              <tbody class="text-sm">
+                {% for e in c.entries %}
+                <tr class="border-b border-zinc-200 dark:border-zinc-800">
+                  <td data-th="{{ t('product') }}" class="py-2">{{ e.product }}</td>
+                  <td data-th="{{ t('price') }}" class="py-2">{{ '%.0f' % e.price }}</td>
+                  <td data-th="{{ t('trend') }}" class="py-2">
+                    {% if e.trend=='up' %}
+                      <span class="badge badge-green">{{ t('up') }}</span>
+                    {% else %}
+                      <span class="badge badge-red">{{ t('down') }}</span>
+                    {% endif %}
+                  </td>
+                  <td data-th="{{ t('percent') }} %" class="py-2">{{ '%.0f' % e.percent }}</td>
+                  <td data-th="{{ t('is_prod_city') }}" class="py-2">
+                    {% if e.is_production_city %}
+                      <span class="badge badge-green">{{ t('yes') }}</span>
+                    {% else %}
+                      <span class="badge badge-gray">{{ t('no') }}</span>
+                    {% endif %}
+                  </td>
+                  <td data-th="{{ t('actions') }}" class="py-2">
+                    <a class="btn btn-outline"
+                       href="{{ url_for('edit_entry', entry_id=e.id, lang=lang, next=request.full_path) }}">
+                      {{ t('edit') }}
+                    </a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    </details>
+      </details>
+      {% endif %}
     {% endfor %}
   </div>
   {% endif %}
 </section>
 {% endblock %}
+
