@@ -93,7 +93,7 @@
     </div>
   </form>
 
-  <!-- Список заявок (для админа, одно поле пароля) -->
+  <!-- Список заявок (одно поле пароля) -->
   <div class="mt-8">
     <h2 class="text-lg font-semibold mb-2">{{ t('pending_requests') }}</h2>
     {% if pending and pending|length %}
@@ -139,7 +139,6 @@
                 passInput.focus();
                 return false;
               }
-              // добавляем скрытое поле с паролем перед отправкой
               const hidden = document.createElement('input');
               hidden.type = 'hidden';
               hidden.name = 'admin_pass';
@@ -149,12 +148,6 @@
           });
         })();
       </script>
-    {% else %}
-      <p class="opacity-70">{{ t('no_data') }}</p>
-    {% endif %}
-  </div>
-        {% endfor %}
-      </div>
     {% else %}
       <p class="opacity-70">{{ t('no_data') }}</p>
     {% endif %}
@@ -187,3 +180,4 @@
   </script>
 </section>
 {% endblock %}
+
