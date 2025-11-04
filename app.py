@@ -287,26 +287,55 @@ def index():
         )
 
     if tab == "cities":
+        # Переключатель: any | only_prod | only_nonprod
+        pf = (request.args.get("pf") or "any").strip().lower()
+        if pf not in ("any", "only_prod", "only_nonprod"):
+            pf = "any"
+    
+        # Берём только последние записи по (city, product)
         rows = (
             db.session.query(Entry)
-            .filter(Entry.is_production_city.is_(True))
-            .order_by(Entry.city.asc(), Entry.product.asc(), Entry.created_at.desc())
+            .order_by(Entry.city.asc(), Entry.product.asc(),
+                      Entry.created_at.desc())
             .all()
         )
-        latest = {}
+        latest: dict[tuple[str, str], Entry] = {}
         for e in rows:
             key = (e.city, e.product)
             if key not in latest:
                 latest[key] = e
+    
+        # Группируем по городу и применяем фильтр производственности
         by_city: Dict[str, List[Entry]] = {}
         for (city, product), e in latest.items():
+            if pf == "only_prod" and not e.is_production_city:
+                continue
+            if pf == "only_nonprod" and e.is_production_city:
+                continue
             by_city.setdefault(city, []).append(e)
+    
+        # Сортировка внутри города по имени товара (и свежести как tie-breaker)
         for city in by_city:
             by_city[city].sort(key=lambda x: (x.product.lower(), -x.created_at.timestamp()))
-        city_list = [{"city": c, "entries": by_city[c]} for c in sorted(by_city.keys(), key=lambda x: x.lower())]
+    
+        # Список городов (только те, где после фильтра есть товары)
+        city_list = [
+            {"city": c, "entries": by_city[c]}
+            for c in sorted([c for c in by_city.keys()], key=lambda x: x.lower())
+            if by_city[c]
+        ]
+    
+        # для автодополнений, если нужно где-то в шаблоне
         cities_list = [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()]
         products_list = [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()]
-        return render_template("cities.html", city_list=city_list, cities_list=cities_list, products_list=products_list)
+    
+        return render_template(
+            "cities.html",
+            city_list=city_list,
+            cities_list=cities_list,
+            products_list=products_list,
+            pf=pf,  # <<< передаём выбранный режим
+        )
 
     # routes (latest per city for product; buy!=sell city)
     products = [p for (p,) in db.session.query(Entry.product).distinct().all()]
