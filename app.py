@@ -375,12 +375,16 @@ def index():
             "buy_price": float(buy_entry.price),
             "buy_entry_id": buy_entry.id,
             "buy_updated": buy_entry.updated_at or buy_entry.created_at,
-
+            "buy_percent": float(buy_entry.percent) if buy_entry.percent is not None else None,
+            "buy_trend": buy_entry.trend,
+        
             "sell_city": sell_city,
             "sell_price": float(sell_entry.price),
             "sell_entry_id": sell_entry.id,
             "sell_updated": sell_entry.updated_at or sell_entry.created_at,
-
+            "sell_percent": float(sell_entry.percent) if sell_entry.percent is not None else None,
+            "sell_trend": sell_entry.trend,
+        
             "spread_percent": float(spread),
             "profit": float(sell_entry.price - buy_entry.price),
             "route_updated": route_updated,
