@@ -1,4 +1,3 @@
-
 import os
 
 class Config:
@@ -12,11 +11,15 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     JSON_SORT_KEYS = False
 
-    # Connection pool hints
+    # Very small, safe defaults; can be overridden with env vars
+    POOL_SIZE = int(os.environ.get('DB_POOL_SIZE', '2'))
+    MAX_OVERFLOW = int(os.environ.get('DB_MAX_OVERFLOW', '2'))
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_pre_ping': True,
         'pool_recycle': 1800,
+        'pool_size': POOL_SIZE,
+        'max_overflow': MAX_OVERFLOW,
     }
 
-    # Dev helper to bootstrap tables; disable in prod
-    CREATE_TABLES_ON_START = os.environ.get('CREATE_TABLES_ON_START', '1') == '1'
+    # Disable auto-create by default in prod-like envs
+    CREATE_TABLES_ON_START = os.environ.get('CREATE_TABLES_ON_START', '0') == '1'
