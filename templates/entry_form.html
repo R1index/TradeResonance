@@ -5,6 +5,7 @@
 
   <form method="post" class="grid grid-cols-1 md:grid-cols-4 gap-3" id="entryForm">
     <input type="hidden" name="next" value="{{ next_url or request.referrer }}">
+    <input type="hidden" name="_action" value="submit_request">
 
     <!-- Город -->
     <div class="md:col-span-2">
@@ -13,8 +14,8 @@
         name="city"
         class="input"
         list="citiesList"
-        value="{% if e %}{{ e.city }}{% else %}{{ request.form.get('city','') or request.args.get('city','') }}{% endif %}"
-        {% if e %}disabled{% else %}required{% endif %}>
+        value="{{ request.form.get('city','') or request.args.get('city','') }}"
+        required>
       <datalist id="citiesList">
         {% for c in cities_list %}<option value="{{ c }}">{% endfor %}
       </datalist>
@@ -27,8 +28,8 @@
         name="product"
         class="input"
         list="productsList"
-        value="{% if e %}{{ e.product }}{% else %}{{ request.form.get('product','') }}{% endif %}"
-        {% if e %}disabled{% else %}required{% endif %}>
+        value="{{ request.form.get('product','') }}"
+        required>
       <datalist id="productsList">
         {% for p in products_list %}<option value="{{ p }}">{% endfor %}
       </datalist>
@@ -43,7 +44,7 @@
         </button>
       </div>
       <input id="priceField" type="number" step="1" name="price" class="input"
-             value="{% if e %}{{ e.price }}{% else %}{{ request.form.get('price','') }}{% endif %}" required>
+             value="{{ request.form.get('price','') }}" required>
     </div>
 
     <!-- Процент + Очистить -->
@@ -55,7 +56,7 @@
         </button>
       </div>
       <input id="percentField" type="number" step="1" name="percent" class="input"
-             value="{% if e %}{{ e.percent|int }}{% else %}{{ request.form.get('percent','0') }}{% endif %}" required>
+             value="{{ request.form.get('percent','0') }}" required>
     </div>
 
     <!-- Тренд + стрелки -->
@@ -69,8 +70,7 @@
       </div>
       <select id="trendSelect" name="trend" class="select" required>
         {% for opt in ['up','down'] %}
-        <option value="{{ opt }}"
-          {% if e and e.trend==opt %}selected{% elif not e and request.form.get('trend','up')==opt %}selected{% endif %}>
+        <option value="{{ opt }}" {% if request.form.get('trend','up')==opt %}selected{% endif %}>
           {{ t(opt) }}
         </option>
         {% endfor %}
@@ -80,63 +80,57 @@
     <!-- Производственный город -->
     <div class="flex items-end">
       <label class="inline-flex items-center gap-2">
-        {% if not e %}
-          <input type="checkbox" class="h-4 w-4" name="is_production_city"
-                 {% if request.form.get('is_production_city') or (e and e.is_production_city) %}checked{% endif %}>
-        {% else %}
-          <input type="checkbox" class="h-4 w-4" {% if e.is_production_city %}checked{% endif %} disabled>
-        {% endif %}
+        <input type="checkbox" class="h-4 w-4" name="is_production_city"
+               {% if request.form.get('is_production_city') %}checked{% endif %}>
         <span class="label">{{ t('is_prod_city') }}</span>
       </label>
     </div>
 
-    <!-- Пароль (только при создании) -->
-    {% if not e %}
-    <div>
-      <label class="label">{{ t('password') }}</label>
-      <input type="password" name="admin_pass" class="input" autocomplete="off"
-             placeholder="{{ t('password') }}" required
-             value="{{ request.form.get('admin_pass','') or request.args.get('admin_pass','') }}">
-    </div>
-    {% endif %}
-
     <!-- Кнопки -->
     <div class="md:col-span-4 flex gap-2 pt-2">
-      <button class="btn btn-primary" id="submitBtn" type="submit">{{ t('save') if e else t('create') }}</button>
+      <button class="btn btn-primary" id="submitBtn" type="submit">{{ t('submit') }}</button>
       <a class="btn btn-outline" href="{{ next_url or request.referrer or url_for('index', lang=lang) }}">← {{ t('back') }}</a>
     </div>
   </form>
 
+  <!-- Список заявок (для админа) -->
+  <div class="mt-8">
+    <h2 class="text-lg font-semibold mb-2">{{ t('pending_requests') }}</h2>
+    {% if pending and pending|length %}
+      <div class="space-y-2">
+        {% for p in pending %}
+          <div class="border rounded p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div class="text-sm">
+              <div><b>{{ p.city }}</b> — {{ p.product }}</div>
+              <div>{{ t('price') }}: {{ '%.0f'|format(p.price) }} | {{ t('trend') }}: {{ t(p.trend) }} | {{ t('percent') }}: {{ '%.0f'|format(p.percent) }}%</div>
+              <div>{{ t('is_prod_city') }}: {{ t('yes') if p.is_production_city else t('no') }}</div>
+              <div class="opacity-70">#{{ p.id }} · {{ p.submitted_at }}</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <form method="post" class="flex items-center gap-2">
+                <input type="hidden" name="_action" value="approve">
+                <input type="hidden" name="pending_id" value="{{ p.id }}">
+                <input type="password" name="admin_pass" class="input" placeholder="{{ t('admin_password') }}" required autocomplete="off" style="width: 12rem;">
+                <button class="btn btn-primary" type="submit">{{ t('approve') }}</button>
+              </form>
+              <form method="post" class="flex items-center gap-2">
+                <input type="hidden" name="_action" value="reject">
+                <input type="hidden" name="pending_id" value="{{ p.id }}">
+                <input type="password" name="admin_pass" class="input" placeholder="{{ t('admin_password') }}" required autocomplete="off" style="width: 12rem;">
+                <button class="btn btn-outline" type="submit">{{ t('reject') }}</button>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="opacity-70">{{ t('no_data') }}</p>
+    {% endif %}
+  </div>
+
   <script>
     (function () {
       const form = document.getElementById('entryForm');
-      const isEdit = {{ 'true' if e else 'false' }};
-      const cityInput = form.querySelector('input[name="city"]');
-      const passInput = form.querySelector('input[name="admin_pass"]');
-
-      // локальные ключи (переживаем редирект)
-      const K_CITY = 'th_city';
-      const K_PASS = 'th_admin';
-
-      // Восстанавливаем (если это создание и поля пустые)
-      if (!isEdit) {
-        if (cityInput && !cityInput.value) {
-          const v = sessionStorage.getItem(K_CITY);
-          if (v) cityInput.value = v;
-        }
-        if (passInput && !passInput.value) {
-          const v = sessionStorage.getItem(K_PASS);
-          if (v) passInput.value = v;
-        }
-      }
-
-      // Сохраняем перед submit (только создание)
-      form.addEventListener('submit', () => {
-        if (!isEdit) {
-          if (cityInput) sessionStorage.setItem(K_CITY, cityInput.value || '');
-          if (passInput) sessionStorage.setItem(K_PASS, passInput.value || '');
-        }
-      });
 
       // Очистка по кнопкам
       document.querySelectorAll('[data-clear]').forEach(btn => {
@@ -155,29 +149,8 @@
         });
       });
 
-      // Если пришли после успешного создания — очистим всё, кроме City и Password.
-      // Сервер после сохранения делает PRG-редирект обратно на /entries/new.
-      // Факт «успеха» распознаём по query-параметру success=1 (задать в контроллере) ИЛИ по флешу.
-      const flashHolder = document.querySelector('[data-flash]');
-      const flashDataRaw = flashHolder ? flashHolder.getAttribute('data-flash') : '';
-      let isSuccess = false;
-      try {
-        const f = flashDataRaw ? JSON.parse(flashDataRaw) : null;
-        isSuccess = !!(f && f.message && (f.message.includes('{{ t("saved") }}') || f.message.includes('{{ t("updated") }}')));
-      } catch {}
-
-      if (!isEdit && isSuccess) {
-        // очистим все поля формы…
-        form.reset();
-        // …кроме города и пароля (берём из sessionStorage)
-        if (cityInput) cityInput.value = sessionStorage.getItem(K_CITY) || cityInput.value;
-        if (passInput) passInput.value = sessionStorage.getItem(K_PASS) || passInput.value;
-        // и вернём тренд к up
-        if (trendSel) trendSel.value = 'up';
-        // фокус на цену
-        const price = document.getElementById('priceField');
-        if (price) price.focus();
-      }
+      const price = document.getElementById('priceField');
+      if (price) price.focus();
     })();
   </script>
 </section>
