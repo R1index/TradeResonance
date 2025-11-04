@@ -211,21 +211,22 @@ def inject_base():
 # --------- утилиты SQL ---------
 def latest_entries_subq():
     """Последняя запись на (city, product) — кросс-СУБД через оконку."""
-    ts = func.coalesce(Entry.updated_at, Entry.created_at).label("ts")
-    rn = func.row_number().over(
+    ts = sa.func.coalesce(Entry.updated_at, Entry.created_at).label("ts")
+    rn = sa.func.row_number().over(
         partition_by=(Entry.city, Entry.product),
         order_by=sa.desc(ts)
     ).label("rn")
-    base = (
-        db.session.query(
-            Entry.id, Entry.city, Entry.product, Entry.price,
-            Entry.trend, Entry.percent, Entry.is_production_city,
-            Entry.created_at, Entry.updated_at, ts, rn
-        )
-        .subquery()
-    )
-    # фильтруем rn=1
-    return select([c for c in base.c if c.key != "rn"]).where(base.c.rn == 1).subquery()
+
+    # Используем SQLAlchemy 2.0 style select()
+    base = sa.select(
+        Entry.id, Entry.city, Entry.product, Entry.price,
+        Entry.trend, Entry.percent, Entry.is_production_city,
+        Entry.created_at, Entry.updated_at, ts, rn
+    ).subquery()
+
+    # select(*cols) вместо select([cols...])
+    cols = [c for c in base.c if c.key != "rn"]
+    return sa.select(*cols).where(base.c.rn == 1).subquery()
 
 # крошечный кэш справочников (60с)
 _dict_cache: Dict[str, Tuple[datetime, List[str]]] = {}
