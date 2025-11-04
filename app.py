@@ -389,116 +389,85 @@ def index():
             pf=pf,
         )
 
-# ---------- ROUTES ----------
-elif tab == "routes":
-    q_product = (request.args.get("product") or "").strip()
+    # ---------- ROUTES ----------
+    elif tab == "routes":
+        q_product = (request.args.get("product") or "").strip()
 
-    # Подвыборка последних записей
-    L = latest_entries_subq()
+        # подвыборка «последних» записей
+        L = latest_entries_subq()
 
-    # Автодополнение по существующим продуктам
-    products_list = cached_list(
-        "products_latest",
-        lambda: [p for (p,) in db.session.query(L.c.product).distinct().order_by(L.c.product.asc()).all()]
-    )
-
-    # CTE для покупок (только production cities)
-    buy_cte = db.session.query(
-        L.c.product.label("product"),
-        L.c.city.label("buy_city"),
-        L.c.price.label("buy_price"),
-        L.c.id.label("buy_id"),
-        L.c.trend.label("buy_trend"),
-        L.c.percent.label("buy_percent"),
-        L.c.updated_at.label("buy_updated"),
-        L.c.created_at.label("buy_created"),
-        L.c.is_production_city.label("buy_is_production")
-    ).filter(L.c.is_production_city == True).subquery()  # ← ВАЖНО: только production cities
-
-    # CTE для продаж (все города)
-    sell_cte = db.session.query(
-        L.c.product.label("product"),
-        L.c.city.label("sell_city"),
-        L.c.price.label("sell_price"),
-        L.c.id.label("sell_id"),
-        L.c.trend.label("sell_trend"),
-        L.c.percent.label("sell_percent"),
-        L.c.updated_at.label("sell_updated"),
-        L.c.created_at.label("sell_created"),
-        L.c.is_production_city.label("sell_is_production")
-    ).subquery()  # ← Все города для продажи
-
-    # Запрос для всех возможных пар
-    routes_query = (
-        db.session.query(
-            buy_cte.c.product,
-            buy_cte.c.buy_city,
-            buy_cte.c.buy_price,
-            buy_cte.c.buy_id,
-            buy_cte.c.buy_trend,
-            buy_cte.c.buy_percent,
-            buy_cte.c.buy_updated,
-            buy_cte.c.buy_created,
-            buy_cte.c.buy_is_production,
-            
-            sell_cte.c.sell_city,
-            sell_cte.c.sell_price,
-            sell_cte.c.sell_id,
-            sell_cte.c.sell_trend,
-            sell_cte.c.sell_percent,
-            sell_cte.c.sell_updated,
-            sell_cte.c.sell_created,
-            sell_cte.c.sell_is_production,
-            
-            ((sell_cte.c.sell_price - buy_cte.c.buy_price) / buy_cte.c.buy_price * 100).label("spread_percent"),
-            (sell_cte.c.sell_price - buy_cte.c.buy_price).label("profit")
+        # автодополнение по существующим продуктам (только из «последних»)
+        products_list = cached_list(
+            "products_latest",
+            lambda: [p for (p,) in db.session.query(L.c.product).distinct().order_by(L.c.product.asc()).all()]
         )
-        .join(sell_cte, buy_cte.c.product == sell_cte.c.product)
-        .filter(buy_cte.c.buy_city != sell_cte.c.sell_city)  # Разные города
-        .filter(sell_cte.c.sell_price > buy_cte.c.buy_price)  # Продажа дороже покупки
-        .order_by((sell_cte.c.sell_price - buy_cte.c.buy_price).desc())  # Сортировка по профиту
-    )
-    
-    if q_product:
-        routes_query = routes_query.filter(buy_cte.c.product.ilike(f"%{q_product}%"))
 
-    # Ограничиваем количество результатов
-    routes_result = routes_query.limit(500).all()
+        base = db.session.query(
+            L.c.id, L.c.product, L.c.city, L.c.price, L.c.trend, L.c.percent,
+            L.c.created_at, L.c.updated_at
+        )
+        if q_product:
+            base = base.filter(L.c.product.ilike(f"%{q_product}%"))
 
-    # Преобразуем результат
-    routes = []
-    for r in routes_result:
-        buy_updated = r.buy_updated or r.buy_created
-        sell_updated = r.sell_updated or r.sell_created
-        route_updated = max(buy_updated, sell_updated)
-        
-        routes.append({
-            "product": r.product,
-            "buy_city": r.buy_city,
-            "buy_price": float(r.buy_price),
-            "buy_entry_id": int(r.buy_id),
-            "buy_trend": r.buy_trend,
-            "buy_percent": float(r.buy_percent) if r.buy_percent is not None else None,
-            "buy_updated": buy_updated,
-            "buy_is_production": bool(r.buy_is_production),
+        # ранжируем цены по продукту (asc/desc) одной CTE
+        ts = func.coalesce(L.c.updated_at, L.c.created_at)
+        ranked = base.add_columns(
+            func.row_number().over(partition_by=L.c.product, order_by=L.c.price.asc()).label("rnk_buy"),
+            func.row_number().over(partition_by=L.c.product, order_by=L.c.price.desc()).label("rnk_sell"),
+            ts.label("ts")
+        ).cte("ranked")
+
+        buy = select(ranked).where(ranked.c.rnk_buy == 1).subquery()
+        sell = select(ranked).where(ranked.c.rnk_sell == 1).subquery()
+
+        pair = (
+            db.session.query(
+                buy.c.product.label("product"),
+                buy.c.city.label("buy_city"),  buy.c.price.label("buy_price"),
+                buy.c.id.label("buy_entry_id"), buy.c.trend.label("buy_trend"),
+                buy.c.percent.label("buy_percent"), buy.c.updated_at.label("buy_updated"),
+                buy.c.created_at.label("buy_created"),
+
+                sell.c.city.label("sell_city"), sell.c.price.label("sell_price"),
+                sell.c.id.label("sell_entry_id"), sell.c.trend.label("sell_trend"),
+                sell.c.percent.label("sell_percent"), sell.c.updated_at.label("sell_updated"),
+                sell.c.created_at.label("sell_created"),
+            )
+            .join(sell, sell.c.product == buy.c.product)
+            .filter(sell.c.price > buy.c.price)
+            .filter(sell.c.city != buy.c.city)
+            .order_by((sell.c.price - buy.c.price).desc())
+        ).all()
+
+        routes = []
+        for r in pair:
+            spread = float((r.sell_price - r.buy_price) / r.buy_price * 100.0)
+            # Исправлено: используем правильные переменные
+            buy_updated = r.buy_updated or r.buy_created
+            sell_updated = r.sell_updated or r.sell_created
+            route_updated = max(buy_updated, sell_updated)
             
-            "sell_city": r.sell_city,
-            "sell_price": float(r.sell_price),
-            "sell_entry_id": int(r.sell_id),
-            "sell_trend": r.sell_trend,
-            "sell_percent": float(r.sell_percent) if r.sell_percent is not None else None,
-            "sell_updated": sell_updated,
-            "sell_is_production": bool(r.sell_is_production),
-            
-            "spread_percent": float(r.spread_percent),
-            "profit": float(r.profit),
-            "route_updated": route_updated,
-        })
+            routes.append({
+                "product": r.product,
+                "buy_city": r.buy_city, "buy_price": float(r.buy_price),
+                "buy_entry_id": int(r.buy_entry_id), "buy_trend": r.buy_trend,
+                "buy_percent": float(r.buy_percent) if r.buy_percent is not None else None,
+                "buy_updated": buy_updated,
 
-    return render_template("routes.html",
-                           routes=routes,
-                           products_list=products_list,
-                           q_product=q_product)
+                "sell_city": r.sell_city, "sell_price": float(r.sell_price),
+                "sell_entry_id": int(r.sell_entry_id), "sell_trend": r.sell_trend,
+                "sell_percent": float(r.sell_percent) if r.sell_percent is not None else None,
+                "sell_updated": sell_updated,
+
+                "spread_percent": spread,
+                "profit": float(r.sell_price - r.buy_price),
+                "route_updated": route_updated,
+            })
+
+        return render_template("routes.html",
+                               routes=routes,
+                               products_list=products_list,
+                               q_product=q_product)
     
     # Если tab не распознан, перенаправляем на prices
     return redirect(url_for("index", tab="prices", lang=lang))
