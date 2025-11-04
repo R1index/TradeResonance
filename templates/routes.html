@@ -36,7 +36,7 @@
   {% else %}
   <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
     {% for r in routes %}
-    <div class="group rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 shadow-sm bg-white dark:bg-zinc-900 transition hover:shadow-md">
+    <div class="route-card p-4 transition hover:shadow-md">
       <div class="flex items-start justify-between mb-2">
         <h3 class="font-semibold text-zinc-900 dark:text-zinc-100">{{ r.product }}</h3>
         <span class="badge">{{ '%.1f' % r.spread_percent }}%</span>
