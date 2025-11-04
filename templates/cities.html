@@ -3,7 +3,25 @@
 <section class="card p-4">
   <div class="flex items-center justify-between mb-3">
     <h1 class="text-xl font-semibold">{{ t('nav_cities') }}</h1>
-    <span class="badge">{{ city_list|length }} cities</span>
+
+    <!-- Переключатель фильтра -->
+    <form method="get" class="flex items-center gap-2">
+      <input type="hidden" name="tab" value="cities">
+      <select name="pf" class="select">
+        <option value="any" {% if pf=='any' %}selected{% endif %}>
+          {{ 'All products' if lang=='en' else 'Все товары' }}
+        </option>
+        <option value="only_prod" {% if pf=='only_prod' %}selected{% endif %}>
+          {{ 'Only producing' if lang=='en' else 'Только производит' }}
+        </option>
+        <option value="only_nonprod" {% if pf=='only_nonprod' %}selected{% endif %}>
+          {{ 'Only non-producing' if lang=='en' else 'Только не производит' }}
+        </option>
+      </select>
+      <button class="btn btn-outline" type="submit">
+        {{ t('filters') }}
+      </button>
+    </form>
   </div>
 
   {% if not city_list %}
@@ -14,7 +32,7 @@
     <details class="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
       <summary class="cursor-pointer list-none px-4 py-3 flex items-center justify-between">
         <span class="font-medium">{{ c.city }}</span>
-        <span class="badge">{{ c.entries|length }} items</span>
+        <span class="badge">{{ c.entries|length }} {{ 'items' if lang=='en' else 'тов.' }}</span>
       </summary>
       <div class="px-4 pb-4">
         <div class="overflow-x-auto">
@@ -34,11 +52,22 @@
               <tr class="border-b border-zinc-200 dark:border-zinc-800">
                 <td data-th="{{ t('product') }}" class="py-2">{{ e.product }}</td>
                 <td data-th="{{ t('price') }}" class="py-2">{{ '%.0f' % e.price }}</td>
-                <td data-th="{{ t('trend') }}" class="py-2">{% if e.trend=='up' %}<span class="badge badge-green">{{ t('up') }}</span>{% else %}<span class="badge badge-red">{{ t('down') }}</span>{% endif %}</td>
+                <td data-th="{{ t('trend') }}" class="py-2">
+                  {% if e.trend=='up' %}
+                    <span class="badge badge-green">{{ t('up') }}</span>
+                  {% else %}
+                    <span class="badge badge-red">{{ t('down') }}</span>
+                  {% endif %}
+                </td>
                 <td data-th="{{ t('percent') }} %" class="py-2">{{ '%.0f' % e.percent }}</td>
-                <td data-th="{{ t('is_prod_city') }}" class="py-2">{{ t('yes') if e.is_production_city else t('no') }}</td>
+                <td data-th="{{ t('is_prod_city') }}" class="py-2">
+                  {{ t('yes') if e.is_production_city else t('no') }}
+                </td>
                 <td data-th="{{ t('actions') }}" class="py-2">
-                  <a class="btn btn-outline" href="{{ url_for('edit_entry', entry_id=e.id, lang=lang) }}">{{ t('edit') }}</a>
+                  <a class="btn btn-outline"
+                     href="{{ url_for('edit_entry', entry_id=e.id, lang=lang, next=request.full_path) }}">
+                    {{ t('edit') }}
+                  </a>
                 </td>
               </tr>
               {% endfor %}
