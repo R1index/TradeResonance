@@ -26,6 +26,7 @@
         <a href="{{ url_for('index', lang=lang) }}" class="flex items-center gap-2 font-semibold tracking-tight text-lg">
           <span>🧭</span><span>{{ t('app_title') }}</span>
         </a>
+
         <nav class="hidden md:flex items-center gap-1">
           <a class="tab {{ 'tab-active' if request.args.get('tab','prices')=='prices' else '' }}" href="{{ url_for('index', tab='prices', lang=lang) }}">{{ t('nav_prices') }}</a>
           <a class="tab {{ 'tab-active' if request.args.get('tab')=='cities' else '' }}" href="{{ url_for('index', tab='cities', lang=lang) }}">{{ t('nav_cities') }}</a>
@@ -33,7 +34,18 @@
           <a class="tab" href="{{ url_for('new_entry', lang=lang) }}">{{ t('nav_add') }}</a>
           <a class="tab" href="{{ url_for('import_csv', lang=lang) }}">{{ t('nav_import') }}</a>
         </nav>
-        <div class="flex items-center gap-2">
+
+        <div class="flex items-center gap-3">
+          <!-- ⏱ ВРЕМЯ: UTC и локальное -->
+          <div id="clockZone" class="hidden sm:flex flex-col items-end leading-4">
+            <div class="text-[11px] sm:text-xs font-mono text-zinc-600 dark:text-zinc-300" title="Coordinated Universal Time">
+              UTC <span id="clockUTC">--:--:--</span>
+            </div>
+            <div class="text-[11px] sm:text-xs font-mono text-zinc-500 dark:text-zinc-400">
+              <span id="clockLocalTz">LOCAL</span> <span id="clockLocal">--:--:--</span>
+            </div>
+          </div>
+
           <div class="hidden sm:flex rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800">
             <a class="px-3 py-1.5 {{ 'bg-zinc-200 dark:bg-zinc-800' if lang=='en' else '' }}" href="?lang=en">EN</a>
             <a class="px-3 py-1.5 {{ 'bg-zinc-200 dark:bg-zinc-800' if lang=='ru' else '' }}" href="?lang=ru">RU</a>
@@ -42,8 +54,15 @@
           <button class="md:hidden p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" id="menuBtn" aria-label="Menu">☰</button>
         </div>
       </div>
+
       <div id="mobileMenu" class="md:hidden hidden border-t border-zinc-200 dark:border-zinc-800">
         <div class="mx-auto max-w-7xl px-3 sm:px-6 py-2 grid gap-2">
+          <!-- Время в мобильном меню одной строкой -->
+          <div class="flex items-center justify-between text-xs font-mono text-zinc-600 dark:text-zinc-300">
+            <span>UTC <span id="mClockUTC">--:--:--</span></span>
+            <span><span id="mClockLocalTz">LOCAL</span> <span id="mClockLocal">--:--:--</span></span>
+          </div>
+
           <a class="tab" href="{{ url_for('index', tab='prices', lang=lang) }}">{{ t('nav_prices') }}</a>
           <a class="tab" href="{{ url_for('index', tab='cities', lang=lang) }}">{{ t('nav_cities') }}</a>
           <a class="tab" href="{{ url_for('index', tab='routes', lang=lang) }}">{{ t('nav_routes') }}</a>
@@ -60,6 +79,66 @@
     <main class="mx-auto max-w-7xl px-3 sm:px-6 py-6 space-y-6">
       {% block content %}{% endblock %}
     </main>
+
+    <!-- Скрипт часов и базовый UI -->
+    <script>
+      // Тема
+      document.getElementById('themeToggle')?.addEventListener('click', () => {
+        const root = document.documentElement;
+        const next = root.classList.toggle('dark') ? 'dark' : 'light';
+        localStorage.setItem('theme', next);
+      });
+
+      // Мобильное меню
+      document.getElementById('menuBtn')?.addEventListener('click', () => {
+        const m = document.getElementById('mobileMenu');
+        if (m) m.classList.toggle('hidden');
+      });
+
+      // Часы: формат YYYY-MM-DD HH:mm:ss
+      function fmt(dt) {
+        const y = dt.getFullYear();
+        const m = String(dt.getMonth()+1).padStart(2,'0');
+        const d = String(dt.getDate()).padStart(2,'0');
+        const hh = String(dt.getHours()).padStart(2,'0');
+        const mm = String(dt.getMinutes()).padStart(2,'0');
+        const ss = String(dt.getSeconds()).padStart(2,'0');
+        return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+      }
+      function tzAbbr(timeZone) {
+        try {
+          const f = new Intl.DateTimeFormat([], {timeZone, timeZoneName:'short'});
+          const parts = f.formatToParts(new Date());
+          const tz = parts.find(p => p.type === 'timeZoneName');
+          return tz ? tz.value : timeZone;
+        } catch { return timeZone; }
+      }
+      const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local';
+      const localLabel = tzAbbr(localTz);
+
+      function tick() {
+        const now = new Date();
+        // UTC
+        const utc = new Date(now.getTime() + now.getTimezoneOffset()*60000);
+        // Обновляем десктоп
+        const elUTC = document.getElementById('clockUTC');
+        const elLocal = document.getElementById('clockLocal');
+        const elLocalTz = document.getElementById('clockLocalTz');
+        if (elUTC) elUTC.textContent = fmt(utc);
+        if (elLocal) elLocal.textContent = fmt(now);
+        if (elLocalTz) elLocalTz.textContent = localLabel;
+
+        // Обновляем мобильное меню
+        const mUTC = document.getElementById('mClockUTC');
+        const mLocal = document.getElementById('mClockLocal');
+        const mLocalTz = document.getElementById('mClockLocalTz');
+        if (mUTC) mUTC.textContent = fmt(utc);
+        if (mLocal) mLocal.textContent = fmt(now);
+        if (mLocalTz) mLocalTz.textContent = localLabel;
+      }
+      tick();
+      setInterval(tick, 1000);
+    </script>
 
     <script src="{{ url_for('static', filename='tw-app.js') }}"></script>
   </body>
