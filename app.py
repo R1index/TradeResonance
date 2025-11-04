@@ -395,45 +395,118 @@ def index():
 @app.route("/entries/new", methods=["GET", "POST"])
 def new_entry():
     lang = get_lang()
+
+    # подготовим списки для datalist
+    cities_list = [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()]
+    products_list = [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()]
+
+    # значения по умолчанию для "липких" полей
+    prefill = {
+        "city": "",
+        "product": "",
+        "price": "",
+        "trend": "up",
+        "percent": "",
+        "is_production_city": False,
+        "admin_pass": "",
+    }
+
     if request.method == "POST":
-        admin_pass = request.form.get("admin_pass", "")
+        # забираем всё из формы, чтобы потом вернуть на страницу (не теряем ввод)
+        prefill["city"]   = (request.form.get("city") or "").strip()
+        prefill["product"]= (request.form.get("product") or "").strip()
+        prefill["price"]  = request.form.get("price") or ""
+        prefill["trend"]  = (request.form.get("trend") or "up").strip()
+        prefill["percent"]= request.form.get("percent") or ""
+        prefill["is_production_city"] = parse_bool(request.form.get("is_production_city"))
+        prefill["admin_pass"] = request.form.get("admin_pass") or ""
+
+        admin_pass = prefill["admin_pass"]
         if not admin_pass:
             flash(t("required_password"))
-            return redirect(url_for("new_entry", lang=lang))
+            return render_template(
+                "entry_form.html",
+                e=None,
+                title=t("new_entry"),
+                cities_list=cities_list,
+                products_list=products_list,
+                next_url=None,
+                prefill=prefill,  # <<<<<< вернём введённые значения
+            )
         if admin_pass != ADMIN_PASSWORD:
             flash(t("wrong_password"))
-            return redirect(url_for("new_entry", lang=lang))
+            return render_template(
+                "entry_form.html",
+                e=None,
+                title=t("new_entry"),
+                cities_list=cities_list,
+                products_list=products_list,
+                next_url=None,
+                prefill=prefill,
+            )
 
-        city = request.form.get("city", "").strip()
-        product = request.form.get("product", "").strip()
-        price = float(request.form.get("price"))
-        trend_v = (request.form.get("trend") or "up").strip()
-        percent_v = float(request.form.get("percent") or 0)
-        is_prod = parse_bool(request.form.get("is_production_city"))
+        # валидация чисел (пустые не падают)
+        try:
+            price_v = float(prefill["price"])
+        except Exception:
+            price_v = 0.0
+        try:
+            percent_v = float(prefill["percent"] or 0)
+        except Exception:
+            percent_v = 0.0
+
+        # upsert
+        city = prefill["city"]
+        product = prefill["product"]
+        trend_v = prefill["trend"]
+        is_prod = prefill["is_production_city"]
+
+        if not city or not product or price_v <= 0:
+            flash(t("no_data"))
+            return render_template(
+                "entry_form.html",
+                e=None, title=t("new_entry"),
+                cities_list=cities_list, products_list=products_list,
+                next_url=None, prefill=prefill
+            )
 
         existing = Entry.query.filter_by(city=city, product=product).first()
         if existing:
-            existing.price = price
+            existing.price = price_v
             existing.trend = trend_v
             existing.percent = percent_v
             existing.is_production_city = existing.is_production_city or is_prod
             db.session.commit()
             flash(t("updated"))
         else:
-            e = Entry(city=city, product=product, price=price, trend=trend_v, percent=percent_v, is_production_city=is_prod)
+            e = Entry(
+                city=city, product=product, price=price_v,
+                trend=trend_v, percent=percent_v, is_production_city=is_prod
+            )
             db.session.add(e)
             db.session.commit()
             flash(t("saved"))
 
         dedupe_entries()
-        next_url = request.form.get('next') or url_for('index', lang=lang)
-        return redirect(next_url)
 
-    cities_list = [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()]
-    products_list = [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()]
-    next_url = safe_next(request.args.get("next")) or safe_next(request.referrer)
-    return render_template('entry_form.html', e=None, title=t('new_entry'),
-                           cities_list=cities_list, products_list=products_list, next_url=next_url)
+        # ВАЖНО: остаёмся на этой же странице "Add Entry"
+        # и НЕ очищаем поля — возвращаем шаблон с тем же prefill.
+        return render_template(
+            "entry_form.html",
+            e=None,
+            title=t("new_entry"),
+            cities_list=cities_list,
+            products_list=products_list,
+            next_url=None,
+            prefill=prefill,
+        )
+
+    # GET — просто пустая форма (prefill можно не передавать)
+    return render_template(
+        "entry_form.html", e=None, title=t("new_entry"),
+        cities_list=cities_list, products_list=products_list,
+        next_url=None, prefill=None
+    )
 
 @app.route("/entries/<int:entry_id>/edit", methods=["GET", "POST"])
 def edit_entry(entry_id):
