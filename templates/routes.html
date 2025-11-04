@@ -21,14 +21,11 @@
     </form>
 
     <script>
-      // автосабмит по Enter или выбору
       document.addEventListener('DOMContentLoaded', function () {
         const f = document.getElementById('routesFilter');
         const i = document.getElementById('productInput');
         if (!f || !i) return;
-        i.addEventListener('keydown', e => {
-          if (e.key === 'Enter') f.submit();
-        });
+        i.addEventListener('keydown', e => { if (e.key === 'Enter') f.submit(); });
         i.addEventListener('change', () => f.submit());
       });
     </script>
@@ -42,10 +39,7 @@
     <div class="group rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 shadow-sm bg-white dark:bg-zinc-900 transition hover:shadow-md">
       <div class="flex items-start justify-between mb-2">
         <h3 class="font-semibold text-zinc-900 dark:text-zinc-100">{{ r.product }}</h3>
-        <div class="flex items-center gap-2">
-          <span class="badge">{{ '%.1f' % r.spread_percent }}%</span>
-          <span class="badge badge-green">+{{ '%.0f' % r.profit }}</span>
-        </div>
+        <span class="badge">{{ '%.1f' % r.spread_percent }}%</span>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -55,7 +49,12 @@
           <div class="font-medium text-zinc-900 dark:text-zinc-100">{{ r.buy_city }}</div>
           <div class="flex items-center gap-2">
             <div class="text-lg text-zinc-800 dark:text-zinc-200">{{ '%.0f' % r.buy_price }}</div>
-            <a class="btn btn-outline px-2 py-1 text-xs opacity-0 group-hover:opacity-100 transition"
+            {% if r.buy_percent is not none %}
+              <span class="badge {{ 'badge-green' if r.buy_trend=='up' else 'badge-red' }}">
+                {{ '%.0f' % r.buy_percent }}%
+              </span>
+            {% endif %}
+            <a class="btn btn-outline px-2 py-1 text-xs"
                href="{{ url_for('edit_entry', entry_id=r.buy_entry_id, lang=lang, next=request.full_path) }}">
               {{ t('edit') }}
             </a>
@@ -71,7 +70,12 @@
           <div class="font-medium text-zinc-900 dark:text-zinc-100">{{ r.sell_city }}</div>
           <div class="flex items-center gap-2">
             <div class="text-lg text-zinc-800 dark:text-zinc-200">{{ '%.0f' % r.sell_price }}</div>
-            <a class="btn btn-outline px-2 py-1 text-xs opacity-0 group-hover:opacity-100 transition"
+            {% if r.sell_percent is not none %}
+              <span class="badge {{ 'badge-green' if r.sell_trend=='up' else 'badge-red' }}">
+                {{ '%.0f' % r.sell_percent }}%
+              </span>
+            {% endif %}
+            <a class="btn btn-outline px-2 py-1 text-xs"
                href="{{ url_for('edit_entry', entry_id=r.sell_entry_id, lang=lang, next=request.full_path) }}">
               {{ t('edit') }}
             </a>
@@ -83,11 +87,10 @@
       </div>
 
       <div class="mt-3 flex items-center justify-between">
-        <span class="text-xs text-zinc-500">{{ 'Updated: ' if lang=='en' else 'Обновлено: ' }}{{ (r.route_updated).strftime("%Y-%m-%d %H:%M") }}</span>
-        <a class="btn btn-outline px-2 py-1 text-xs"
-           href="{{ url_for('new_entry', lang=lang) }}?product={{ r.product|urlencode }}">
-          + {{ t('nav_add') }}
-        </a>
+        <span class="text-xs text-zinc-500">
+          {{ 'Updated: ' if lang=='en' else 'Обновлено: ' }}{{ (r.route_updated).strftime("%Y-%m-%d %H:%M") }}
+        </span>
+        <!-- Add Entry УДАЛЁН -->
       </div>
     </div>
     {% endfor %}
