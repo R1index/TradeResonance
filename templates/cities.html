@@ -22,7 +22,6 @@
       <button class="btn btn-outline" type="submit">{{ t('filters') }}</button>
     </form>
     <script>
-      // автоприменение фильтра при смене селекта
       document.addEventListener('DOMContentLoaded', function () {
         const s = document.getElementById('pfSelect');
         const f = document.getElementById('pfForm');
@@ -37,7 +36,8 @@
   <div class="space-y-2">
     {% for c in city_list %}
       {% if c.entries and c.entries|length > 0 %}
-      <details class="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+      <!-- Без жёстких цветов: базовые стили берутся из tw-app.css (селектор details{...}) -->
+      <details>
         <summary class="cursor-pointer list-none px-4 py-3 flex items-center justify-between">
           <span class="font-medium">{{ c.city }}</span>
           <span class="badge">{{ c.entries|length }} {{ 'items' if lang=='en' else 'тов.' }}</span>
@@ -58,24 +58,24 @@
               <tbody class="text-sm">
                 {% for e in c.entries %}
                 <tr class="border-b border-zinc-200 dark:border-zinc-800">
-                  <td data-th="{{ t('product') }}" class="py-2">{{ e.product }}</td>
-                  <td data-th="{{ t('price') }}" class="py-2">{{ '%.0f' % e.price }}</td>
-                  <td data-th="{{ t('trend') }}" class="py-2">
+                  <td class="py-2">{{ e.product }}</td>
+                  <td class="py-2">{{ '%.0f' % e.price }}</td>
+                  <td class="py-2">
                     {% if e.trend=='up' %}
                       <span class="badge badge-green">{{ t('up') }}</span>
                     {% else %}
                       <span class="badge badge-red">{{ t('down') }}</span>
                     {% endif %}
                   </td>
-                  <td data-th="{{ t('percent') }} %" class="py-2">{{ '%.0f' % e.percent }}</td>
-                  <td data-th="{{ t('is_prod_city') }}" class="py-2">
+                  <td class="py-2">{{ '%.0f' % e.percent }}</td>
+                  <td class="py-2">
                     {% if e.is_production_city %}
                       <span class="badge badge-green">{{ t('yes') }}</span>
                     {% else %}
                       <span class="badge badge-gray">{{ t('no') }}</span>
                     {% endif %}
                   </td>
-                  <td data-th="{{ t('actions') }}" class="py-2">
+                  <td class="py-2">
                     <a class="btn btn-outline"
                        href="{{ url_for('edit_entry', entry_id=e.id, lang=lang, next=request.full_path) }}">
                       {{ t('edit') }}
@@ -94,4 +94,3 @@
   {% endif %}
 </section>
 {% endblock %}
-
