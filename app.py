@@ -77,7 +77,6 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "password": "Password",
         "wrong_password": "Wrong password",
         "required_password": "Password is required",
-
     },
     "ru": {
         "app_title": "Трейд Хелпер",
@@ -126,7 +125,6 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "password": "Пароль",
         "wrong_password": "Неверный пароль",
         "required_password": "Требуется пароль",
-
     }
 }
 
@@ -196,7 +194,6 @@ with app.app_context():
     except Exception:
         db.session.rollback()
 
-
 from urllib.parse import urlparse
 
 def safe_next(url):
@@ -207,6 +204,7 @@ def safe_next(url):
     if netloc and netloc != request.host:
         return None
     return url
+
 def parse_bool(val: Optional[str]) -> bool:
     if isinstance(val, bool): return val
     if val is None: return False
@@ -226,19 +224,19 @@ def index():
         q_city    = (request.args.get("city") or "").strip()
         q_product = (request.args.get("product") or "").strip()
         q_trend   = (request.args.get("trend") or "").strip()
-    
+
         q_price_min   = request.args.get("price_min", type=float)
         q_price_max   = request.args.get("price_max", type=float)
         q_percent_min = request.args.get("percent_min", type=float)
         q_percent_max = request.args.get("percent_max", type=float)
-    
+
         # Производственный город: any|yes|no
         q_prod = (request.args.get("prod") or "any").strip().lower()
-    
+
         # Сортировка
         # price_asc|price_desc|percent_asc|percent_desc|updated_asc|updated_desc
         q_sort = (request.args.get("sort") or "updated_desc").strip().lower()
-    
+
         query = Entry.query
         if q_city:
             query = query.filter(Entry.city.ilike(f"%{q_city}%"))
@@ -246,7 +244,7 @@ def index():
             query = query.filter(Entry.product.ilike(f"%{q_product}%"))
         if q_trend in ("up", "down"):
             query = query.filter(Entry.trend == q_trend)
-    
+
         if q_price_min is not None:
             query = query.filter(Entry.price >= q_price_min)
         if q_price_max is not None:
@@ -255,12 +253,12 @@ def index():
             query = query.filter(Entry.percent >= q_percent_min)
         if q_percent_max is not None:
             query = query.filter(Entry.percent <= q_percent_max)
-    
+
         if q_prod == "yes":
             query = query.filter(Entry.is_production_city.is_(True))
         elif q_prod == "no":
             query = query.filter(Entry.is_production_city.is_(False))
-    
+
         sort_map = {
             "price_asc": Entry.price.asc(),
             "price_desc": Entry.price.desc(),
@@ -270,24 +268,23 @@ def index():
             "updated_desc": Entry.updated_at.desc().nullslast(),
         }
         query = query.order_by(sort_map.get(q_sort, sort_map["updated_desc"]))
-    
+
         entries = query.limit(1000).all()
-    
+
         cities_list = [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()]
         products_list = [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()]
-    
+
         return render_template(
             "prices.html",
             entries=entries,
             cities_list=cities_list,
             products_list=products_list,
-            # передаём текущие значения фильтров в шаблон
+            # текущие значения фильтров
             q_city=q_city, q_product=q_product, q_trend=q_trend,
             q_price_min=q_price_min, q_price_max=q_price_max,
             q_percent_min=q_percent_min, q_percent_max=q_percent_max,
             q_prod=q_prod, q_sort=q_sort,
         )
-
 
     if tab == "cities":
         rows = (
@@ -332,15 +329,28 @@ def index():
         sell_city, sell_entry = max(items, key=lambda kv: kv[1].price)
         if sell_entry.price <= buy_entry.price or buy_city == sell_city:
             continue
+
         spread = (sell_entry.price - buy_entry.price) / buy_entry.price * 100.0
+        route_updated = max(
+            (buy_entry.updated_at or buy_entry.created_at),
+            (sell_entry.updated_at or sell_entry.created_at),
+        )
+
         routes.append({
             "product": prod,
             "buy_city": buy_city,
             "buy_price": float(buy_entry.price),
+            "buy_entry_id": buy_entry.id,
+            "buy_updated": buy_entry.updated_at or buy_entry.created_at,
+
             "sell_city": sell_city,
             "sell_price": float(sell_entry.price),
+            "sell_entry_id": sell_entry.id,
+            "sell_updated": sell_entry.updated_at or sell_entry.created_at,
+
             "spread_percent": float(spread),
             "profit": float(sell_entry.price - buy_entry.price),
+            "route_updated": route_updated,
         })
     routes.sort(key=lambda r: r["profit"], reverse=True)
     return render_template("routes.html", routes=routes)
@@ -380,8 +390,10 @@ def new_entry():
         return redirect(next_url)
     cities_list = [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()]
     products_list = [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()]
-    next_url = safe_next(request.referrer)
-    return render_template('entry_form.html', e=None, title=t('new_entry'), cities_list=cities_list, products_list=products_list, next_url=next_url)
+    # учитываем ?next=... если пришёл (например, из routes)
+    next_url = safe_next(request.args.get("next")) or safe_next(request.referrer)
+    return render_template('entry_form.html', e=None, title=t('new_entry'),
+                           cities_list=cities_list, products_list=products_list, next_url=next_url)
 
 @app.route("/entries/<int:entry_id>/edit", methods=["GET", "POST"])
 def edit_entry(entry_id):
@@ -393,27 +405,30 @@ def edit_entry(entry_id):
             e.price = float(request.form.get("price", e.price))
         except Exception:
             pass
-    
+
         e.trend = (request.form.get("trend") or e.trend).strip()
-    
+
         try:
             e.percent = float(request.form.get("percent", e.percent))
         except Exception:
             pass
-    
-        # 🔒 ВАЖНО: не менять флаг, если поле не пришло (в форме при редактировании у чекбокса нет name)
+
+        # 🔒 Не менять флаг при редактировании (в форме у чекбокса нет name)
         if "is_production_city" in request.form:
             e.is_production_city = bool(request.form.get("is_production_city"))
-    
+
         db.session.commit()
         flash(t("updated"))
         dedupe_entries()
         next_url = request.form.get("next") or url_for("index", lang=lang)
         return redirect(next_url)
+
     cities_list = [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()]
     products_list = [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()]
-    next_url = safe_next(request.referrer)
-    return render_template('entry_form.html', e=e, title=t('edit_entry'), cities_list=cities_list, products_list=products_list, next_url=next_url)
+    # учитываем ?next=... если пришёл (например, из routes)
+    next_url = safe_next(request.args.get("next")) or safe_next(request.referrer)
+    return render_template('entry_form.html', e=e, title=t('edit_entry'),
+                           cities_list=cities_list, products_list=products_list, next_url=next_url)
 
 @app.route("/import", methods=["GET", "POST"])
 def import_csv():
@@ -464,10 +479,10 @@ def import_csv():
         next_url = request.form.get('next') or url_for('index', lang=lang)
         return redirect(next_url)
     return render_template("import_form.html")
-    
+
 @app.route("/export.csv")
 def export_csv():
-    # te же фильтры, что и на вкладке "Цены"
+    # (экспорт можно оставить как есть, он не влияет на Routes)
     q_city = (request.args.get("city") or "").strip()
     q_product = (request.args.get("product") or "").strip()
     q_trend = (request.args.get("trend") or "").strip()
@@ -502,7 +517,6 @@ def export_csv():
 
     buf = io.StringIO()
     w = csv.writer(buf)
-    # заголовки
     w.writerow(["id","created_at","updated_at","city","product","price","trend","percent","is_production_city"])
     for e in rows:
         w.writerow([
@@ -520,7 +534,6 @@ def export_csv():
     resp = Response(buf.getvalue(), mimetype="text/csv; charset=utf-8")
     resp.headers["Content-Disposition"] = "attachment; filename=entries.csv"
     return resp
-    
 
 @app.route("/admin/dedupe")
 def admin_dedupe():
