@@ -5,34 +5,50 @@
 
   <form method="post" class="grid grid-cols-1 md:grid-cols-4 gap-3" id="entryForm">
     <input type="hidden" name="next" value="{{ next_url or request.referrer }}">
+    
+    <!-- Для новой заявки используем submit_request, для редактирования - обычный POST -->
+    {% if not e %}
     <input type="hidden" name="_action" value="submit_request">
+    {% endif %}
 
     <!-- Город -->
     <div class="md:col-span-2">
       <label class="label">{{ t('city') }}</label>
-      <input
-        name="city"
-        class="input"
-        list="citiesList"
-        value="{{ request.form.get('city','') or request.args.get('city','') }}"
-        required>
-      <datalist id="citiesList">
-        {% for c in cities_list %}<option value="{{ c }}">{% endfor %}
-      </datalist>
+      {% if e %}
+        <!-- В режиме редактирования город только для чтения -->
+        <input name="city" class="input bg-gray-100" value="{{ e.city }}" readonly>
+      {% else %}
+        <!-- В режиме создания - обычное поле -->
+        <input
+          name="city"
+          class="input"
+          list="citiesList"
+          value="{{ request.form.get('city','') or request.args.get('city','') }}"
+          required>
+        <datalist id="citiesList">
+          {% for c in cities_list %}<option value="{{ c }}">{% endfor %}
+        </datalist>
+      {% endif %}
     </div>
 
     <!-- Товар -->
     <div class="md:col-span-2">
       <label class="label">{{ t('product') }}</label>
-      <input
-        name="product"
-        class="input"
-        list="productsList"
-        value="{{ request.form.get('product','') }}"
-        required>
-      <datalist id="productsList">
-        {% for p in products_list %}<option value="{{ p }}">{% endfor %}
-      </datalist>
+      {% if e %}
+        <!-- В режиме редактирования товар только для чтения -->
+        <input name="product" class="input bg-gray-100" value="{{ e.product }}" readonly>
+      {% else %}
+        <!-- В режиме создания - обычное поле -->
+        <input
+          name="product"
+          class="input"
+          list="productsList"
+          value="{{ request.form.get('product','') }}"
+          required>
+        <datalist id="productsList">
+          {% for p in products_list %}<option value="{{ p }}">{% endfor %}
+        </datalist>
+      {% endif %}
     </div>
 
     <!-- Цена + Очистить -->
@@ -44,7 +60,7 @@
         </button>
       </div>
       <input id="priceField" type="number" step="1" name="price" class="input"
-             value="{{ request.form.get('price','') }}" required>
+             value="{{ e.price if e else request.form.get('price','') }}" required>
     </div>
 
     <!-- Процент + Очистить -->
@@ -56,7 +72,7 @@
         </button>
       </div>
       <input id="percentField" type="number" step="1" name="percent" class="input"
-             value="{{ request.form.get('percent','0') }}" required>
+             value="{{ e.percent if e else request.form.get('percent','0') }}" required>
     </div>
 
     <!-- Тренд + стрелки -->
@@ -70,7 +86,12 @@
       </div>
       <select id="trendSelect" name="trend" class="select" required>
         {% for opt in ['up','down'] %}
-        <option value="{{ opt }}" {% if request.form.get('trend','up')==opt %}selected{% endif %}>
+        <option value="{{ opt }}" 
+                {% if e %}
+                  {% if e.trend == opt %}selected{% endif %}
+                {% else %}
+                  {% if request.form.get('trend','up') == opt %}selected{% endif %}
+                {% endif %}>
           {{ t(opt) }}
         </option>
         {% endfor %}
@@ -81,22 +102,44 @@
     <div class="flex items-end">
       <label class="inline-flex items-center gap-2">
         <input type="checkbox" class="h-4 w-4" name="is_production_city"
-               {% if request.form.get('is_production_city') %}checked{% endif %}>
+               {% if e %}
+                 {% if e.is_production_city %}checked{% endif %}
+               {% else %}
+                 {% if request.form.get('is_production_city') %}checked{% endif %}
+               {% endif %}
+               {% if e %}disabled{% endif %}>
         <span class="label">{{ t('is_prod_city') }}</span>
+        {% if e %}
+          <span class="text-xs opacity-70">({{ t('cannot_edit') if t('cannot_edit') else 'Cannot edit' }})</span>
+        {% endif %}
       </label>
     </div>
 
     <!-- Кнопки -->
     <div class="md:col-span-4 flex gap-2 pt-2">
-      <button class="btn btn-primary" id="submitBtn" type="submit">{{ t('submit') }}</button>
+      {% if e %}
+        <button class="btn btn-primary" id="submitBtn" type="submit">{{ t('save') }}</button>
+      {% else %}
+        <button class="btn btn-primary" id="submitBtn" type="submit">{{ t('submit') }}</button>
+      {% endif %}
       <a class="btn btn-outline" href="{{ next_url or request.referrer or url_for('index', lang=lang) }}">← {{ t('back') }}</a>
     </div>
   </form>
 
-  <!-- Список заявок (одно поле пароля) -->
+  <!-- Список заявок (только для создания новых записей) -->
+  {% if not e %}
   <div class="mt-8">
     <h2 class="text-lg font-semibold mb-2">{{ t('pending_requests') }}</h2>
     {% if pending and pending|length %}
+      <!-- Общее поле пароля для админских действий -->
+      <div class="mb-4 p-3 bg-gray-50 rounded">
+        <label class="label">{{ t('admin_password') }}</label>
+        <div class="flex items-center gap-3">
+          <input type="password" id="adminPassGlobal" class="input" placeholder="{{ t('admin_password') }}" autocomplete="off" style="width: 14rem;">
+          <span class="opacity-70 text-sm">{{ t('need_password_for_action') }}</span>
+        </div>
+      </div>
+
       <div class="space-y-2" id="pendingList">
         {% for p in pending %}
           <div class="border rounded p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -104,15 +147,17 @@
               <div><b>{{ p.city }}</b> — {{ p.product }}</div>
               <div>{{ t('price') }}: {{ '%.0f'|format(p.price) }} | {{ t('trend') }}: {{ t(p.trend) }} | {{ t('percent') }}: {{ '%.0f'|format(p.percent) }}%</div>
               <div>{{ t('is_prod_city') }}: {{ t('yes') if p.is_production_city else t('no') }}</div>
-              <div class="opacity-70">#{{ p.id }} · {{ p.submitted_at }}</div>
+              <div class="opacity-70">#{{ p.id }} · {{ p.submitted_at.strftime('%Y-%m-%d %H:%M') if p.submitted_at else '' }}</div>
             </div>
             <div class="flex items-center gap-2">
-              <form method="post" class="approveForm flex items-center gap-2">
+              <!-- Форма для одобрения -->
+              <form method="post" class="approveForm">
                 <input type="hidden" name="_action" value="approve">
                 <input type="hidden" name="pending_id" value="{{ p.id }}">
                 <button class="btn btn-primary" type="submit">{{ t('approve') }}</button>
               </form>
-              <form method="post" class="rejectForm flex items-center gap-2">
+              <!-- Форма для отклонения -->
+              <form method="post" class="rejectForm">
                 <input type="hidden" name="_action" value="reject">
                 <input type="hidden" name="pending_id" value="{{ p.id }}">
                 <button class="btn btn-outline" type="submit">{{ t('reject') }}</button>
@@ -122,28 +167,24 @@
         {% endfor %}
       </div>
 
-      <!-- Общее поле пароля -->
-      <div class="mt-4 flex items-center gap-3">
-        <input type="password" id="adminPassGlobal" class="input" placeholder="{{ t('admin_password') }}" autocomplete="off" style="width: 14rem;">
-        <span class="opacity-70 text-sm">{{ t('need_password_for_action') }}</span>
-      </div>
-
       <script>
         (function(){
           const passInput = document.getElementById('adminPassGlobal');
-          document.querySelectorAll('#pendingList form').forEach(f => {
-            f.addEventListener('submit', ev => {
+          
+          document.querySelectorAll('#pendingList form').forEach(form => {
+            form.addEventListener('submit', function(ev) {
               if (!passInput.value.trim()) {
                 ev.preventDefault();
                 alert('{{ t("need_password_for_action") }}');
                 passInput.focus();
                 return false;
               }
-              const hidden = document.createElement('input');
-              hidden.type = 'hidden';
-              hidden.name = 'admin_pass';
-              hidden.value = passInput.value;
-              f.appendChild(hidden);
+              
+              const hiddenInput = document.createElement('input');
+              hiddenInput.type = 'hidden';
+              hiddenInput.name = 'admin_pass';
+              hiddenInput.value = passInput.value;
+              this.appendChild(hiddenInput);
             });
           });
         })();
@@ -152,6 +193,7 @@
       <p class="opacity-70">{{ t('no_data') }}</p>
     {% endif %}
   </div>
+  {% endif %}
 
   <script>
     (function () {
@@ -161,7 +203,10 @@
       document.querySelectorAll('[data-clear]').forEach(btn => {
         btn.addEventListener('click', () => {
           const el = document.querySelector(btn.getAttribute('data-clear'));
-          if (el) { el.value = ''; el.focus(); }
+          if (el) { 
+            el.value = ''; 
+            el.focus(); 
+          }
         });
       });
 
@@ -170,14 +215,34 @@
       document.querySelectorAll('[data-trend]').forEach(btn => {
         btn.addEventListener('click', () => {
           const val = btn.getAttribute('data-trend');
-          if (trendSel) { trendSel.value = val; trendSel.dispatchEvent(new Event('change')); }
+          if (trendSel) { 
+            trendSel.value = val; 
+            trendSel.dispatchEvent(new Event('change')); 
+          }
         });
       });
 
+      // Фокус на поле цены при загрузке
       const price = document.getElementById('priceField');
       if (price) price.focus();
+
+      // Предотвращение двойной отправки
+      let isSubmitting = false;
+      if (form) {
+        form.addEventListener('submit', function() {
+          if (isSubmitting) {
+            event.preventDefault();
+            return false;
+          }
+          isSubmitting = true;
+          const submitBtn = document.getElementById('submitBtn');
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = '{{ t("saving" if t("saving") else "Saving...") }}';
+          }
+        });
+      }
     })();
   </script>
 </section>
 {% endblock %}
-
