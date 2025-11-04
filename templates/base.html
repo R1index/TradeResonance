@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ t('app_title') }}</title>
 
-    <!-- Tailwind config BEFORE CDN + early theme boot (fixes dark mode on mobile) -->
+    <!-- Tailwind config BEFORE CDN + early theme boot -->
     <script>
       // Tailwind config
       window.tailwind = { config: { darkMode: 'class' } };
@@ -33,12 +33,12 @@
 
     <link rel="stylesheet" href="{{ url_for('static', filename='tw-app.css') }}">
   </head>
-  <body class="min-h-full bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 transition-colors">
+  <body class="min-h-full transition-colors">
     <div id="toast-zone" class="fixed top-4 right-4 z-50 space-y-2"></div>
     {% set flash_msg = (get_flashed_messages() or [])|first %}
     <div data-flash='{{ {"message": flash_msg, "type": "success"} | tojson if flash_msg else "" }}' class="hidden"></div>
 
-    <header class="border-b border-zinc-200 dark:border-zinc-800 bg-white/60 dark:bg-zinc-900/60 backdrop-blur shadow-sm">
+    <header class="header-blur shadow-sm">
       <div class="mx-auto max-w-7xl px-3 sm:px-6 py-3 flex items-center justify-between">
         <a href="{{ url_for('index', lang=lang) }}" class="flex items-center gap-2 font-semibold tracking-tight text-lg">
           <span>🧭</span><span>{{ t('app_title') }}</span>
