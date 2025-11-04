@@ -4,16 +4,33 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ t('app_title') }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Tailwind config BEFORE CDN + early theme boot (fixes dark mode on mobile) -->
     <script>
-      tailwind.config = { darkMode: 'class' };
-      (function(){
-        const saved = localStorage.getItem('theme');
-        if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-          document.documentElement.classList.add('dark');
-        }
+      // Tailwind config
+      window.tailwind = { config: { darkMode: 'class' } };
+
+      // Early theme boot to avoid FOUC and ensure mobile works
+      (function () {
+        try {
+          const saved = localStorage.getItem('theme'); // 'dark' | 'light' | null
+          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          const enableDark = saved ? (saved === 'dark') : prefersDark;
+          if (enableDark) document.documentElement.classList.add('dark');
+
+          // Hint for native controls
+          let meta = document.querySelector('meta[name="color-scheme"]');
+          if (!meta) {
+            meta = document.createElement('meta');
+            meta.name = 'color-scheme';
+            document.head.appendChild(meta);
+          }
+          meta.content = enableDark ? 'dark light' : 'light dark';
+        } catch {}
       })();
     </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
     <link rel="stylesheet" href="{{ url_for('static', filename='tw-app.css') }}">
   </head>
   <body class="min-h-full bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 transition-colors">
@@ -36,7 +53,7 @@
         </nav>
 
         <div class="flex items-center gap-3">
-          <!-- ⏱ ВРЕМЯ: UTC и локальное -->
+          <!-- ⏱ UTC & Local time -->
           <div id="clockZone" class="hidden sm:flex flex-col items-end leading-4">
             <div class="text-[11px] sm:text-xs font-mono text-zinc-600 dark:text-zinc-300" title="Coordinated Universal Time">
               UTC <span id="clockUTC">--:--:--</span>
@@ -50,8 +67,8 @@
             <a class="px-3 py-1.5 {{ 'bg-zinc-200 dark:bg-zinc-800' if lang=='en' else '' }}" href="?lang=en">EN</a>
             <a class="px-3 py-1.5 {{ 'bg-zinc-200 dark:bg-zinc-800' if lang=='ru' else '' }}" href="?lang=ru">RU</a>
           </div>
-          <button id="themeToggle" class="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" title="Toggle theme">🌓</button>
-          <button class="md:hidden p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" id="menuBtn" aria-label="Menu">☰</button>
+          <button id="themeToggle" class="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" title="Toggle theme" aria-label="Toggle theme">🌓</button>
+          <button class="md:hidden p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" id="menuBtn" aria-label="Menu" aria-expanded="false">☰</button>
         </div>
       </div>
 
@@ -80,64 +97,78 @@
       {% block content %}{% endblock %}
     </main>
 
-    <!-- Скрипт часов и базовый UI -->
+    <!-- Init UI after DOM is ready -->
     <script>
-      // Тема
-      document.getElementById('themeToggle')?.addEventListener('click', () => {
-        const root = document.documentElement;
-        const next = root.classList.toggle('dark') ? 'dark' : 'light';
-        localStorage.setItem('theme', next);
-      });
+      document.addEventListener('DOMContentLoaded', function () {
+        // Theme toggle
+        const themeBtn = document.getElementById('themeToggle');
+        function setTheme(next) {
+          const root = document.documentElement;
+          if (next === 'dark') root.classList.add('dark'); else root.classList.remove('dark');
+          localStorage.setItem('theme', next);
+          let m = document.querySelector('meta[name="color-scheme"]');
+          if (!m) { m = document.createElement('meta'); m.name = 'color-scheme'; document.head.appendChild(m); }
+          m.content = next === 'dark' ? 'dark light' : 'light dark';
+        }
+        themeBtn && themeBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const next = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
+          setTheme(next);
+        });
 
-      // Мобильное меню
-      document.getElementById('menuBtn')?.addEventListener('click', () => {
-        const m = document.getElementById('mobileMenu');
-        if (m) m.classList.toggle('hidden');
-      });
+        // Mobile menu toggle (fix on phones)
+        const menuBtn = document.getElementById('menuBtn');
+        const mobileMenu = document.getElementById('mobileMenu');
+        if (menuBtn && mobileMenu) {
+          menuBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            mobileMenu.classList.toggle('hidden');
+            const expanded = menuBtn.getAttribute('aria-expanded') === 'true';
+            menuBtn.setAttribute('aria-expanded', (!expanded).toString());
+          }, { passive: false });
+        }
 
-      // Часы: формат YYYY-MM-DD HH:mm:ss
-      function fmt(dt) {
-        const y = dt.getFullYear();
-        const m = String(dt.getMonth()+1).padStart(2,'0');
-        const d = String(dt.getDate()).padStart(2,'0');
-        const hh = String(dt.getHours()).padStart(2,'0');
-        const mm = String(dt.getMinutes()).padStart(2,'0');
-        const ss = String(dt.getSeconds()).padStart(2,'0');
-        return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
-      }
-      function tzAbbr(timeZone) {
-        try {
-          const f = new Intl.DateTimeFormat([], {timeZone, timeZoneName:'short'});
-          const parts = f.formatToParts(new Date());
-          const tz = parts.find(p => p.type === 'timeZoneName');
-          return tz ? tz.value : timeZone;
-        } catch { return timeZone; }
-      }
-      const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local';
-      const localLabel = tzAbbr(localTz);
+        // Clocks (UTC + local)
+        function fmt(dt) {
+          const y = dt.getFullYear();
+          const m = String(dt.getMonth()+1).padStart(2,'0');
+          const d = String(dt.getDate()).padStart(2,'0');
+          const hh = String(dt.getHours()).padStart(2,'0');
+          const mm = String(dt.getMinutes()).padStart(2,'0');
+          const ss = String(dt.getSeconds()).padStart(2,'0');
+          return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+        }
+        function tzAbbr(timeZone) {
+          try {
+            const f = new Intl.DateTimeFormat([], {timeZone, timeZoneName:'short'});
+            const parts = f.formatToParts(new Date());
+            const tz = parts.find(p => p.type === 'timeZoneName');
+            return tz ? tz.value : timeZone;
+          } catch { return timeZone; }
+        }
+        const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local';
+        const localLabel = tzAbbr(localTz);
 
-      function tick() {
-        const now = new Date();
-        // UTC
-        const utc = new Date(now.getTime() + now.getTimezoneOffset()*60000);
-        // Обновляем десктоп
         const elUTC = document.getElementById('clockUTC');
         const elLocal = document.getElementById('clockLocal');
         const elLocalTz = document.getElementById('clockLocalTz');
-        if (elUTC) elUTC.textContent = fmt(utc);
-        if (elLocal) elLocal.textContent = fmt(now);
-        if (elLocalTz) elLocalTz.textContent = localLabel;
-
-        // Обновляем мобильное меню
         const mUTC = document.getElementById('mClockUTC');
         const mLocal = document.getElementById('mClockLocal');
         const mLocalTz = document.getElementById('mClockLocalTz');
-        if (mUTC) mUTC.textContent = fmt(utc);
-        if (mLocal) mLocal.textContent = fmt(now);
+        if (elLocalTz) elLocalTz.textContent = localLabel;
         if (mLocalTz) mLocalTz.textContent = localLabel;
-      }
-      tick();
-      setInterval(tick, 1000);
+
+        function tick() {
+          const now = new Date();
+          const utc = new Date(now.getTime() + now.getTimezoneOffset()*60000);
+          if (elUTC)   elUTC.textContent = fmt(utc);
+          if (elLocal) elLocal.textContent = fmt(now);
+          if (mUTC)    mUTC.textContent = fmt(utc);
+          if (mLocal)  mLocal.textContent = fmt(now);
+        }
+        tick();
+        setInterval(tick, 1000);
+      });
     </script>
 
     <script src="{{ url_for('static', filename='tw-app.js') }}"></script>
