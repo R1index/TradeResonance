@@ -4,13 +4,14 @@
   <div class="flex items-start justify-between gap-3 mb-4">
     <h1 class="text-xl font-semibold">{{ t('nav_routes') }}</h1>
 
-    <!-- Форма фильтра по товару -->
-    <form method="get" class="flex items-end gap-2">
+    <!-- Фильтр по товару -->
+    <form method="get" class="flex items-end gap-2" id="routesFilter">
       <input type="hidden" name="tab" value="routes">
+      <input type="hidden" name="lang" value="{{ lang }}">
       <div>
         <label class="label">{{ t('product') }}</label>
         <input class="input" name="product" placeholder="{{ t('product') }}"
-               value="{{ q_product or '' }}" list="productsList">
+               value="{{ q_product or '' }}" list="productsList" id="productInput" autocomplete="off">
         <datalist id="productsList">
           {% for p in products_list %}<option value="{{ p }}">{% endfor %}
         </datalist>
@@ -18,6 +19,19 @@
       <button class="btn btn-outline" type="submit">{{ t('filters') }}</button>
       <a class="btn btn-outline" href="{{ url_for('index', tab='routes', lang=lang) }}">Reset</a>
     </form>
+
+    <script>
+      // автосабмит по Enter или выбору из datalist
+      document.addEventListener('DOMContentLoaded', function () {
+        const f = document.getElementById('routesFilter');
+        const i = document.getElementById('productInput');
+        if (!f || !i) return;
+        i.addEventListener('keydown', e => {
+          if (e.key === 'Enter') f.submit();
+        });
+        i.addEventListener('change', () => f.submit());
+      });
+    </script>
   </div>
 
   {% if not routes %}
@@ -28,7 +42,10 @@
     <div class="rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 shadow-sm bg-white dark:bg-zinc-900">
       <div class="flex items-start justify-between mb-2">
         <h3 class="font-semibold">{{ r.product }}</h3>
-        <span class="badge">{{ '%.1f' % r.spread_percent }}%</span>
+        <div class="flex items-center gap-2">
+          <span class="badge">{{ '%.1f' % r.spread_percent }}%</span>
+          <span class="badge badge-green">+{{ '%.0f' % r.profit }}</span>
+        </div>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -43,6 +60,9 @@
               {{ t('edit') }}
             </a>
           </div>
+          <div class="text-[11px] text-zinc-500 mt-1">
+            {{ (r.buy_updated).strftime("%Y-%m-%d %H:%M") }}
+          </div>
         </div>
 
         <!-- SELL -->
@@ -56,12 +76,19 @@
               {{ t('edit') }}
             </a>
           </div>
+          <div class="text-[11px] text-zinc-500 mt-1">
+            {{ (r.sell_updated).strftime("%Y-%m-%d %H:%M") }}
+          </div>
         </div>
       </div>
 
       <div class="mt-3 flex items-center justify-between">
-        <span class="badge">{{ '+' ~ ('%.0f' % r.profit) }}</span>
-        <span class="text-xs text-zinc-500">{{ (r.route_updated).strftime("%Y-%m-%d %H:%M") }}</span>
+        <span class="text-xs text-zinc-500">{{ 'Updated: ' if lang=='en' else 'Обновлено: ' }}{{ (r.route_updated).strftime("%Y-%m-%d %H:%M") }}</span>
+        <!-- дополнительный быстрый переход на создание новой записи для этого товара -->
+        <a class="btn btn-outline px-2 py-1 text-xs"
+           href="{{ url_for('new_entry', lang=lang) }}?product={{ r.product|urlencode }}">
+          + {{ t('nav_add') }}
+        </a>
       </div>
     </div>
     {% endfor %}
