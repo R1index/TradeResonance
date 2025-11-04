@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card p-4">
+  <h1 class="text-xl font-semibold mb-3">{{ title }}</h1>
+  <form method="post" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+    <input type="hidden" name="next" value="{{ next_url or request.referrer }}">
+
+    <!-- Город -->
+    <div class="md:col-span-2">
+      <label class="label">{{ t('city') }}</label>
+      <input name="city" class="input" value="{{ e.city if e else '' }}" list="citiesList" {% if e %}disabled{% else %}required{% endif %}>
+      <datalist id="citiesList">
+        {% for c in cities_list %}<option value="{{ c }}">{% endfor %}
+      </datalist>
+    </div>
+
+    <!-- Товар -->
+    <div class="md:col-span-2">
+      <label class="label">{{ t('product') }}</label>
+      <input name="product" class="input" value="{{ e.product if e else '' }}" list="productsList" {% if e %}disabled{% else %}required{% endif %}>
+      <datalist id="productsList">
+        {% for p in products_list %}<option value="{{ p }}">{% endfor %}
+      </datalist>
+    </div>
+
+    <!-- Цена + Очистить -->
+    <div>
+      <div class="flex items-center justify-between">
+        <label class="label">{{ t('price') }}</label>
+        <button type="button" class="btn btn-outline px-2 py-1 text-xs" data-clear="#priceField">
+          {{ 'Clear' if lang=='en' else 'Очистить' }}
+        </button>
+      </div>
+      <input id="priceField" type="number" step="1" name="price" class="input" value="{{ e.price if e else '' }}" required>
+    </div>
+
+    <!-- Процент + Очистить -->
+    <div>
+      <div class="flex items-center justify-between">
+        <label class="label">{{ t('percent') }} %</label>
+        <button type="button" class="btn btn-outline px-2 py-1 text-xs" data-clear="#percentField">
+          {{ 'Clear' if lang=='en' else 'Очистить' }}
+        </button>
+      </div>
+      <input id="percentField" type="number" step="1" name="percent" class="input" value="{{ e.percent if e else 0 }}" required>
+    </div>
+
+    <!-- Тренд + стрелки -->
+    <div>
+      <div class="flex items-center justify-between">
+        <label class="label">{{ t('trend') }}</label>
+        <div class="flex gap-1">
+          <button type="button" class="btn btn-outline px-2 py-1 text-xs" data-trend="up" title="{{ t('up') }}">▲</button>
+          <button type="button" class="btn btn-outline px-2 py-1 text-xs" data-trend="down" title="{{ t('down') }}">▼</button>
+        </div>
+      </div>
+      <select id="trendSelect" name="trend" class="select" required>
+        {% for opt in ['up','down'] %}
+        <option value="{{ opt }}" {% if e and e.trend==opt %}selected{% endif %}>{{ t(opt) }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Производственный город -->
+    <div class="flex items-end">
+      <label class="inline-flex items-center gap-2">
+        {% if not e %}
+          <!-- Создание: поле активно -->
+          <input type="checkbox" class="h-4 w-4" name="is_production_city" {% if e and e.is_production_city %}checked{% endif %}>
+        {% else %}
+          <!-- Редактирование: отображаем, но без name -->
+          <input type="checkbox" class="h-4 w-4" {% if e.is_production_city %}checked{% endif %} disabled>
+        {% endif %}
+        <span class="label">{{ t('is_prod_city') }}</span>
+      </label>
+    </div>
+
+    <!-- Пароль (только при создании) -->
+    {% if not e %}
+    <div>
+      <label class="label">{{ t('password') }}</label>
+      <input type="password" name="admin_pass" class="input" placeholder="{{ t('password') }}" required>
+    </div>
+    {% endif %}
+
+    <!-- Кнопки -->
+    <div class="md:col-span-4 flex gap-2 pt-2">
+      <button class="btn btn-primary" type="submit">{{ t('save') if e else t('create') }}</button>
+      <a class="btn btn-outline" href="{{ next_url or request.referrer or url_for('index', lang=lang) }}">← {{ t('back') }}</a>
+    </div>
+  </form>
+
+  <!-- маленький JS для кнопок очистки и тренда -->
+  <script>
+    (function(){
+      // Очистка полей
+      document.querySelectorAll('[data-clear]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const sel = btn.getAttribute('data-clear');
+          const el = document.querySelector(sel);
+          if (el) { el.value = ''; el.focus(); }
+        })
+      });
+      // Тренд ↑/↓
+      const trendSel = document.getElementById('trendSelect');
+      document.querySelectorAll('[data-trend]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const val = btn.getAttribute('data-trend');
+          if (trendSel) { trendSel.value = val; trendSel.dispatchEvent(new Event('change')); }
+        })
+      });
+    })();
+  </script>
+</section>
+{% endblock %}

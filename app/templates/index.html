@@ -1,0 +1,55 @@
+
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.tailwindcss.com/3.4.10"></script>
+    <title>Trade Helper</title>
+</head>
+<body class="bg-slate-50">
+    <div class="max-w-5xl mx-auto p-6">
+        <h1 class="text-2xl font-semibold mb-4">Trade Helper</h1>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="space-y-2 mb-4">
+              {% for cat, msg in messages %}
+                <div class="p-3 rounded border {{ 'border-red-300 bg-red-50' if cat=='error' else 'border-emerald-300 bg-emerald-50' }}">{{ msg }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        <table class="w-full bg-white rounded shadow">
+            <thead>
+                <tr class="text-left">
+                    <th class="p-3 border-b">City</th>
+                    <th class="p-3 border-b">Product</th>
+                    <th class="p-3 border-b">Price</th>
+                    <th class="p-3 border-b">Updated</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in items %}
+                <tr class="odd:bg-slate-50">
+                    <td class="p-3">{{ e.city }}</td>
+                    <td class="p-3">{{ e.product }}</td>
+                    <td class="p-3">{{ '%.2f'|format(e.price) }}</td>
+                    <td class="p-3">{{ e.updated_at }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="flex gap-2 mt-4">
+            {% if pagination.has_prev %}
+                <a class="px-3 py-2 rounded border" href="?page={{ pagination.prev_num }}&per_page={{ pagination.per_page }}">Prev</a>
+            {% endif %}
+            <div class="px-3 py-2">Page {{ pagination.page }} / {{ pagination.pages }}</div>
+            {% if pagination.has_next %}
+                <a class="px-3 py-2 rounded border" href="?page={{ pagination.next_num }}&per_page={{ pagination.per_page }}">Next</a>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
