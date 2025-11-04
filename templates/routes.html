@@ -1,39 +1,55 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="card p-4">
-  <div class="flex items-center justify-between mb-3">
+  <div class="flex items-center justify-between mb-4">
     <h1 class="text-xl font-semibold">{{ t('nav_routes') }}</h1>
-    <span class="badge">{{ routes|length }} routes</span>
+    <span class="text-sm text-zinc-500">{{ routes|length }} routes</span>
   </div>
 
   {% if not routes %}
     <p class="text-zinc-500">{{ t('no_data') }}</p>
   {% else %}
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
     {% for r in routes %}
-    <article class="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
-      <header class="flex items-center justify-between mb-2">
-        <h2 class="font-semibold">{{ r.product }}</h2>
+    <div class="rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 shadow-sm bg-white dark:bg-zinc-900">
+      <div class="flex items-start justify-between mb-2">
+        <h3 class="font-semibold">{{ r.product }}</h3>
         <span class="badge">{{ '%.1f' % r.spread_percent }}%</span>
-      </header>
-      <div class="grid grid-cols-2 gap-3 text-sm">
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- BUY -->
         <div>
-          <div class="text-zinc-500">{{ t('route_buy') }}</div>
+          <div class="text-xs text-zinc-500">{{ t('route_buy') }}</div>
           <div class="font-medium">{{ r.buy_city }}</div>
-          <div class="text-zinc-500">{{ t('price') }}</div>
-          <div class="font-semibold">{{ '%.0f' % r.buy_price }}</div>
+          <div class="flex items-center gap-2">
+            <div class="text-lg">{{ '%.0f' % r.buy_price }}</div>
+            <a class="btn btn-outline px-2 py-1 text-xs"
+               href="{{ url_for('edit_entry', entry_id=r.buy_entry_id, lang=lang, next=request.full_path) }}">
+              {{ t('edit') }}
+            </a>
+          </div>
         </div>
+
+        <!-- SELL -->
         <div>
-          <div class="text-zinc-500">{{ t('route_sell') }}</div>
+          <div class="text-xs text-zinc-500">{{ t('route_sell') }}</div>
           <div class="font-medium">{{ r.sell_city }}</div>
-          <div class="text-zinc-500">{{ t('price') }}</div>
-          <div class="font-semibold">{{ '%.0f' % r.sell_price }}</div>
+          <div class="flex items-center gap-2">
+            <div class="text-lg">{{ '%.0f' % r.sell_price }}</div>
+            <a class="btn btn-outline px-2 py-1 text-xs"
+               href="{{ url_for('edit_entry', entry_id=r.sell_entry_id, lang=lang, next=request.full_path) }}">
+              {{ t('edit') }}
+            </a>
+          </div>
         </div>
       </div>
-      <footer class="mt-3 text-sm">
-        <span class="badge">+{{ '%.0f' % r.profit }}</span>
-      </footer>
-    </article>
+
+      <div class="mt-3 flex items-center justify-between">
+        <span class="badge">{{ '+' ~ ('%.0f' % r.profit) }}</span>
+        <span class="text-xs text-zinc-500">{{ (r.route_updated).strftime("%Y-%m-%d %H:%M") }}</span>
+      </div>
+    </div>
     {% endfor %}
   </div>
   {% endif %}
