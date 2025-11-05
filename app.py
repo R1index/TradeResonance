@@ -516,7 +516,7 @@ def new_entry():
         if not city or not product or price <= 0:
             flash(t("no_data"))
         else:
-            # Проверяем, существует ли уже запись с таким городом и товаром
+            # ПРОВЕРЯЕМ СУЩЕСТВОВАНИЕ ЗАПИСИ ПЕРЕД СОЗДАНИЕМ ЗАЯВКИ
             existing_entry = Entry.query.filter_by(city=city, product=product).first()
             if existing_entry:
                 # Если запись существует, перенаправляем на редактирование
