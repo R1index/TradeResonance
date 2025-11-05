@@ -11,15 +11,21 @@
     <input type="hidden" name="_action" value="submit_request">
     {% endif %}
 
-    <!-- Город -->
+    <!-- Город + Очистить -->
     <div class="md:col-span-2">
-      <label class="label">{{ t('city') }}</label>
+      <div class="flex items-center justify-between">
+        <label class="label">{{ t('city') }}</label>
+        <button type="button" class="btn btn-outline px-2 py-1 text-xs" data-clear="#cityField">
+          {{ 'Clear' if lang=='en' else 'Очистить' }}
+        </button>
+      </div>
       {% if e %}
         <!-- В режиме редактирования город только для чтения -->
-        <input name="city" class="input bg-gray-100" value="{{ e.city }}" readonly>
+        <input id="cityField" name="city" class="input bg-gray-100" value="{{ e.city }}" readonly>
       {% else %}
         <!-- В режиме создания - обычное поле -->
         <input
+          id="cityField"
           name="city"
           class="input"
           list="citiesList"
@@ -31,15 +37,21 @@
       {% endif %}
     </div>
 
-    <!-- Товар -->
+    <!-- Товар + Очистить -->
     <div class="md:col-span-2">
-      <label class="label">{{ t('product') }}</label>
+      <div class="flex items-center justify-between">
+        <label class="label">{{ t('product') }}</label>
+        <button type="button" class="btn btn-outline px-2 py-1 text-xs" data-clear="#productField">
+          {{ 'Clear' if lang=='en' else 'Очистить' }}
+        </button>
+      </div>
       {% if e %}
         <!-- В режиме редактирования товар только для чтения -->
-        <input name="product" class="input bg-gray-100" value="{{ e.product }}" readonly>
+        <input id="productField" name="product" class="input bg-gray-100" value="{{ e.product }}" readonly>
       {% else %}
         <!-- В режиме создания - обычное поле -->
         <input
+          id="productField"
           name="product"
           class="input"
           list="productsList"
@@ -51,7 +63,7 @@
       {% endif %}
     </div>
 
-    <!-- Цена + Очистить -->
+    <!-- Цена + Очистить + Цифровая клавиатура -->
     <div>
       <div class="flex items-center justify-between">
         <label class="label">{{ t('price') }}</label>
@@ -59,11 +71,20 @@
           {{ 'Clear' if lang=='en' else 'Очистить' }}
         </button>
       </div>
-      <input id="priceField" type="number" step="1" name="price" class="input"
+      <input id="priceField" type="number" step="1" name="price" class="input mb-2"
              value="{{ e.price if e else request.form.get('price','') }}" required>
+      
+      <!-- Цифровая клавиатура для цены (только на десктопе) -->
+      <div class="hidden md:grid grid-cols-3 gap-1 mb-2">
+        {% for i in range(1, 10) %}
+        <button type="button" class="btn btn-outline p-1 text-sm" data-input="#priceField" data-value="{{ i }}">{{ i }}</button>
+        {% endfor %}
+        <button type="button" class="btn btn-outline p-1 text-sm" data-input="#priceField" data-value="0">0</button>
+        <button type="button" class="btn btn-outline p-1 text-sm" data-backspace="#priceField">⌫</button>
+      </div>
     </div>
 
-    <!-- Процент + Очистить -->
+    <!-- Процент + Очистить + Цифровая клавиатура -->
     <div>
       <div class="flex items-center justify-between">
         <label class="label">{{ t('percent') }} %</label>
@@ -71,8 +92,17 @@
           {{ 'Clear' if lang=='en' else 'Очистить' }}
         </button>
       </div>
-      <input id="percentField" type="number" step="1" name="percent" class="input"
+      <input id="percentField" type="number" step="1" name="percent" class="input mb-2"
              value="{{ e.percent if e else request.form.get('percent','0') }}" required>
+      
+      <!-- Цифровая клавиатура для процентов (только на десктопе) -->
+      <div class="hidden md:grid grid-cols-3 gap-1 mb-2">
+        {% for i in range(1, 10) %}
+        <button type="button" class="btn btn-outline p-1 text-sm" data-input="#percentField" data-value="{{ i }}">{{ i }}</button>
+        {% endfor %}
+        <button type="button" class="btn btn-outline p-1 text-sm" data-input="#percentField" data-value="0">0</button>
+        <button type="button" class="btn btn-outline p-1 text-sm" data-backspace="#percentField">⌫</button>
+      </div>
     </div>
 
     <!-- Тренд + стрелки -->
@@ -218,6 +248,31 @@
           if (trendSel) { 
             trendSel.value = val; 
             trendSel.dispatchEvent(new Event('change')); 
+          }
+        });
+      });
+
+      // Цифровая клавиатура (работает всегда, но отображается только на десктопе)
+      document.querySelectorAll('[data-input]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const target = document.querySelector(btn.getAttribute('data-input'));
+          const value = btn.getAttribute('data-value');
+          if (target) {
+            target.value += value;
+            target.dispatchEvent(new Event('input', { bubbles: true }));
+            target.focus();
+          }
+        });
+      });
+
+      // Кнопка Backspace
+      document.querySelectorAll('[data-backspace]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const target = document.querySelector(btn.getAttribute('data-backspace'));
+          if (target && target.value.length > 0) {
+            target.value = target.value.slice(0, -1);
+            target.dispatchEvent(new Event('input', { bubbles: true }));
+            target.focus();
           }
         });
       });
