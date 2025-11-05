@@ -5,11 +5,8 @@
 
   <form method="post" class="grid grid-cols-1 md:grid-cols-4 gap-3" id="entryForm">
     <input type="hidden" name="next" value="{{ next_url or request.referrer }}">
-    
-    <!-- Для новой заявки используем submit_request, для редактирования - обычный POST -->
-    {% if not e %}
-    <input type="hidden" name="_action" value="submit_request">
-    {% endif %}
+
+    {# скрытый _action убран — действие выбирается кнопками ниже #}
 
     <!-- Город + Очистить (только в режиме создания) -->
     <div class="md:col-span-2">
@@ -22,15 +19,14 @@
         {% endif %}
       </div>
       {% if e %}
-        <!-- В режиме редактирования город только для чтения -->
         <input id="cityField" name="city" class="input bg-gray-100" value="{{ e.city }}" readonly>
       {% else %}
-        <!-- В режиме создания - обычное поле -->
         <input
           id="cityField"
           name="city"
           class="input"
           list="citiesList"
+          autocomplete="off" spellcheck="false"
           value="{{ request.form.get('city','') or request.args.get('city','') }}"
           required>
         <datalist id="citiesList">
@@ -50,15 +46,14 @@
         {% endif %}
       </div>
       {% if e %}
-        <!-- В режиме редактирования товар только для чтения -->
         <input id="productField" name="product" class="input bg-gray-100" value="{{ e.product }}" readonly>
       {% else %}
-        <!-- В режиме создания - обычное поле -->
         <input
           id="productField"
           name="product"
           class="input"
           list="productsList"
+          autocomplete="off" spellcheck="false"
           value="{{ request.form.get('product','') }}"
           required>
         <datalist id="productsList">
@@ -76,8 +71,9 @@
         </button>
       </div>
       <input id="priceField" type="number" step="1" name="price" class="input mb-2"
-             value="{{ e.price if e else request.form.get('price','') }}" required>
-      
+             value="{% if e %}{{ (overrides.price if overrides is defined and overrides.price is not none else e.price) | default('', true) }}{% else %}{{ request.form.get('price','') }}{% endif %}"
+             {% if not e %}required{% endif %}>
+
       <!-- Цифровая клавиатура для цены (только на десктопе) -->
       <div class="hidden md:grid grid-cols-3 gap-1 mb-2">
         {% for i in range(1, 10) %}
@@ -97,8 +93,9 @@
         </button>
       </div>
       <input id="percentField" type="number" step="1" name="percent" class="input mb-2"
-             value="{{ e.percent if e else request.form.get('percent','0') }}" required>
-      
+             value="{% if e %}{{ (overrides.percent if overrides is defined and overrides.percent is not none else e.percent) | default('0', true) }}{% else %}{{ request.form.get('percent','0') }}{% endif %}"
+             {% if not e %}required{% endif %}>
+
       <!-- Цифровая клавиатура для процентов (только на десктопе) -->
       <div class="hidden md:grid grid-cols-3 gap-1 mb-2">
         {% for i in range(1, 10) %}
@@ -118,17 +115,10 @@
           <button type="button" class="btn btn-outline px-2 py-1 text-xs" data-trend="down" title="{{ t('down') }}">▼</button>
         </div>
       </div>
+      {% set cur_trend = (overrides.trend if e and overrides is defined and overrides.trend else (e.trend if e else request.form.get('trend'))) or ('up') %}
       <select id="trendSelect" name="trend" class="select" required>
-        {% for opt in ['up','down'] %}
-        <option value="{{ opt }}" 
-                {% if e %}
-                  {% if e.trend == opt %}selected{% endif %}
-                {% else %}
-                  {% if request.form.get('trend','up') == opt %}selected{% endif %}
-                {% endif %}>
-          {{ t(opt) }}
-        </option>
-        {% endfor %}
+        <option value="up"   {{ 'selected' if cur_trend=='up'   else '' }}>{{ t('up') }}</option>
+        <option value="down" {{ 'selected' if cur_trend=='down' else '' }}>{{ t('down') }}</option>
       </select>
     </div>
 
@@ -154,7 +144,12 @@
       {% if e %}
         <button class="btn btn-primary" id="submitBtn" type="submit">{{ t('save') }}</button>
       {% else %}
-        <button class="btn btn-primary" id="submitBtn" type="submit">{{ t('submit/find') }}</button>
+        <button class="btn btn-outline" type="submit" name="_action" value="find_existing" formnovalidate>
+          {{ 'submit/find' if lang=='en' else 'submit/find' }}
+        </button>
+        <button class="btn btn-primary" id="submitBtn" type="submit" name="_action" value="submit_request">
+          {{ t('submit') if t('submit') else 'Submit' }}
+        </button>
       {% endif %}
       <a class="btn btn-outline" href="{{ next_url or request.referrer or url_for('index', lang=lang) }}">← {{ t('back') }}</a>
     </div>
@@ -184,13 +179,11 @@
               <div class="opacity-70">#{{ p.id }} · {{ p.submitted_at.strftime('%Y-%m-%d %H:%M') if p.submitted_at else '' }}</div>
             </div>
             <div class="flex items-center gap-2">
-              <!-- Форма для одобрения -->
               <form method="post" class="approveForm">
                 <input type="hidden" name="_action" value="approve">
                 <input type="hidden" name="pending_id" value="{{ p.id }}">
                 <button class="btn btn-primary" type="submit">{{ t('approve') }}</button>
               </form>
-              <!-- Форма для отклонения -->
               <form method="post" class="rejectForm">
                 <input type="hidden" name="_action" value="reject">
                 <input type="hidden" name="pending_id" value="{{ p.id }}">
@@ -204,7 +197,6 @@
       <script>
         (function(){
           const passInput = document.getElementById('adminPassGlobal');
-          
           document.querySelectorAll('#pendingList form').forEach(form => {
             form.addEventListener('submit', function(ev) {
               if (!passInput.value.trim()) {
@@ -213,7 +205,6 @@
                 passInput.focus();
                 return false;
               }
-              
               const hiddenInput = document.createElement('input');
               hiddenInput.type = 'hidden';
               hiddenInput.name = 'admin_pass';
@@ -237,10 +228,7 @@
       document.querySelectorAll('[data-clear]').forEach(btn => {
         btn.addEventListener('click', () => {
           const el = document.querySelector(btn.getAttribute('data-clear'));
-          if (el) { 
-            el.value = ''; 
-            el.focus(); 
-          }
+          if (el) { el.value = ''; el.focus(); }
         });
       });
 
@@ -249,14 +237,11 @@
       document.querySelectorAll('[data-trend]').forEach(btn => {
         btn.addEventListener('click', () => {
           const val = btn.getAttribute('data-trend');
-          if (trendSel) { 
-            trendSel.value = val; 
-            trendSel.dispatchEvent(new Event('change')); 
-          }
+          if (trendSel) { trendSel.value = val; trendSel.dispatchEvent(new Event('change')); }
         });
       });
 
-      // Цифровая клавиатура (работает всегда, но отображается только на десктопе)
+      // Цифровая клавиатура
       document.querySelectorAll('[data-input]').forEach(btn => {
         btn.addEventListener('click', () => {
           const target = document.querySelector(btn.getAttribute('data-input'));
@@ -288,7 +273,7 @@
       // Предотвращение двойной отправки
       let isSubmitting = false;
       if (form) {
-        form.addEventListener('submit', function() {
+        form.addEventListener('submit', function(event) {
           if (isSubmitting) {
             event.preventDefault();
             return false;
@@ -297,10 +282,39 @@
           const submitBtn = document.getElementById('submitBtn');
           if (submitBtn) {
             submitBtn.disabled = true;
-            submitBtn.textContent = '{{ t("saving" if t("saving") else "Saving...") }}';
+            submitBtn.textContent = '{{ t("saving") if t("saving") else "Saving..." }}';
           }
         });
       }
+    })();
+  </script>
+
+  <!-- Усиление datalist: сначала варианты, начинающиеся с введённого префикса -->
+  <script>
+    (function enhanceDatalist(){
+      function prioritizePrefix(inputId, listId){
+        const input = document.getElementById(inputId);
+        const list  = document.getElementById(listId);
+        if(!input || !list) return;
+        const original = Array.from(list.options).map(o => o.value);
+        input.addEventListener('input', () => {
+          const q = (input.value || '').toLowerCase();
+          const starts = [], contains = [];
+          for(const v of original){
+            const lv = v.toLowerCase();
+            if(q && lv.startsWith(q)) starts.push(v);
+            else if(!q || lv.includes(q)) contains.push(v);
+          }
+          list.innerHTML = '';
+          [...new Set([...starts, ...contains])].slice(0, 200).forEach(v=>{
+            const opt = document.createElement('option');
+            opt.value = v;
+            list.appendChild(opt);
+          });
+        });
+      }
+      prioritizePrefix('cityField', 'citiesList');
+      prioritizePrefix('productField', 'productsList');
     })();
   </script>
 </section>
