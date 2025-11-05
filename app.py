@@ -542,29 +542,12 @@ def new_entry():
                 db.session.commit()
                 flash(t("request_submitted"))
 
-    if request.method == "POST" and request.form.get("_action") in {"approve", "reject"}:
-        admin_pass = (request.form.get("admin_pass") or "").strip()
-        if not admin_pass:
-            flash(t("need_password_for_action"))
-        elif admin_pass != ADMIN_PASSWORD:
-            flash(t("wrong_password"))
-        else:
-            pid = request.form.get("pending_id", type=int)
-            p = PendingEntry.query.get(pid)
-            if p:
-                if request.form.get("_action") == "approve":
-                    approve_pending(p)
-                    flash(t("approved"))
-                else:
-                    db.session.delete(p)
-                    db.session.commit()
-                    flash(t("rejected"))
-
     pending = PendingEntry.query.order_by(PendingEntry.submitted_at.desc()).all()
 
     return render_template("entry_form.html", e=None, title=t("new_entry"),
                            cities_list=cities_list, products_list=products_list,
                            pending=pending, next_url=request.args.get('next'))
+
 
 @app.route("/entries/<int:entry_id>/edit", methods=["GET", "POST"])
 def edit_entry(entry_id):
@@ -591,7 +574,6 @@ def edit_entry(entry_id):
     next_url = safe_next(request.args.get("next")) or safe_next(request.referrer)
     return render_template('entry_form.html', e=e, title=t('edit_entry'),
                            cities_list=cities_list, products_list=products_list, next_url=next_url)
-
 
 @app.route("/import", methods=["GET", "POST"])
 def import_csv():
