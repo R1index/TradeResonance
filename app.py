@@ -324,9 +324,10 @@ def index():
         q_prod = (request.args.get("prod") or "any").strip().lower()
         q_sort = (request.args.get("sort") or "updated_desc").strip().lower()
 
-        # --- пагинация (page/per_page из query; per_page по умолчанию можно менять)
+        # --- пагинация
         page = request.args.get("page", 1, type=int)
         per_page = request.args.get("per_page", 15, type=int)
+        per_page = max(1, min(500, per_page))
 
         query = Entry.query
 
@@ -359,11 +360,10 @@ def index():
         }
         query = query.order_by(sort_map.get(q_sort, sort_map["updated_desc"]))
 
-        # --- ВАЖНО: вместо .limit(1000).all() используем paginate
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
         entries = pagination.items
 
-        # --- окно номеров страниц максимум из 20 ссылок
+        # окно номеров страниц максимум из 20 ссылок
         window = 20
         start = max(1, pagination.page - (window // 2))
         end = min(pagination.pages, start + window - 1)
@@ -432,7 +432,11 @@ def index():
         )
 
     elif tab == "routes":
+        # --- фильтры и пагинация
         q_product = (request.args.get("product") or "").strip()
+        page      = request.args.get("page", 1, type=int)
+        per_page  = request.args.get("per_page", 15, type=int)
+        per_page  = max(1, min(500, per_page))
 
         L = latest_entries_subq()
 
@@ -441,7 +445,7 @@ def index():
             lambda: [p for (p,) in db.session.query(L.c.product).distinct().order_by(L.c.product.asc()).all()]
         )
 
-        # CTE для покупок (только production cities)
+        # CTE: покупки (только production cities)
         buy_cte = db.session.query(
             L.c.product.label("product"),
             L.c.city.label("buy_city"),
@@ -451,10 +455,10 @@ def index():
             L.c.percent.label("buy_percent"),
             L.c.updated_at.label("buy_updated"),
             L.c.created_at.label("buy_created"),
-            L.c.is_production_city.label("buy_is_production")
-        ).filter(L.c.is_production_city == True).subquery()
+            L.c.is_production_city.label("buy_is_production"),
+        ).filter(L.c.is_production_city.is_(True)).subquery()
 
-        # CTE для продаж (все города)
+        # CTE: продажи (все города)
         sell_cte = db.session.query(
             L.c.product.label("product"),
             L.c.city.label("sell_city"),
@@ -464,7 +468,7 @@ def index():
             L.c.percent.label("sell_percent"),
             L.c.updated_at.label("sell_updated"),
             L.c.created_at.label("sell_created"),
-            L.c.is_production_city.label("sell_is_production")
+            L.c.is_production_city.label("sell_is_production"),
         ).subquery()
 
         routes_query = (
@@ -489,53 +493,94 @@ def index():
                 sell_cte.c.sell_is_production,
 
                 ((sell_cte.c.sell_price - buy_cte.c.buy_price) / buy_cte.c.buy_price * 100).label("spread_percent"),
-                (sell_cte.c.sell_price - buy_cte.c.buy_price).label("profit")
+                (sell_cte.c.sell_price - buy_cte.c.buy_price).label("profit"),
             )
             .join(sell_cte, buy_cte.c.product == sell_cte.c.product)
             .filter(buy_cte.c.buy_city != sell_cte.c.sell_city)
             .filter(sell_cte.c.sell_price > buy_cte.c.buy_price)
-            .order_by((sell_cte.c.sell_price - buy_cte.c.buy_price).desc())
+            .order_by(sa.desc(sa.text("profit")))
         )
-
         if q_product:
             routes_query = routes_query.filter(buy_cte.c.product.ilike(f"%{q_product}%"))
 
-        routes_result = routes_query.limit(500).all()
+        rows = routes_query.all()
+
+        # helper: ISO UTC с суффиксом Z (считаем, что даты уже в UTC)
+        def to_iso_utc(dt):
+            if not dt:
+                return None
+            return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
         routes = []
-        for r in routes_result:
-            buy_updated = r.buy_updated or r.buy_created
-            sell_updated = r.sell_updated or r.sell_created
+        for r in rows:
+            buy_updated   = r.buy_updated or r.buy_created
+            sell_updated  = r.sell_updated or r.sell_created
             route_updated = max(buy_updated, sell_updated)
 
             routes.append({
                 "product": r.product,
+
                 "buy_city": r.buy_city,
                 "buy_price": float(r.buy_price),
                 "buy_entry_id": int(r.buy_id),
                 "buy_trend": r.buy_trend,
                 "buy_percent": float(r.buy_percent) if r.buy_percent is not None else None,
-                "buy_updated": buy_updated,
                 "buy_is_production": bool(r.buy_is_production),
+                "buy_updated_iso": to_iso_utc(buy_updated),   # <-- UTC ISO
 
                 "sell_city": r.sell_city,
                 "sell_price": float(r.sell_price),
                 "sell_entry_id": int(r.sell_id),
                 "sell_trend": r.sell_trend,
                 "sell_percent": float(r.sell_percent) if r.sell_percent is not None else None,
-                "sell_updated": sell_updated,
                 "sell_is_production": bool(r.sell_is_production),
+                "sell_updated_iso": to_iso_utc(sell_updated), # <-- UTC ISO
 
                 "spread_percent": float(r.spread_percent),
                 "profit": float(r.profit),
-                "route_updated": route_updated,
+                "route_updated_iso": to_iso_utc(route_updated),  # <-- UTC ISO
             })
+
+        # --- ручная пагинация маршрутов
+        total = len(routes)
+        pages = max(1, (total + per_page - 1) // per_page)
+        page = max(1, min(page, pages))
+        start_i = (page - 1) * per_page
+        end_i = start_i + per_page
+        routes_page = routes[start_i:end_i]
+
+        class SimplePagination:
+            def __init__(self, page, per_page, total, pages):
+                self.page = page
+                self.per_page = per_page
+                self.total = total
+                self.pages = pages
+            @property
+            def has_prev(self): return self.page > 1
+            @property
+            def has_next(self): return self.page < self.pages
+            @property
+            def prev_num(self): return max(1, self.page - 1)
+            @property
+            def next_num(self): return min(self.pages, self.page + 1)
+
+        pagination = SimplePagination(page, per_page, total, pages)
+
+        # окно страниц (до 20)
+        window = 20
+        start_p = max(1, page - window // 2)
+        end_p = min(pages, start_p + window - 1)
+        start_p = max(1, end_p - window + 1)
+        page_numbers = list(range(start_p, end_p + 1))
 
         return render_template(
             "routes.html",
-            routes=routes,
+            routes=routes_page,
             products_list=products_list,
             q_product=q_product,
+            pagination=pagination,
+            page_numbers=page_numbers,
+            per_page=per_page,
             lang=lang,
         )
 
