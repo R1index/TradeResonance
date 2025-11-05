@@ -132,9 +132,9 @@
           <td class="py-2" data-col="percent">{{ '%.0f' % e.percent }}</td>
           <td class="py-2">{{ t('yes') if e.is_production_city else t('no') }}</td>
 
-          {# относительное время для updated: пишем ISO в data-атрибут, текст проставит JS #}
+          {# Пишем UTC-ISO с 'Z'. Предполагается, что updated_at хранится в UTC. #}
           <td class="py-2" data-col="updated"
-              data-updated-iso="{{ (e.updated_at or e.created_at).strftime('%Y-%m-%dT%H:%M:%S') }}">
+              data-updated-iso="{{ (e.updated_at or e.created_at).strftime('%Y-%m-%dT%H:%M:%SZ') }}">
           </td>
 
           <td class="py-2">
@@ -282,28 +282,18 @@
   outline: 2px solid #3b82f6;
   outline-offset: -2px;
 }
-
-/* Ползунок — наследует основной цвет темы */
+/* Ползунок */
 input[type="range"] { accent-color: var(--primary, #3b82f6); }
-
-/* Кнопки + / - около слайдера */
-.btn-icon {
-  padding: 0.25rem 0.5rem;
-  min-width: 2rem;
-  text-align: center;
-}
-
-/* Кнопки тренда */
+/* Кнопки + / - */
+.btn-icon { padding: 0.25rem 0.5rem; min-width: 2rem; text-align: center; }
+/* Тренд-кнопки */
 .btn-trend { padding: 0.4rem 0.75rem; border-radius: 0.5rem; border: 1px solid transparent; }
 .btn-up   { background: #16a34a; color:#fff; }
 .btn-down { background: #dc2626; color:#fff; }
 .btn-trend:is(:hover,:focus) { filter: brightness(0.95); }
 .btn-trend.is-active { box-shadow: 0 0 0 2px rgba(255,255,255,0.6) inset; border-color: rgba(255,255,255,0.7); }
-
-/* Скрытый, но в DOM, для сабмита */
-.sr-only {
-  position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;
-}
+/* Скрытый select (остается для POST/доступности) */
+.sr-only { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0; }
 </style>
 
 <script>
@@ -372,26 +362,17 @@ input[type="range"] { accent-color: var(--primary, #3b82f6); }
     }
   }
 
-  // === Относительное время "n мин/час/дн назад" ===
+  // === Относительное время от UTC ===
   function relLabel(dateIso, lang){
     if (!dateIso) return '';
-    const now = new Date();
+    // dateIso должен быть с 'Z' => UTC
+    const now = new Date(); // это "текущий момент" в UTC для toISOString; разность корректна независимо от TZ
     const d = new Date(dateIso);
     if (isNaN(d.getTime())) return '';
     let sec = Math.max(0, Math.floor((now - d) / 1000));
 
-    const en = {
-      just: 'just now',
-      min:  'min ago',
-      hour: 'h ago',
-      day:  'd ago'
-    };
-    const ru = {
-      just: 'только что',
-      min1:  'мин назад',      // 1..59
-      hour1: 'ч назад',        // 1..23
-      day1:  'дн назад'        // 1..?
-    };
+    const en = { just:'just now', min:'min ago', hour:'h ago', day:'d ago' };
+    const ru = { just:'только что', min1:'мин назад', hour1:'ч назад', day1:'дн назад' };
     const isEn = (lang === 'en');
 
     if (sec < 45) return isEn ? en.just : ru.just;
@@ -409,37 +390,27 @@ input[type="range"] { accent-color: var(--primary, #3b82f6); }
       cell.textContent = relLabel(cell.getAttribute('data-updated-iso'), lang);
     });
   }
-
-  // первичная отрисовка относительного времени
   renderAllRelative();
-  // обновление раз в минуту
   setInterval(renderAllRelative, 60 * 1000);
 
-  // === Пересчёт цены при изменении процента (0..200) + синхронизация слайдера ===
+  // === Пересчёт цены (0..200) + синхронизированный слайдер ===
   function calcBaseFromForm(form){
     const p0 = Number(form.dataset.price0 || form.price?.defaultValue || form.price?.value || 0);
     const perc0Raw = Number(form.dataset.percent0 || form.percent?.defaultValue || form.percent?.value || 100);
-    const perc0 = (isFinite(perc0Raw) && perc0Raw > 0) ? perc0Raw : 100; // если 0/NaN -> 100%
+    const perc0 = (isFinite(perc0Raw) && perc0Raw > 0) ? perc0Raw : 100;
     return p0 / (perc0/100);
   }
-
   function clampPercent(v){
     if (!isFinite(v)) return 0;
     if (v < 0) return 0;
     if (v > 200) return 200;
     return Math.round(v);
   }
-
   function applyPercent(form, perc, source){
-    // число
     const percentInput = form.querySelector('input[name="percent"]');
     if (percentInput) percentInput.value = perc;
-
-    // слайдер
     const slider = percentInput ? form.querySelector(`input[type="range"][data-bind-to="${percentInput.id}"]`) : null;
     if (slider && source !== 'slider') slider.value = perc;
-
-    // подпись рядом
     let key = null;
     if (percentInput && percentInput.id) {
       const parts = percentInput.id.split('percent-');
@@ -449,15 +420,12 @@ input[type="range"] { accent-color: var(--primary, #3b82f6); }
       const label = form.querySelector(`[data-percent-label="${CSS.escape(key)}"]`);
       if (label) label.textContent = `${perc}%`;
     }
-
-    // пересчёт цены (readonly)
     const base = calcBaseFromForm(form);
     const newPrice = Math.round(base * (perc/100));
     const priceInput = form.querySelector('input[name="price"]');
     if (priceInput && isFinite(newPrice)) priceInput.value = newPrice;
   }
 
-  // ввод с клавиатуры в числовом поле процентов
   table.addEventListener('input', (e) => {
     const num = e.target.closest('input[name="percent"]');
     if (!num) return;
@@ -466,8 +434,6 @@ input[type="range"] { accent-color: var(--primary, #3b82f6); }
     const perc = clampPercent(Number(num.value));
     applyPercent(form, perc, 'number');
   });
-
-  // движение ползунка
   table.addEventListener('input', (e) => {
     const slider = e.target.closest('input[type="range"][data-bind-to]');
     if (!slider) return;
@@ -476,8 +442,6 @@ input[type="range"] { accent-color: var(--primary, #3b82f6); }
     const perc = clampPercent(Number(slider.value));
     applyPercent(form, perc, 'slider');
   });
-
-  // кнопки +/- возле ползунка (Shift = шаг 5)
   table.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-delta]');
     if (!btn) return;
@@ -491,22 +455,19 @@ input[type="range"] { accent-color: var(--primary, #3b82f6); }
     applyPercent(form, next, 'button');
   });
 
-  // === Тренд-кнопки (зелёная UP / красная DOWN) ===
+  // === Тренд-кнопки ===
   function syncTrendButtons(form){
     const select = form.querySelector('select[name="trend"]');
     const upBtn = form.querySelector('.btn-trend.btn-up');
     const downBtn = form.querySelector('.btn-trend.btn-down');
     if (!select || !upBtn || !downBtn) return;
-
     const val = (select.value || '').toLowerCase();
     const isUp = val === 'up';
-
     upBtn.classList.toggle('is-active', isUp);
     downBtn.classList.toggle('is-active', !isUp);
     upBtn.setAttribute('aria-pressed', String(isUp));
     downBtn.setAttribute('aria-pressed', String(!isUp));
   }
-
   table.addEventListener('click', (e) => {
     const tbtn = e.target.closest('button[data-trend]');
     if (!tbtn) return;
@@ -514,7 +475,6 @@ input[type="range"] { accent-color: var(--primary, #3b82f6); }
     if (!form) return;
     const select = form.querySelector('select[name="trend"]');
     if (!select) return;
-
     select.value = tbtn.dataset.trend === 'down' ? 'down' : 'up';
     syncTrendButtons(form);
   });
@@ -542,18 +502,17 @@ input[type="range"] { accent-color: var(--primary, #3b82f6); }
       if (row){
         row.querySelector('[data-col="price"]').textContent   = Number(price).toFixed(0);
         row.querySelector('[data-col="percent"]').textContent = Number(percent).toFixed(0);
-
         const trendCell = row.querySelector('[data-col="trend"]');
         trendCell.innerHTML = trend === 'up'
           ? `<span class="badge badge-green">{{ t('up') }}</span>`
           : `<span class="badge badge-red">{{ t('down') }}</span>`;
 
-        // Обновляем "Обновлено": ставим ISO = сейчас и перерисовываем относительное время
+        // Пишем момент сохранения в UTC (ISO с Z) и сразу рендерим относительное
         const updatedCell = row.querySelector('[data-col="updated"]');
         if (updatedCell){
-          const nowIso = new Date().toISOString().slice(0,19); // YYYY-MM-DDTHH:mm:ss
-          updatedCell.setAttribute('data-updated-iso', nowIso);
-          updatedCell.textContent = relLabel(nowIso, "{{ lang }}"); // "только что"
+          const nowIsoUtc = new Date().toISOString(); // UTC ISO, с Z
+          updatedCell.setAttribute('data-updated-iso', nowIsoUtc);
+          updatedCell.textContent = relLabel(nowIsoUtc, "{{ lang }}");
         }
       }
       toggleEditor(id, false);
@@ -564,7 +523,7 @@ input[type="range"] { accent-color: var(--primary, #3b82f6); }
     }
   });
 
-  // Синхронизируем тренд-кнопки сразу для раскрытых блоков (если такие есть)
+  // синхронизация тренд-кнопок на всякий случай
   table.querySelectorAll('tr[id^="editor-"] form.quick-form').forEach(syncTrendButtons);
 })();
 </script>
