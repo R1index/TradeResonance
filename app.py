@@ -516,7 +516,7 @@ def new_entry():
         if not city or not product:
             flash(t("no_data"))
         else:
-            # СНАЧАЛА ПРОВЕРЯЕМ СУЩЕСТВОВАНИЕ ЗАПИСИ (даже если price = 0)
+            # Проверяем существование записи (даже если price = 0)
             from sqlalchemy import func
             existing_entry = Entry.query.filter(
                 func.lower(Entry.city) == func.lower(city),
@@ -526,7 +526,7 @@ def new_entry():
             if existing_entry:
                 # Если запись существует, перенаправляем на редактирование
                 flash(t("edit_existing"))
-                return redirect(url_for("edit_entry", entry_id=existing_entry.id, lang=lang))
+                return redirect(url_for("edit_entry", entry_id=existing_entry.id, lang=lang, next_url=request.args.get('next')))
             
             # Если записи нет, тогда проверяем цену
             if price <= 0:
@@ -564,7 +564,7 @@ def new_entry():
 
     return render_template("entry_form.html", e=None, title=t("new_entry"),
                            cities_list=cities_list, products_list=products_list,
-                           pending=pending, next_url=None)
+                           pending=pending, next_url=request.args.get('next'))
 
 @app.route("/entries/<int:entry_id>/edit", methods=["GET", "POST"])
 def edit_entry(entry_id):
@@ -591,6 +591,7 @@ def edit_entry(entry_id):
     next_url = safe_next(request.args.get("next")) or safe_next(request.referrer)
     return render_template('entry_form.html', e=e, title=t('edit_entry'),
                            cities_list=cities_list, products_list=products_list, next_url=next_url)
+
 
 @app.route("/import", methods=["GET", "POST"])
 def import_csv():
