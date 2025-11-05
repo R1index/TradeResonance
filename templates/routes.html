@@ -4,7 +4,6 @@
   <div class="flex items-start justify-between gap-3 mb-4">
     <h1 class="text-xl font-semibold">{{ t('nav_routes') }}</h1>
 
-    <!-- Фильтры -->
     <form method="get" class="grid grid-cols-1 md:grid-cols-6 gap-3 items-end" id="routesFilter">
       <input type="hidden" name="tab" value="routes">
       <input type="hidden" name="lang" value="{{ lang }}">
@@ -70,12 +69,8 @@
           {{ g.pair_from }} → {{ g.pair_to }}
         </h3>
         <div class="text-right">
-          <div class="text-sm font-medium">
-            {{ '%.0f' % g.sum_profit }}
-          </div>
-          <div class="text-[11px] text-[var(--muted)]">
-            {{ 'sum profit' if lang=='en' else 'сумма прибыли' }}
-          </div>
+          <div class="text-sm font-medium">{{ '%.0f' % g.sum_profit }}</div>
+          <div class="text-[11px] text-[var(--muted)]">{{ 'sum profit' if lang=='en' else 'сумма прибыли' }}</div>
         </div>
       </div>
 
@@ -88,41 +83,61 @@
         <table class="min-w-full table-card">
           <thead class="text-left text-sm text-zinc-600 dark:text-zinc-400">
             <tr>
-              <th class="py-2">{{ t('product') }}</th>
-              <th class="py-2">{{ t('route_buy') }}</th>
-              <th class="py-2">{{ t('route_sell') }}</th>
-              <th class="py-2">{{ 'Profit' if lang=='en' else 'Прибыль' }}</th>
-              <th class="py-2">{{ t('actions') }}</th>
+              <th class="py-2 w-[30%]">{{ t('product') }}</th>
+              <th class="py-2 w-[35%]">{{ t('route_buy') }}</th>
+              <th class="py-2 w-[35%]">{{ t('route_sell') }}</th>
+              <th class="py-2 text-right">{{ 'Profit' if lang=='en' else 'Прибыль' }}</th>
             </tr>
           </thead>
           <tbody class="text-sm">
             {% for it in g['items'] %}
-            <tr class="border-b border-zinc-200 dark:border-zinc-800">
-              <td class="py-2">{{ it.product }}</td>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800 align-top">
               <td class="py-2">
-                {{ it.buy_city }} • {{ '%.0f' % it.buy_price }}
-                <span class="badge {{ 'badge-green' if it.buy_trend=='up' else 'badge-red' }}">
-                  {{ '%.0f' % it.buy_percent }}%
-                </span>
-                <a class="btn btn-outline px-2 py-1 text-xs"
-                   href="{{ url_for('edit_entry', entry_id=it.buy_entry_id, lang=lang, next=request.full_path) }}">
-                  {{ t('edit') }}
-                </a>
+                <div class="font-medium">{{ it.product }}</div>
               </td>
+
+              <!-- BUY -->
               <td class="py-2">
-                {{ it.sell_city }} • {{ '%.0f' % it.sell_price }}
-                <span class="badge {{ 'badge-green' if it.sell_trend=='up' else 'badge-red' }}">
-                  {{ '%.0f' % it.sell_percent }}%
-                </span>
-                <a class="btn btn-outline px-2 py-1 text-xs"
-                   href="{{ url_for('edit_entry', entry_id=it.sell_entry_id, lang=lang, next=request.full_path) }}">
-                  {{ t('edit') }}
-                </a>
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="font-medium">{{ it.buy_city }}</span>
+                  <span>• {{ '%.0f' % it.buy_price }}</span>
+                  <span class="badge {{ 'badge-green' if it.buy_trend=='up' else 'badge-red' }}">
+                    {{ it.buy_percent is not none and ('%.0f' % it.buy_percent) or '—' }}%
+                  </span>
+                  <a class="btn btn-outline px-2 py-1 text-xs"
+                     href="{{ url_for('edit_entry', entry_id=it.buy_entry_id, lang=lang, next=request.full_path) }}">
+                    {{ t('edit') }}
+                  </a>
+                </div>
+                <div class="text-[11px] text-[var(--muted)] mt-1">
+                  {{ 'updated' if lang=='en' else 'обновлено' }}:
+                  <span data-updated-iso="{{ it.buy_updated_iso }}"></span>
+                </div>
               </td>
+
+              <!-- SELL -->
               <td class="py-2">
-                {{ '%.0f' % it.profit }} ({{ '%.1f' % it.margin_pct }}%)
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="font-medium">{{ it.sell_city }}</span>
+                  <span>• {{ '%.0f' % it.sell_price }}</span>
+                  <span class="badge {{ 'badge-green' if it.sell_trend=='up' else 'badge-red' }}">
+                    {{ it.sell_percent is not none and ('%.0f' % it.sell_percent) or '—' }}%
+                  </span>
+                  <a class="btn btn-outline px-2 py-1 text-xs"
+                     href="{{ url_for('edit_entry', entry_id=it.sell_entry_id, lang=lang, next=request.full_path) }}">
+                    {{ t('edit') }}
+                  </a>
+                </div>
+                <div class="text-[11px] text-[var(--muted)] mt-1">
+                  {{ 'updated' if lang=='en' else 'обновлено' }}:
+                  <span data-updated-iso="{{ it.sell_updated_iso }}"></span>
+                </div>
               </td>
-              <td class="py-2 text-[11px] text-[var(--muted)]" data-updated-iso="{{ it.updated_utc_iso }}"></td>
+
+              <td class="py-2 text-right whitespace-nowrap">
+                <div class="font-medium">+{{ '%.0f' % it.profit }}</div>
+                <div class="text-[11px] text-[var(--muted)]">{{ '%.1f' % it.margin_pct }}%</div>
+              </td>
             </tr>
             {% endfor %}
           </tbody>
@@ -136,7 +151,6 @@
     {% endfor %}
   </div>
 
-  <!-- ПАГИНАЦИЯ -->
   {% if pagination and pagination.pages > 1 %}
   <nav class="mt-4 flex flex-wrap items-center justify-center gap-2" aria-label="Pagination">
     {% if pagination.page > 1 %}
@@ -179,7 +193,6 @@
 
 <script>
 (function(){
-  // автосабмит: Enter/изменение + сброс page=1
   const f = document.getElementById('routesFilter');
   const prod = document.getElementById('productInput');
   if (f) {
@@ -197,13 +210,12 @@
     }
   }
 
-  // Относительное время от UTC (ISO с Z)
   function relLabel(dateIso, isEn){
     if (!dateIso) return '';
-    const d = new Date(dateIso); // 'Z' → UTC
+    const d = new Date(dateIso); // Z -> UTC
     if (isNaN(d.getTime())) return '';
     const now = new Date();
-    let sec = Math.max(0, Math.floor((now - d) / 1000));
+    const sec = Math.max(0, Math.floor((now - d) / 1000));
     if (sec < 45) return isEn ? 'just now' : 'только что';
     const min = Math.floor(sec/60);
     if (min < 60) return isEn ? `${min} min ago` : `${min} мин назад`;
@@ -213,9 +225,9 @@
     return isEn ? `${day} d ago` : `${day} дн назад`;
   }
 
-  function renderRelative(container){
+  function renderRelative(root){
     const isEn = "{{ lang }}" === "en";
-    container.querySelectorAll('[data-updated-iso]').forEach(el => {
+    root.querySelectorAll('[data-updated-iso]').forEach(el => {
       el.textContent = relLabel(el.getAttribute('data-updated-iso'), isEn);
     });
   }
