@@ -112,10 +112,9 @@
           <td class="py-2">{{ e.id }}</td>
           <td class="py-2">{{ e.city }}</td>
 
-          <!-- по клику раскрываем редактор -->
-          <td class="py-2 text-[var(--brand)] cursor-pointer underline-offset-2 hover:underline"
-              data-quick-edit="{{ e.id }}">
-            {{ e.product }}
+          <!-- Кликабельна вся ячейка, без синего текста -->
+          <td class="py-2 click-cell" data-quick-edit="{{ e.id }}" tabindex="0" aria-label="Quick edit {{ e.product }}">
+            <span class="click-cell__inner">{{ e.product }}</span>
           </td>
 
           <td class="py-2" data-col="price">{{ '%.0f' % e.price }}</td>
@@ -135,7 +134,7 @@
           </td>
         </tr>
 
-        <!-- строка-редактор (скрыта) -->
+        <!-- строка-редактор -->
         <tr class="hidden bg-[var(--bg)]" id="editor-{{ e.id }}">
           <td colspan="10" class="py-3">
             <form class="flex flex-wrap items-end gap-3 quick-form"
@@ -176,7 +175,6 @@
   {% endif %}
 </section>
 
-<!-- JS: раскрытие/сворачивание и AJAX-сохранение -->
 <script>
 (function(){
   const table = document.getElementById('pricesTable');
@@ -184,27 +182,33 @@
 
   let openedId = null;
 
-  // делегирование клика по продукту
+  // клик по всей ячейке
   table.addEventListener('click', (e) => {
     const td = e.target.closest('[data-quick-edit]');
     if (!td) return;
-    const id = td.getAttribute('data-quick-edit');
-    toggleEditor(id);
+    toggleEditor(td.getAttribute('data-quick-edit'));
   });
 
-  // кнопка закрыть в редакторе
+  // раскрытие по Enter / Space
+  table.addEventListener('keydown', (e) => {
+    const td = e.target.closest('[data-quick-edit]');
+    if (!td) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      toggleEditor(td.getAttribute('data-quick-edit'));
+    }
+  });
+
   table.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-close]');
     if (!btn) return;
-    const id = btn.getAttribute('data-close');
-    toggleEditor(id, false);
+    toggleEditor(btn.getAttribute('data-close'), false);
   });
 
   function toggleEditor(id, forceOpen){
     const row = document.getElementById('editor-'+id);
     if (!row) return;
 
-    // закрываем прежний редактор
     if (openedId && openedId !== id){
       const prev = document.getElementById('editor-'+openedId);
       if (prev) prev.classList.add('hidden');
@@ -214,59 +218,48 @@
     const willOpen = (forceOpen !== undefined) ? forceOpen : row.classList.contains('hidden');
     row.classList.toggle('hidden', !willOpen);
     openedId = willOpen ? id : null;
+
     if (willOpen){
       const firstInput = row.querySelector('input[name="price"]');
       if (firstInput) firstInput.focus();
     }
   }
 
-  // AJAX-сохранение (прогрессивное улучшение)
+  // AJAX-сохранение
   table.addEventListener('submit', async (e) => {
     const form = e.target.closest('form.quick-form');
     if (!form) return;
     e.preventDefault();
 
-    const tr = form.closest('tr');
-    const id = tr.id.replace('editor-','');
-
+    const id = form.closest('tr').id.replace('editor-','');
     const submitBtn = form.querySelector('button[type="submit"]');
     const orig = submitBtn.textContent;
     submitBtn.disabled = true; submitBtn.textContent = '{{ t("saving") }}';
 
     try{
       const resp = await fetch(form.action, { method: 'POST', body: new FormData(form) });
-      // после успешного POST Flask редиректит; fetch последует за редиректом и вернёт HTML.
-      if (!resp.ok){ throw new Error('HTTP '+resp.status); }
+      if (!resp.ok) throw new Error('HTTP '+resp.status);
 
-      // Обновляем значения в таблице из формы
-      const price = form.querySelector('[name="price"]').value || '';
-      const trend = form.querySelector('[name="trend"]').value || '';
-      const percent = form.querySelector('[name="percent"]').value || '';
+      const price   = form.price.value || '';
+      const trend   = form.trend.value || '';
+      const percent = form.percent.value || '';
 
       const row = table.querySelector('tr[data-row="'+id+'"]');
       if (row){
         row.querySelector('[data-col="price"]').textContent = Number(price).toFixed(0);
         row.querySelector('[data-col="percent"]').textContent = Number(percent).toFixed(0);
-
         const trendCell = row.querySelector('[data-col="trend"]');
-        if (trendCell){
-          trendCell.innerHTML = trend === 'up'
-            ? `<span class="badge badge-green">{{ t('up') }}</span>`
-            : `<span class="badge badge-red">{{ t('down') }}</span>`;
-        }
-
-        // поставим "Updated" текущее время локально
+        trendCell.innerHTML = trend === 'up'
+          ? `<span class="badge badge-green">{{ t('up') }}</span>`
+          : `<span class="badge badge-red">{{ t('down') }}</span>`;
         const now = new Date();
         const pad = n => String(n).padStart(2,'0');
-        const stamp = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
-        row.querySelector('[data-col="updated"]').textContent = stamp;
+        row.querySelector('[data-col="updated"]').textContent =
+          `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
       }
-
       toggleEditor(id, false);
     }catch(err){
-      console.error(err);
-      // fallback: обычная отправка формы
-      form.submit();
+      form.submit(); // фолбэк
     }finally{
       submitBtn.disabled = false; submitBtn.textContent = orig;
     }
@@ -274,4 +267,3 @@
 })();
 </script>
 {% endblock %}
-
