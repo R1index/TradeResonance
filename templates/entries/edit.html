@@ -1,0 +1,55 @@
+
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>{{ t('edit_entry') }} #{{ e.id }}</h2>
+  <form method="post" id="editForm" class="row">
+    <input type="hidden" name="next" value="{{ next_url }}">
+    <input type="hidden" name="lang" value="{{ lang }}">
+
+    <div class="col-6">
+      <label class="label">{{ t('city') }}</label>
+      <input class="input" value="{{ e.city }}" disabled>
+    </div>
+
+    <div class="col-6">
+      <label class="label">{{ t('product') }}</label>
+      <input class="input" value="{{ e.product }}" disabled>
+    </div>
+
+    <div class="col-6">
+      <label class="label">{{ t('price') }}</label>
+      <input name="price" type="number" step="0.01" min="0" class="input"
+             value="{{ (pre_price if pre_price is not none else e.price) or '' }}">
+    </div>
+
+    <div class="col-6">
+      <label class="label">{{ t('percent') }}</label>
+      <input name="percent" type="number" step="0.01" class="input"
+             value="{{ (pre_percent if pre_percent is not none else e.percent) or '' }}">
+    </div>
+
+    <div class="col-6">
+      <label class="label">{{ t('trend') }}</label>
+      {% set curr = pre_trend or e.trend or 'up' %}
+      <select name="trend" class="input">
+        <option value="up"   {{ 'selected' if curr=='up'   else '' }}>{{ t('trend_up') }}</option>
+        <option value="down" {{ 'selected' if curr=='down' else '' }}>{{ t('trend_down') }}</option>
+        <option value="flat" {{ 'selected' if curr=='flat' else '' }}>{{ t('trend_flat') }}</option>
+      </select>
+    </div>
+
+    <div class="col-6">
+      <label>
+        <input type="checkbox" name="is_production_city" {% if e.is_production_city %}checked{% endif %}>
+        is_production_city
+      </label>
+    </div>
+
+    <div class="col-12 actions">
+      <button type="submit">{{ t('save') }}</button>
+      <a class="secondary" href="{{ next_url }}">{{ t('back') }}</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

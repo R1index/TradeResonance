@@ -1,0 +1,52 @@
+
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>{{ t('add_entry') }}</h2>
+  <form method="post" id="entryForm" class="row">
+    <input type="hidden" name="_action" value="submit_request">
+    <input type="hidden" name="next" value="{{ next_url }}">
+    <input type="hidden" name="lang" value="{{ lang }}">
+
+    <div class="col-6">
+      <label class="label">{{ t('city') }}</label>
+      <input name="city" class="input" list="citiesList" id="cityInput" autocomplete="off" required>
+      <datalist id="citiesList">
+        {% for c in cities_list %}<option value="{{ c }}">{% endfor %}
+      </datalist>
+    </div>
+
+    <div class="col-6">
+      <label class="label">{{ t('product') }}</label>
+      <input name="product" class="input" list="productsList" id="productInput" autocomplete="off" required>
+      <datalist id="productsList">
+        {% for p in products_list %}<option value="{{ p }}">{% endfor %}
+      </datalist>
+    </div>
+
+    <div class="col-6">
+      <label class="label">{{ t('price') }}</label>
+      <input name="price" type="number" step="0.01" min="0" class="input">
+    </div>
+
+    <div class="col-6">
+      <label class="label">{{ t('percent') }}</label>
+      <input name="percent" type="number" step="0.01" class="input">
+    </div>
+
+    <div class="col-6">
+      <label class="label">{{ t('trend') }}</label>
+      <select name="trend" class="input" id="trendInput">
+        <option value="up">{{ t('trend_up') }}</option>
+        <option value="down">{{ t('trend_down') }}</option>
+        <option value="flat">{{ t('trend_flat') }}</option>
+      </select>
+    </div>
+
+    <div class="col-12 actions">
+      <button type="submit">{{ t('submit') }}</button>
+      <a class="secondary" href="{{ next_url }}">{{ t('back') }}</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

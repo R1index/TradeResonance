@@ -1,0 +1,33 @@
+
+<!doctype html>
+<html lang="{{ 'ru' if lang=='ru' else 'en' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ t('title') }}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <style>
+    .container { max-width: 1100px; margin: 0 auto; padding: 1rem; }
+    .card { border: 1px solid #e5e7eb; border-radius: 14px; padding: 1rem; }
+    .row { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; }
+    .col-6 { grid-column: span 6; }
+    .col-12 { grid-column: span 12; }
+    .actions { display:flex; gap:8px; align-items:center; justify-content:flex-end; }
+    .input { width: 100%; }
+    .label { font-weight: 600; margin-bottom: 6px; display:block; }
+  </style>
+</head>
+<body>
+  <main class="container">
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <article>
+          {% for m in messages %}<p>{{ m }}</p>{% endfor %}
+        </article>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+  <script src="{{ url_for('static', filename='main.js') }}"></script>
+</body>
+</html>
