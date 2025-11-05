@@ -157,25 +157,39 @@
                        title="{{ 'Auto-calculated from %' if lang=='en' else 'Автоподсчет от %' }}">
               </div>
 
-              <div>
+              <!-- ТРЕНД: кнопки UP/DOWN + нативный select (для сабмита/доступности) -->
+              <div class="flex flex-col gap-2">
                 <label class="label">{{ t('trend') }}</label>
-                <select class="select w-32" name="trend">
+                <div class="flex items-center gap-2">
+                  <button type="button" class="btn btn-trend btn-up" data-trend="up" aria-pressed="false">
+                    ▲ {{ t('up') }}
+                  </button>
+                  <button type="button" class="btn btn-trend btn-down" data-trend="down" aria-pressed="false">
+                    ▼ {{ t('down') }}
+                  </button>
+                </div>
+                <select class="select w-32 sr-only" name="trend" aria-hidden="true" tabindex="-1">
                   <option value="up"   {% if e.trend=='up' %}selected{% endif %}>{{ t('up') }}</option>
                   <option value="down" {% if e.trend=='down' %}selected{% endif %}>{{ t('down') }}</option>
                 </select>
               </div>
 
-              <!-- ПРОЦЕНТ: число + ползунок (0..200), синхронизированы -->
+              <!-- ПРОЦЕНТ: число + кнопки - / + + ползунок -->
               <div class="md:col-span-2">
                 <label class="label">{{ t('percent') }} %</label>
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-3 flex-wrap">
+                  <button type="button" class="btn btn-icon" data-delta="-1" aria-label="Minus 1%">−</button>
                   <input class="input w-24" type="number" step="1" min="0" max="200"
                          name="percent" id="percent-{{ e.id }}" value="{{ '%.0f' % e.percent }}">
                   <input type="range" class="w-56" min="0" max="200" step="1"
                          value="{{ '%.0f' % e.percent }}" aria-label="Percent slider"
                          data-bind-to="percent-{{ e.id }}">
+                  <button type="button" class="btn btn-icon" data-delta="1" aria-label="Plus 1%">+</button>
                   <span class="text-xs text-[var(--muted)]" data-percent-label="{{ e.id }}">
                     {{ '%.0f' % e.percent }}%
+                  </span>
+                  <span class="text-[11px] text-[var(--muted)]">
+                    {{ 'Shift = step 5' if lang=='en' else 'Shift = шаг 5' }}
                   </span>
                 </div>
               </div>
@@ -265,8 +279,28 @@
   outline: 2px solid #3b82f6;
   outline-offset: -2px;
 }
-/* необязательный штрих для ползунка */
+
+/* Ползунок — позволяет наследовать основной цвет темы */
 input[type="range"] { accent-color: var(--primary, #3b82f6); }
+
+/* Кнопки + / - около слайдера */
+.btn-icon {
+  padding: 0.25rem 0.5rem;
+  min-width: 2rem;
+  text-align: center;
+}
+
+/* Кнопки тренда */
+.btn-trend { padding: 0.4rem 0.75rem; border-radius: 0.5rem; border: 1px solid transparent; }
+.btn-up   { background: #16a34a; color:#fff; }
+.btn-down { background: #dc2626; color:#fff; }
+.btn-trend:is(:hover,:focus) { filter: brightness(0.95); }
+.btn-trend.is-active { box-shadow: 0 0 0 2px rgba(255,255,255,0.6) inset; border-color: rgba(255,255,255,0.7); }
+
+/* Скрывающий класс для нативного select тренда, но оставляем в DOM */
+.sr-only {
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;
+}
 </style>
 
 <script>
@@ -330,6 +364,9 @@ input[type="range"] { accent-color: var(--primary, #3b82f6); }
     if (willOpen){
       const firstInput = row.querySelector('input[name="percent"], input[name="price"]');
       if (firstInput) firstInput.focus();
+      // при открытии — актуализируем состояние тренд-кнопок
+      const form = row.querySelector('form.quick-form');
+      if (form) syncTrendButtons(form);
     }
   }
 
@@ -391,13 +428,52 @@ input[type="range"] { accent-color: var(--primary, #3b82f6); }
     if (!slider) return;
     const form = slider.closest('form.quick-form');
     if (!form) return;
-    const targetId = slider.dataset.bindTo;
-    const num = form.querySelector(`#${CSS.escape(targetId)}`);
     const perc = clampPercent(Number(slider.value));
-    if (num) num.value = perc;
     applyPercent(form, perc, 'slider');
   });
-  // === /Пересчёт и синхронизация ===
+
+  // кнопки +/- возле ползунка (Shift = шаг 5)
+  table.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-delta]');
+    if (!btn) return;
+    const form = btn.closest('form.quick-form');
+    if (!form) return;
+    const percentInput = form.querySelector('input[name="percent"]');
+    let curr = Number(percentInput?.value || 0);
+    let delta = Number(btn.dataset.delta || 0);
+    if (e.shiftKey) delta *= 5;
+    const next = clampPercent(curr + delta);
+    applyPercent(form, next, 'button');
+  });
+
+  // === Тренд-кнопки (зелёная UP / красная DOWN) ===
+  function syncTrendButtons(form){
+    const select = form.querySelector('select[name="trend"]');
+    const upBtn = form.querySelector('.btn-trend.btn-up');
+    const downBtn = form.querySelector('.btn-trend.btn-down');
+    if (!select || !upBtn || !downBtn) return;
+
+    const val = (select.value || '').toLowerCase();
+    const isUp = val === 'up';
+
+    upBtn.classList.toggle('is-active', isUp);
+    downBtn.classList.toggle('is-active', !isUp);
+    upBtn.setAttribute('aria-pressed', String(isUp));
+    downBtn.setAttribute('aria-pressed', String(!isUp));
+  }
+
+  table.addEventListener('click', (e) => {
+    const tbtn = e.target.closest('button[data-trend]');
+    if (!tbtn) return;
+    const form = tbtn.closest('form.quick-form');
+    if (!form) return;
+    const select = form.querySelector('select[name="trend"]');
+    if (!select) return;
+
+    select.value = tbtn.dataset.trend === 'down' ? 'down' : 'up';
+    syncTrendButtons(form);
+  });
+  // === /Тренд-кнопки ===
 
   // AJAX-сохранение
   table.addEventListener('submit', async (e) => {
