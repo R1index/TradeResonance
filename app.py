@@ -263,6 +263,18 @@ def parse_bool(val: Optional[str]) -> bool:
     if val is None: 
         return False
     return str(val).lower() in {"1","true","on","yes","y","да"}
+    
+def _redirect_to_edit(entry_id: int, lang: str, *, next_url=None, price=None, percent=None, trend=None):
+    params = {"entry_id": entry_id, "lang": lang}
+    if next_url:
+        params["next"] = next_url
+    if price not in (None, ""):
+        params["price"] = price
+    if percent not in (None, ""):
+        params["percent"] = percent
+    if trend not in (None, ""):
+        params["trend"] = trend
+    return redirect(url_for("edit_entry", **params))    
 
 @app.context_processor
 def inject_base():
@@ -500,7 +512,39 @@ def new_entry():
     products_list = cached_list("products", lambda: [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()])
 
     if request.method == "POST":
-        action = request.form.get("_action")
+        action = (request.form.get("_action") or "").strip()
+
+        # --- Админские действия из списка заявок ---
+        if action in {"approve", "reject"}:
+            admin_pass = request.form.get("admin_pass", "")
+            if not admin_pass:
+                flash(t("required_password"))
+                return redirect(url_for("new_entry", lang=lang))
+            if admin_pass != ADMIN_PASSWORD:
+                flash(t("wrong_password"))
+                return redirect(url_for("new_entry", lang=lang))
+
+            pid = request.form.get("pending_id", type=int)
+            if not pid:
+                flash(t("no_data"))
+                return redirect(url_for("new_entry", lang=lang))
+
+            p = PendingEntry.query.get(pid)
+            if not p:
+                flash(t("no_data"))
+                return redirect(url_for("new_entry", lang=lang))
+
+            if action == "approve":
+                approve_pending(p)
+                flash(t("approved"))
+            else:
+                db.session.delete(p)
+                db.session.commit()
+                flash(t("rejected"))
+
+            return redirect(url_for("new_entry", lang=lang))
+
+        # --- Создание / поиск существующей записи ---
         city = (request.form.get("city") or "").strip()
         product = (request.form.get("product") or "").strip()
         try:
@@ -517,40 +561,38 @@ def new_entry():
         if not city or not product:
             flash(t("no_data"))
         else:
-            from sqlalchemy import func
             existing_entry = Entry.query.filter(
                 func.lower(Entry.city) == func.lower(city),
                 func.lower(Entry.product) == func.lower(product)
             ).first()
 
-            # Кнопка "find_existing" — всегда пытаемся перейти в редактирование, если нашли
-            if action == "find_existing" and existing_entry:
-                flash(t("edit_existing"))
-                return redirect(url_for(
-                    "edit_entry",
-                    entry_id=existing_entry.id,
-                    lang=lang,
-                    # важно: параметр должен называться 'next'
-                    next=safe_next(request.args.get("next")),
-                    # протащим значения из формы
-                    price=price if price else None,
-                    percent=percent_v if percent_v else None,
-                    trend=trend_v if trend_v else None
-                ))
+            next_url = safe_next(request.args.get("next"))
+
+            # Кнопка "find_existing" — при наличии записи идём на редактирование
+            if action == "find_existing":
+                if existing_entry:
+                    flash(t("edit_existing"))
+                    return _redirect_to_edit(
+                        existing_entry.id, lang,
+                        next_url=next_url,
+                        price=price or None,
+                        percent=percent_v or None,
+                        trend=trend_v or None
+                    )
+                else:
+                    flash(t("no_data"))
 
             # Обычная подача заявки
             if action == "submit_request":
                 if existing_entry:
                     flash(t("edit_existing"))
-                    return redirect(url_for(
-                        "edit_entry",
-                        entry_id=existing_entry.id,
-                        lang=lang,
-                        next=safe_next(request.args.get("next")),
-                        price=price if price else None,
-                        percent=percent_v if percent_v else None,
-                        trend=trend_v if trend_v else None
-                    ))
+                    return _redirect_to_edit(
+                        existing_entry.id, lang,
+                        next_url=next_url,
+                        price=price or None,
+                        percent=percent_v or None,
+                        trend=trend_v or None
+                    )
 
                 if price <= 0:
                     flash(t("no_data"))
@@ -568,6 +610,7 @@ def new_entry():
     return render_template("entry_form.html", e=None, title=t("new_entry"),
                            cities_list=cities_list, products_list=products_list,
                            pending=pending, next_url=request.args.get('next'))
+
 
 @app.route("/entries/<int:entry_id>/edit", methods=["GET", "POST"])
 def edit_entry(entry_id):
@@ -590,11 +633,11 @@ def edit_entry(entry_id):
         next_url = request.form.get("next") or url_for("index", lang=lang)
         return redirect(next_url)
 
-    # значения, пришедшие из /entries/new
+    # значения, пришедшие из /entries/new (для автоподстановки)
     overrides = {
-        "price": request.args.get("price"),
-        "percent": request.args.get("percent"),
-        "trend": request.args.get("trend"),
+        "price": request.args.get("price") if request.args.get("price") is not None else None,
+        "percent": request.args.get("percent") if request.args.get("percent") is not None else None,
+        "trend": request.args.get("trend") if request.args.get("trend") is not None else None,
     }
 
     cities_list = cached_list("cities", lambda: [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()])
