@@ -161,7 +161,7 @@
     <h2 class="text-lg font-semibold mb-2">{{ t('pending_requests') }}</h2>
     {% if pending and pending|length %}
       <!-- Общее поле пароля для админских действий -->
-      <div class="mb-4 p-3 bg-gray-50 rounded">
+      <div class="mb-4 p-3 bg-gray-50 dark:bg-gray-800 dark:border dark:border-gray-700 rounded">
         <label class="label">{{ t('admin_password') }}</label>
         <div class="flex items-center gap-3">
           <input type="password" id="adminPassGlobal" class="input" placeholder="{{ t('admin_password') }}" autocomplete="off" style="width: 14rem;">
