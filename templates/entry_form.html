@@ -11,13 +11,15 @@
     <input type="hidden" name="_action" value="submit_request">
     {% endif %}
 
-    <!-- Город + Очистить -->
+    <!-- Город + Очистить (только в режиме создания) -->
     <div class="md:col-span-2">
       <div class="flex items-center justify-between">
         <label class="label">{{ t('city') }}</label>
+        {% if not e %}
         <button type="button" class="btn btn-outline px-2 py-1 text-xs" data-clear="#cityField">
           {{ 'Clear' if lang=='en' else 'Очистить' }}
         </button>
+        {% endif %}
       </div>
       {% if e %}
         <!-- В режиме редактирования город только для чтения -->
@@ -37,13 +39,15 @@
       {% endif %}
     </div>
 
-    <!-- Товар + Очистить -->
+    <!-- Товар + Очистить (только в режиме создания) -->
     <div class="md:col-span-2">
       <div class="flex items-center justify-between">
         <label class="label">{{ t('product') }}</label>
+        {% if not e %}
         <button type="button" class="btn btn-outline px-2 py-1 text-xs" data-clear="#productField">
           {{ 'Clear' if lang=='en' else 'Очистить' }}
         </button>
+        {% endif %}
       </div>
       {% if e %}
         <!-- В режиме редактирования товар только для чтения -->
