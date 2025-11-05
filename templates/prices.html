@@ -144,7 +144,9 @@
           <td colspan="10" class="py-3">
             <form class="flex flex-wrap items-end gap-3 quick-form"
                   method="post"
-                  action="{{ url_for('edit_entry', entry_id=e.id, lang=lang) }}">
+                  action="{{ url_for('edit_entry', entry_id=e.id, lang=lang) }}"
+                  data-price0="{{ '%.6f' % e.price }}"
+                  data-percent0="{{ '%.6f' % e.percent }}">
               <input type="hidden" name="next" value="{{ request.full_path }}">
               <div>
                 <label class="label">{{ t('price') }}</label>
@@ -159,7 +161,7 @@
               </div>
               <div>
                 <label class="label">{{ t('percent') }} %</label>
-                <input class="input w-28" type="number" step="1" name="percent" value="{{ '%.0f' % e.percent }}">
+                <input class="input w-28" type="number" step="1" min="0" max="200" name="percent" value="{{ '%.0f' % e.percent }}">
               </div>
 
               <div class="flex gap-2">
@@ -181,7 +183,6 @@
   <!-- ПАГИНАЦИЯ: окно до 20 страниц -->
   {% if pagination.pages > 1 %}
   <nav class="mt-4 flex flex-wrap items-center justify-center gap-2" aria-label="Pagination">
-    <!-- First -->
     {% if pagination.page > 1 %}
       <a class="btn btn-outline px-3" href="{{ url_for('index', tab='prices', lang=lang,
             city=q_city, product=q_product, trend=q_trend,
@@ -192,7 +193,6 @@
       <span class="btn btn-disabled px-3">&laquo; First</span>
     {% endif %}
 
-    <!-- Prev -->
     {% if pagination.has_prev %}
       <a class="btn btn-outline px-3" href="{{ url_for('index', tab='prices', lang=lang,
             city=q_city, product=q_product, trend=q_trend,
@@ -203,7 +203,6 @@
       <span class="btn btn-disabled px-3">&lsaquo; Prev</span>
     {% endif %}
 
-    <!-- Номера страниц (окно до 20) -->
     {% for p in page_numbers %}
       {% if p == pagination.page %}
         <span class="btn btn-primary px-3">{{ p }}</span>
@@ -216,7 +215,6 @@
       {% endif %}
     {% endfor %}
 
-    <!-- Next -->
     {% if pagination.has_next %}
       <a class="btn btn-outline px-3" href="{{ url_for('index', tab='prices', lang=lang,
             city=q_city, product=q_product, trend=q_trend,
@@ -227,7 +225,6 @@
       <span class="btn btn-disabled px-3">Next &rsaquo;</span>
     {% endif %}
 
-    <!-- Last -->
     {% if pagination.page < pagination.pages %}
       <a class="btn btn-outline px-3" href="{{ url_for('index', tab='prices', lang=lang,
             city=q_city, product=q_product, trend=q_trend,
@@ -260,7 +257,6 @@
   const filtersForm = document.getElementById('filtersForm');
   if (filtersForm) {
     filtersForm.addEventListener('submit', () => {
-      // удаляем page из query при сабмите, чтобы начать с 1
       const pageInput = document.createElement('input');
       pageInput.type = 'hidden';
       pageInput.name = 'page';
@@ -318,6 +314,40 @@
       if (firstInput) firstInput.focus();
     }
   }
+
+  // === Пересчёт цены при изменении процента (0..200) ===
+  function calcBaseFromForm(form){
+    const p0 = Number(form.dataset.price0 || form.price?.defaultValue || form.price?.value || 0);
+    const perc0Raw = Number(form.dataset.percent0 || form.percent?.defaultValue || form.percent?.value || 100);
+    const perc0 = (isFinite(perc0Raw) && perc0Raw > 0) ? perc0Raw : 100; // если 0/NaN -> считаем как 100%
+    return p0 / (perc0/100);
+  }
+
+  function clampPercent(v){
+    if (!isFinite(v)) return 0;
+    if (v < 0) return 0;
+    if (v > 200) return 200;
+    return Math.round(v);
+  }
+
+  table.addEventListener('input', (e) => {
+    const percentInput = e.target.closest('input[name="percent"]');
+    if (!percentInput) return;
+    const form = percentInput.closest('form.quick-form');
+    if (!form) return;
+
+    let perc = clampPercent(Number(percentInput.value));
+    percentInput.value = perc;
+
+    const base = calcBaseFromForm(form);
+    const newPrice = Math.round(base * (perc/100));
+
+    const priceInput = form.querySelector('input[name="price"]');
+    if (priceInput && isFinite(newPrice)) {
+      priceInput.value = newPrice;
+    }
+  });
+  // === /Пересчёт цены при изменении процента ===
 
   // AJAX-сохранение
   table.addEventListener('submit', async (e) => {
