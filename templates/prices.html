@@ -16,7 +16,7 @@
   </div>
 
   <!-- ФИЛЬТРЫ -->
-  <form class="grid grid-cols-1 md:grid-cols-6 gap-3 mb-3" method="get">
+  <form class="grid grid-cols-1 md:grid-cols-6 gap-3 mb-3" method="get" id="filtersForm">
     <input type="hidden" name="tab" value="prices">
 
     <div>
@@ -77,6 +77,12 @@
         <option value="percent_desc" {% if q_sort=='percent_desc' %}selected{% endif %}>Percent ↓</option>
         <option value="percent_asc"  {% if q_sort=='percent_asc'  %}selected{% endif %}>Percent ↑</option>
       </select>
+    </div>
+
+    <!-- опционально: выбор размера страницы -->
+    <div>
+      <label class="label">Per page</label>
+      <input class="input" type="number" min="1" max="500" name="per_page" value="{{ per_page }}">
     </div>
 
     <div class="md:col-span-6 flex gap-2">
@@ -171,6 +177,68 @@
       </tbody>
     </table>
   </div>
+
+  <!-- ПАГИНАЦИЯ: окно до 20 страниц -->
+  {% if pagination.pages > 1 %}
+  <nav class="mt-4 flex flex-wrap items-center justify-center gap-2" aria-label="Pagination">
+    <!-- First -->
+    {% if pagination.page > 1 %}
+      <a class="btn btn-outline px-3" href="{{ url_for('index', tab='prices', lang=lang,
+            city=q_city, product=q_product, trend=q_trend,
+            price_min=q_price_min, price_max=q_price_max,
+            percent_min=q_percent_min, percent_max=q_percent_max,
+            prod=q_prod, sort=q_sort, per_page=per_page, page=1) }}">&laquo; First</a>
+    {% else %}
+      <span class="btn btn-disabled px-3">&laquo; First</span>
+    {% endif %}
+
+    <!-- Prev -->
+    {% if pagination.has_prev %}
+      <a class="btn btn-outline px-3" href="{{ url_for('index', tab='prices', lang=lang,
+            city=q_city, product=q_product, trend=q_trend,
+            price_min=q_price_min, price_max=q_price_max,
+            percent_min=q_percent_min, percent_max=q_percent_max,
+            prod=q_prod, sort=q_sort, per_page=per_page, page=pagination.prev_num) }}">&lsaquo; Prev</a>
+    {% else %}
+      <span class="btn btn-disabled px-3">&lsaquo; Prev</span>
+    {% endif %}
+
+    <!-- Номера страниц (окно до 20) -->
+    {% for p in page_numbers %}
+      {% if p == pagination.page %}
+        <span class="btn btn-primary px-3">{{ p }}</span>
+      {% else %}
+        <a class="btn btn-outline px-3" href="{{ url_for('index', tab='prices', lang=lang,
+              city=q_city, product=q_product, trend=q_trend,
+              price_min=q_price_min, price_max=q_price_max,
+              percent_min=q_percent_min, percent_max=q_percent_max,
+              prod=q_prod, sort=q_sort, per_page=per_page, page=p) }}">{{ p }}</a>
+      {% endif %}
+    {% endfor %}
+
+    <!-- Next -->
+    {% if pagination.has_next %}
+      <a class="btn btn-outline px-3" href="{{ url_for('index', tab='prices', lang=lang,
+            city=q_city, product=q_product, trend=q_trend,
+            price_min=q_price_min, price_max=q_price_max,
+            percent_min=q_percent_min, percent_max=q_percent_max,
+            prod=q_prod, sort=q_sort, per_page=per_page, page=pagination.next_num) }}">Next &rsaquo;</a>
+    {% else %}
+      <span class="btn btn-disabled px-3">Next &rsaquo;</span>
+    {% endif %}
+
+    <!-- Last -->
+    {% if pagination.page < pagination.pages %}
+      <a class="btn btn-outline px-3" href="{{ url_for('index', tab='prices', lang=lang,
+            city=q_city, product=q_product, trend=q_trend,
+            price_min=q_price_min, price_max=q_price_max,
+            percent_min=q_percent_min, percent_max=q_percent_max,
+            prod=q_prod, sort=q_sort, per_page=per_page, page=pagination.pages) }}">Last &raquo;</a>
+    {% else %}
+      <span class="btn btn-disabled px-3">Last &raquo;</span>
+    {% endif %}
+  </nav>
+  {% endif %}
   {% endif %}
 </section>
 
@@ -179,11 +247,7 @@
   cursor: pointer;
   transition: background-color 0.2s ease;
 }
-
-.clickable-row:hover {
-  background-color: rgba(59, 130, 246, 0.05);
-}
-
+.clickable-row:hover { background-color: rgba(59, 130, 246, 0.05); }
 .clickable-row:focus {
   outline: 2px solid #3b82f6;
   outline-offset: -2px;
@@ -192,6 +256,19 @@
 
 <script>
 (function(){
+  // Сброс страницы на 1 при применении фильтров
+  const filtersForm = document.getElementById('filtersForm');
+  if (filtersForm) {
+    filtersForm.addEventListener('submit', () => {
+      // удаляем page из query при сабмите, чтобы начать с 1
+      const pageInput = document.createElement('input');
+      pageInput.type = 'hidden';
+      pageInput.name = 'page';
+      pageInput.value = '1';
+      filtersForm.appendChild(pageInput);
+    });
+  }
+
   const table = document.getElementById('pricesTable');
   if (!table) return;
 
@@ -201,12 +278,7 @@
   table.addEventListener('click', (e) => {
     const row = e.target.closest('.clickable-row');
     if (!row) return;
-    
-    // Игнорируем клики по кнопкам внутри строки
-    if (e.target.closest('a') || e.target.closest('button')) {
-      return;
-    }
-    
+    if (e.target.closest('a') || e.target.closest('button')) return;
     toggleEditor(row.getAttribute('data-quick-edit'));
   });
 
