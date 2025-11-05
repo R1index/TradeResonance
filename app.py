@@ -512,9 +512,13 @@ def new_entry():
     products_list = cached_list("products", lambda: [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()])
 
     if request.method == "POST":
-        action = (request.form.get("_action") or "").strip()
+        # 1) Дефолтное действие — submit_request (если отправили Enter-ом без нажатия кнопки)
+        action = (request.form.get("_action") or "submit_request").strip()
 
-        # --- Админские действия из списка заявок ---
+        # 2) При POST берем next из form, а не из args
+        next_url = safe_next(request.form.get("next")) or safe_next(request.args.get("next"))
+
+        # --- Админские действия approve/reject ---
         if action in {"approve", "reject"}:
             admin_pass = request.form.get("admin_pass", "")
             if not admin_pass:
@@ -561,39 +565,40 @@ def new_entry():
         if not city or not product:
             flash(t("no_data"))
         else:
+            from sqlalchemy import func
             existing_entry = Entry.query.filter(
                 func.lower(Entry.city) == func.lower(city),
                 func.lower(Entry.product) == func.lower(product)
             ).first()
 
-            next_url = safe_next(request.args.get("next"))
+            # find_existing → редиректим в edit, если нашли
+            if action == "find_existing" and existing_entry:
+                flash(t("edit_existing"))
+                return redirect(url_for(
+                    "edit_entry",
+                    entry_id=existing_entry.id,
+                    lang=lang,
+                    next=next_url,
+                    price=price or None,
+                    percent=percent_v or None,
+                    trend=trend_v or None
+                ))
 
-            # Кнопка "find_existing" — при наличии записи идём на редактирование
-            if action == "find_existing":
-                if existing_entry:
-                    flash(t("edit_existing"))
-                    return _redirect_to_edit(
-                        existing_entry.id, lang,
-                        next_url=next_url,
-                        price=price or None,
-                        percent=percent_v or None,
-                        trend=trend_v or None
-                    )
-                else:
-                    flash(t("no_data"))
+            # submit_request → если запись есть, тоже редиректим в edit
+            if action == "submit_request" and existing_entry:
+                flash(t("edit_existing"))
+                return redirect(url_for(
+                    "edit_entry",
+                    entry_id=existing_entry.id,
+                    lang=lang,
+                    next=next_url,
+                    price=price or None,
+                    percent=percent_v or None,
+                    trend=trend_v or None
+                ))
 
-            # Обычная подача заявки
+            # submit_request → записи нет → создаём pending
             if action == "submit_request":
-                if existing_entry:
-                    flash(t("edit_existing"))
-                    return _redirect_to_edit(
-                        existing_entry.id, lang,
-                        next_url=next_url,
-                        price=price or None,
-                        percent=percent_v or None,
-                        trend=trend_v or None
-                    )
-
                 if price <= 0:
                     flash(t("no_data"))
                 else:
@@ -610,7 +615,6 @@ def new_entry():
     return render_template("entry_form.html", e=None, title=t("new_entry"),
                            cities_list=cities_list, products_list=products_list,
                            pending=pending, next_url=request.args.get('next'))
-
 
 @app.route("/entries/<int:entry_id>/edit", methods=["GET", "POST"])
 def edit_entry(entry_id):
