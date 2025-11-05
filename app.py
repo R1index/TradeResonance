@@ -312,8 +312,10 @@ def index():
     lang = get_lang()
     tab = request.args.get("tab", "prices")
 
+    # =========================
+    # 1️⃣ ВКЛАДКА PRICES
+    # =========================
     if tab == "prices":
-        # --- фильтры
         q_city    = (request.args.get("city") or "").strip()
         q_product = (request.args.get("product") or "").strip()
         q_trend   = (request.args.get("trend") or "").strip()
@@ -324,7 +326,6 @@ def index():
         q_prod = (request.args.get("prod") or "any").strip().lower()
         q_sort = (request.args.get("sort") or "updated_desc").strip().lower()
 
-        # --- пагинация
         page = request.args.get("page", 1, type=int)
         per_page = max(1, min(500, request.args.get("per_page", 15, type=int)))
 
@@ -361,7 +362,6 @@ def index():
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
         entries = pagination.items
 
-        # окно номеров страниц максимум 20
         window = 20
         start = max(1, pagination.page - (window // 2))
         end = min(pagination.pages, start + window - 1)
@@ -392,6 +392,9 @@ def index():
             lang=lang,
         )
 
+    # =========================
+    # 2️⃣ ВКЛАДКА CITIES
+    # =========================
     elif tab == "cities":
         pf = (request.args.get("pf") or "any").strip().lower()
         if pf not in ("any", "only_prod", "only_nonprod"):
@@ -406,7 +409,7 @@ def index():
 
         rows = q.order_by(L.c.city.asc(), L.c.product.asc()).all()
 
-        by_city: Dict[str, List[sa.engine.Row]] = {}
+        by_city = {}
         for r in rows:
             by_city.setdefault(r.city, []).append(r)
         city_list = [{"city": c, "entries": by_city[c]} for c in sorted(by_city.keys(), key=str.lower)]
@@ -429,26 +432,24 @@ def index():
             lang=lang,
         )
 
+    # =========================
+    # 3️⃣ ВКЛАДКА ROUTES
+    # =========================
     elif tab == "routes":
-        # -------- ГРУППОВЫЕ МАРШРУТЫ (A -> B) ПО ПОСЛЕДНИМ ЗАПИСЯМ --------
         q_product = (request.args.get("product") or "").strip()
-        k         = max(1, min(10, request.args.get("k", type=int) or 5))      # топ-K товаров в карточке
+        k = max(1, min(10, request.args.get("k", type=int) or 5))
         min_items = max(1, min(10, request.args.get("min_items", type=int) or 1))
         max_items = max(min_items, min(10, request.args.get("max_items", type=int) or 10))
-        sort_by   = (request.args.get("sort") or "sum_profit_desc").strip().lower()
-        page      = request.args.get("page", 1, type=int) or 1
-        per_page  = max(1, min(100, request.args.get("per_page", 12, type=int) or 12))
+        sort_by = (request.args.get("sort") or "sum_profit_desc").strip().lower()
+        page = request.args.get("page", 1, type=int)
+        per_page = max(1, min(100, request.args.get("per_page", 12, type=int)))
 
-        # берём ИМЕННО последние строки
         L = latest_entries_subq()
-
-        # datalist из L (чтобы совпадало с тем, что реально участвует в расчёте)
         products_list = cached_list(
             "products_latest",
             lambda: [p for (p,) in db.session.query(L.c.product).distinct().order_by(L.c.product.asc()).all()]
         )
 
-        # подтягиваем последние строки (с фильтром по продукту при необходимости)
         q = db.session.query(
             L.c.id, L.c.city, L.c.product, L.c.price, L.c.percent, L.c.trend,
             L.c.updated_at, L.c.created_at, L.c.is_production_city
@@ -462,61 +463,45 @@ def index():
                 "routes.html",
                 groups=[], products_list=products_list,
                 q_product=q_product, k=k, min_items=min_items, max_items=max_items, sort_by=sort_by,
-                pagination=None, page_numbers=[], lang=lang, per_page=per_page,
+                pagination=None, page_numbers=[], lang=lang,
             )
 
-        # Индексация последних строк:
         from collections import defaultdict
-        buy_map  = defaultdict(dict)  # только production города: buy_map[city][product] -> row
-        sell_map = defaultdict(dict)  # любые города:           sell_map[city][product] -> row
-        cities_with_buy  = set()
-        cities_with_sell = set()
-
+        buy_map, sell_map, cities, products = defaultdict(dict), defaultdict(dict), set(), set()
         for r in rows:
-            prod = r.product
+            cities.add(r.city)
+            products.add(r.product)
             if r.is_production_city:
-                buy_map[r.city][prod] = r
-                cities_with_buy.add(r.city)
-            sell_map[r.city][prod] = r
-            cities_with_sell.add(r.city)
+                buy_map[r.city].setdefault(r.product, r)
+            sell_map[r.city].setdefault(r.product, r)
 
-        # helper: ISO UTC (UTC assumed) с суффиксом Z
         def to_iso_utc(dt):
             return dt.strftime("%Y-%m-%dT%H:%M:%SZ") if dt else None
 
         groups = []
-        # перебираем только реальные города, где есть что покупать/продавать
-        for A in cities_with_buy:
-            buy_products = buy_map.get(A, {})
-            if not buy_products:
-                continue
-            for B in cities_with_sell:
+        for A in cities:
+            for B in cities:
                 if A == B:
                     continue
+                buy_products = buy_map.get(A, {})
                 sell_products = sell_map.get(B, {})
-                if not sell_products:
+                if not buy_products or not sell_products:
                     continue
 
-                # Считаем только пересечение товаров для пары A->B
-                common_products = set(buy_products.keys()) & set(sell_products.keys())
-                if not common_products:
-                    continue
-
-                items = []
-                last_upd = None
-                for p in common_products:
-                    ea = buy_products[p]    # покупка (production)
-                    eb = sell_products[p]   # продажа (любой город)
-
+                items, last_upd = [], None
+                for p in products:
+                    ea, eb = buy_products.get(p), sell_products.get(p)
+                    if not ea or not eb:
+                        continue
                     profit = float(eb.price) - float(ea.price)
                     if profit <= 0:
                         continue
-
                     margin_pct = profit * 100.0 / max(1.0, float(ea.price))
-                    upd = max((ea.updated_at or ea.created_at), (eb.updated_at or eb.created_at))
+                    upd_buy = ea.updated_at or ea.created_at
+                    upd_sell = eb.updated_at or eb.created_at
+                    upd = max(upd_buy, upd_sell)
                     if (last_upd is None) or (upd > last_upd):
                         last_upd = upd
-
                     items.append({
                         "product": p,
                         "buy_entry_id": int(ea.id),
@@ -532,20 +517,19 @@ def index():
                         "profit": profit,
                         "margin_pct": margin_pct,
                         "updated_utc_iso": to_iso_utc(upd),
+                        "buy_updated_iso": to_iso_utc(upd_buy),
+                        "sell_updated_iso": to_iso_utc(upd_sell),
                     })
 
                 if not items:
                     continue
-
-                # Топ-K по прибыли для карточки
                 items.sort(key=lambda x: (x["profit"], x["margin_pct"]), reverse=True)
                 items_top = items[:k]
-                count = len(items)  # число доступных товаров на маршруте (всего, не только топ-K)
-                if not (min_items <= count <= max_items):
-                    continue
-
+                count = len(items)
                 sum_profit = sum(x["profit"] for x in items_top)
                 avg_margin = sum(x["margin_pct"] for x in items_top) / max(1, len(items_top))
+                if not (min_items <= count <= max_items):
+                    continue
 
                 groups.append({
                     "pair_from": A,
@@ -557,15 +541,13 @@ def index():
                     "updated_utc_iso": to_iso_utc(last_upd),
                 })
 
-        # сортировка групп
         if sort_by == "avg_margin_desc":
             groups.sort(key=lambda g: (g["avg_margin"], g["sum_profit"]), reverse=True)
         elif sort_by == "count_desc":
             groups.sort(key=lambda g: (g["items_total"], g["sum_profit"]), reverse=True)
-        else:  # sum_profit_desc
+        else:
             groups.sort(key=lambda g: (g["sum_profit"], g["avg_margin"]), reverse=True)
 
-        # пагинация
         total = len(groups)
         start = (page - 1) * per_page
         end = start + per_page
@@ -573,9 +555,7 @@ def index():
 
         class SimplePagination:
             def __init__(self, page, per_page, total):
-                self.page = page
-                self.per_page = per_page
-                self.total = total
+                self.page, self.per_page, self.total = page, per_page, total
                 self.pages = max(1, (total + per_page - 1) // per_page)
             @property
             def has_prev(self): return self.page > 1
@@ -587,8 +567,6 @@ def index():
             def next_num(self): return min(self.pages, self.page + 1)
 
         pagination = SimplePagination(page, per_page, total)
-
-        # окно страниц (до 20)
         window = 20
         start_p = max(1, page - window // 2)
         end_p = min(pagination.pages, start_p + window - 1)
@@ -601,12 +579,13 @@ def index():
             products_list=products_list,
             q_product=q_product,
             k=k, min_items=min_items, max_items=max_items, sort_by=sort_by,
-            pagination=pagination,
-            page_numbers=page_numbers,
-            lang=lang,
-            per_page=per_page,
+            pagination=pagination, page_numbers=page_numbers,
+            lang=lang, per_page=per_page,
         )
 
+    # =========================
+    # 4️⃣ Редирект по умолчанию
+    # =========================
     return redirect(url_for("index", tab="prices", lang=lang))
 
 @app.route("/entries/new", methods=["GET", "POST"])
