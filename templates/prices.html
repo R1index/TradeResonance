@@ -148,10 +148,15 @@
                   data-price0="{{ '%.6f' % e.price }}"
                   data-percent0="{{ '%.6f' % e.percent }}">
               <input type="hidden" name="next" value="{{ request.full_path }}">
+
+              <!-- ЦЕНА: только просмотр (readonly), но уходит в POST -->
               <div>
                 <label class="label">{{ t('price') }}</label>
-                <input class="input w-32" type="number" step="1" name="price" value="{{ '%.0f' % e.price }}">
+                <input class="input w-32" type="number" step="1" name="price"
+                       value="{{ '%.0f' % e.price }}" readonly aria-readonly="true"
+                       title="{{ 'Auto-calculated from %' if lang=='en' else 'Автоподсчет от %' }}">
               </div>
+
               <div>
                 <label class="label">{{ t('trend') }}</label>
                 <select class="select w-32" name="trend">
@@ -159,9 +164,20 @@
                   <option value="down" {% if e.trend=='down' %}selected{% endif %}>{{ t('down') }}</option>
                 </select>
               </div>
-              <div>
+
+              <!-- ПРОЦЕНТ: число + ползунок (0..200), синхронизированы -->
+              <div class="md:col-span-2">
                 <label class="label">{{ t('percent') }} %</label>
-                <input class="input w-28" type="number" step="1" min="0" max="200" name="percent" value="{{ '%.0f' % e.percent }}">
+                <div class="flex items-center gap-3">
+                  <input class="input w-24" type="number" step="1" min="0" max="200"
+                         name="percent" id="percent-{{ e.id }}" value="{{ '%.0f' % e.percent }}">
+                  <input type="range" class="w-56" min="0" max="200" step="1"
+                         value="{{ '%.0f' % e.percent }}" aria-label="Percent slider"
+                         data-bind-to="percent-{{ e.id }}">
+                  <span class="text-xs text-[var(--muted)]" data-percent-label="{{ e.id }}">
+                    {{ '%.0f' % e.percent }}%
+                  </span>
+                </div>
               </div>
 
               <div class="flex gap-2">
@@ -249,6 +265,8 @@
   outline: 2px solid #3b82f6;
   outline-offset: -2px;
 }
+/* необязательный штрих для ползунка */
+input[type="range"] { accent-color: var(--primary, #3b82f6); }
 </style>
 
 <script>
@@ -310,16 +328,16 @@
     openedId = willOpen ? id : null;
 
     if (willOpen){
-      const firstInput = row.querySelector('input[name="price"]');
+      const firstInput = row.querySelector('input[name="percent"], input[name="price"]');
       if (firstInput) firstInput.focus();
     }
   }
 
-  // === Пересчёт цены при изменении процента (0..200) ===
+  // === Пересчёт цены при изменении процента (0..200) + синхронизация слайдера ===
   function calcBaseFromForm(form){
     const p0 = Number(form.dataset.price0 || form.price?.defaultValue || form.price?.value || 0);
     const perc0Raw = Number(form.dataset.percent0 || form.percent?.defaultValue || form.percent?.value || 100);
-    const perc0 = (isFinite(perc0Raw) && perc0Raw > 0) ? perc0Raw : 100; // если 0/NaN -> считаем как 100%
+    const perc0 = (isFinite(perc0Raw) && perc0Raw > 0) ? perc0Raw : 100; // если 0/NaN -> 100%
     return p0 / (perc0/100);
   }
 
@@ -330,24 +348,56 @@
     return Math.round(v);
   }
 
-  table.addEventListener('input', (e) => {
-    const percentInput = e.target.closest('input[name="percent"]');
-    if (!percentInput) return;
-    const form = percentInput.closest('form.quick-form');
-    if (!form) return;
+  function applyPercent(form, perc, source){
+    // число
+    const percentInput = form.querySelector('input[name="percent"]');
+    if (percentInput) percentInput.value = perc;
 
-    let perc = clampPercent(Number(percentInput.value));
-    percentInput.value = perc;
+    // слайдер
+    const slider = percentInput ? form.querySelector(`input[type="range"][data-bind-to="${percentInput.id}"]`) : null;
+    if (slider && source !== 'slider') slider.value = perc;
 
+    // подпись рядом
+    let key = null;
+    if (percentInput && percentInput.id) {
+      const parts = percentInput.id.split('percent-');
+      if (parts.length === 2) key = parts[1];
+    }
+    if (key){
+      const label = form.querySelector(`[data-percent-label="${CSS.escape(key)}"]`);
+      if (label) label.textContent = `${perc}%`;
+    }
+
+    // пересчёт цены (readonly)
     const base = calcBaseFromForm(form);
     const newPrice = Math.round(base * (perc/100));
-
     const priceInput = form.querySelector('input[name="price"]');
-    if (priceInput && isFinite(newPrice)) {
-      priceInput.value = newPrice;
-    }
+    if (priceInput && isFinite(newPrice)) priceInput.value = newPrice;
+  }
+
+  // ввод с клавиатуры в числовом поле процентов
+  table.addEventListener('input', (e) => {
+    const num = e.target.closest('input[name="percent"]');
+    if (!num) return;
+    const form = num.closest('form.quick-form');
+    if (!form) return;
+    const perc = clampPercent(Number(num.value));
+    applyPercent(form, perc, 'number');
   });
-  // === /Пересчёт цены при изменении процента ===
+
+  // движение ползунка
+  table.addEventListener('input', (e) => {
+    const slider = e.target.closest('input[type="range"][data-bind-to]');
+    if (!slider) return;
+    const form = slider.closest('form.quick-form');
+    if (!form) return;
+    const targetId = slider.dataset.bindTo;
+    const num = form.querySelector(`#${CSS.escape(targetId)}`);
+    const perc = clampPercent(Number(slider.value));
+    if (num) num.value = perc;
+    applyPercent(form, perc, 'slider');
+  });
+  // === /Пересчёт и синхронизация ===
 
   // AJAX-сохранение
   table.addEventListener('submit', async (e) => {
@@ -370,7 +420,7 @@
 
       const row = table.querySelector('tr[data-row="'+id+'"]');
       if (row){
-        row.querySelector('[data-col="price"]').textContent = Number(price).toFixed(0);
+        row.querySelector('[data-col="price"]').textContent   = Number(price).toFixed(0);
         row.querySelector('[data-col="percent"]').textContent = Number(percent).toFixed(0);
         const trendCell = row.querySelector('[data-col="trend"]');
         trendCell.innerHTML = trend === 'up'
