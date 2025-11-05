@@ -513,13 +513,18 @@ def new_entry():
             percent_v = 0.0
         is_prod = parse_bool(request.form.get("is_production_city"))
         
+        print(f"DEBUG: Received - city='{city}', product='{product}', price={price}")  # ДЛЯ ОТЛАДКИ
+        
         if not city or not product:
             flash(t("no_data"))
         else:
             # СНАЧАЛА ПРОВЕРЯЕМ СУЩЕСТВОВАНИЕ ЗАПИСИ (даже если price = 0)
             existing_entry = Entry.query.filter_by(city=city, product=product).first()
+            print(f"DEBUG: Existing entry found: {existing_entry}")  # ДЛЯ ОТЛАДКИ
+            
             if existing_entry:
                 # Если запись существует, перенаправляем на редактирование
+                print(f"DEBUG: Redirecting to edit entry {existing_entry.id}")  # ДЛЯ ОТЛАДКИ
                 flash(t("edit_existing"))
                 return redirect(url_for("edit_entry", entry_id=existing_entry.id, lang=lang))
             
