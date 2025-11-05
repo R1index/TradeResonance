@@ -4,7 +4,6 @@
   <div class="flex items-center justify-between mb-4">
     <h1 class="text-xl font-semibold">{{ t('nav_prices') }}</h1>
     <div class="flex gap-2">
-      <!-- можно удалить, если экспорт не нужен -->
       <a class="btn btn-outline"
          href="{{ url_for('export_csv') }}?city={{ q_city }}&product={{ q_product }}&trend={{ q_trend }}
          &price_min={{ q_price_min }}&price_max={{ q_price_max }}
@@ -41,7 +40,6 @@
       </select>
     </div>
 
-    <!-- Цена -->
     <div>
       <label class="label">{{ t('price') }} ≥</label>
       <input class="input" type="number" step="1" name="price_min" value="{{ q_price_min or '' }}">
@@ -51,7 +49,6 @@
       <input class="input" type="number" step="1" name="price_max" value="{{ q_price_max or '' }}">
     </div>
 
-    <!-- Процент -->
     <div>
       <label class="label">{{ t('percent') }}% ≥</label>
       <input class="input" type="number" step="1" name="percent_min" value="{{ q_percent_min or '' }}">
@@ -61,7 +58,6 @@
       <input class="input" type="number" step="1" name="percent_max" value="{{ q_percent_max or '' }}">
     </div>
 
-    <!-- Производственный город -->
     <div>
       <label class="label">{{ t('is_prod_city') }}</label>
       <select class="select" name="prod">
@@ -71,7 +67,6 @@
       </select>
     </div>
 
-    <!-- Сортировка -->
     <div>
       <label class="label">Sort</label>
       <select class="select" name="sort">
@@ -94,7 +89,7 @@
     <p class="text-zinc-500">{{ t('no_data') }}</p>
   {% else %}
   <div class="overflow-x-auto">
-    <table class="min-w-full table-card">
+    <table class="min-w-full table-card" id="pricesTable">
       <thead class="text-left text-sm text-zinc-600 dark:text-zinc-400">
         <tr>
           <th class="py-2">ID</th>
@@ -109,26 +104,69 @@
           <th class="py-2">{{ t('actions') }}</th>
         </tr>
       </thead>
+
       <tbody class="text-sm">
         {% for e in entries %}
-        <tr class="border-b border-zinc-200 dark:border-zinc-800">
-          <td data-th="ID" class="py-2">{{ e.id }}</td>
-          <td data-th="{{ t('city') }}" class="py-2">{{ e.city }}</td>
-          <td data-th="{{ t('product') }}" class="py-2">{{ e.product }}</td>
-          <td data-th="{{ t('price') }}" class="py-2">{{ '%.0f' % e.price }}</td>
-          <td data-th="{{ t('trend') }}" class="py-2">
+        <!-- основная строка -->
+        <tr class="border-b border-zinc-200 dark:border-zinc-800" data-row="{{ e.id }}">
+          <td class="py-2">{{ e.id }}</td>
+          <td class="py-2">{{ e.city }}</td>
+
+          <!-- по клику раскрываем редактор -->
+          <td class="py-2 text-[var(--brand)] cursor-pointer underline-offset-2 hover:underline"
+              data-quick-edit="{{ e.id }}">
+            {{ e.product }}
+          </td>
+
+          <td class="py-2" data-col="price">{{ '%.0f' % e.price }}</td>
+          <td class="py-2" data-col="trend">
             {% if e.trend=='up' %}
               <span class="badge badge-green">{{ t('up') }}</span>
             {% else %}
               <span class="badge badge-red">{{ t('down') }}</span>
             {% endif %}
           </td>
-          <td data-th="{{ t('percent') }} %" class="py-2">{{ '%.0f' % e.percent }}</td>
-          <td data-th="{{ t('is_prod_city') }}" class="py-2">{{ t('yes') if e.is_production_city else t('no') }}</td>
-          <td data-th="Created" class="py-2">{{ e.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
-          <td data-th="Updated" class="py-2">{{ (e.updated_at or e.created_at).strftime("%Y-%m-%d %H:%M") }}</td>
-          <td data-th="{{ t('actions') }}" class="py-2">
+          <td class="py-2" data-col="percent">{{ '%.0f' % e.percent }}</td>
+          <td class="py-2">{{ t('yes') if e.is_production_city else t('no') }}</td>
+          <td class="py-2" data-col="created">{{ e.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+          <td class="py-2" data-col="updated">{{ (e.updated_at or e.created_at).strftime("%Y-%m-%d %H:%M") }}</td>
+          <td class="py-2">
             <a class="btn btn-outline" href="{{ url_for('edit_entry', entry_id=e.id, lang=lang) }}">{{ t('edit') }}</a>
+          </td>
+        </tr>
+
+        <!-- строка-редактор (скрыта) -->
+        <tr class="hidden bg-[var(--bg)]" id="editor-{{ e.id }}">
+          <td colspan="10" class="py-3">
+            <form class="flex flex-wrap items-end gap-3 quick-form"
+                  method="post"
+                  action="{{ url_for('edit_entry', entry_id=e.id, lang=lang) }}">
+              <input type="hidden" name="next" value="{{ request.full_path }}">
+              <div>
+                <label class="label">{{ t('price') }}</label>
+                <input class="input w-32" type="number" step="1" name="price" value="{{ '%.0f' % e.price }}">
+              </div>
+              <div>
+                <label class="label">{{ t('trend') }}</label>
+                <select class="select w-32" name="trend">
+                  <option value="up"   {% if e.trend=='up' %}selected{% endif %}>{{ t('up') }}</option>
+                  <option value="down" {% if e.trend=='down' %}selected{% endif %}>{{ t('down') }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="label">{{ t('percent') }} %</label>
+                <input class="input w-28" type="number" step="1" name="percent" value="{{ '%.0f' % e.percent }}">
+              </div>
+
+              <div class="flex gap-2">
+                <button class="btn btn-primary" type="submit">{{ t('save') }}</button>
+                <button class="btn btn-outline" type="button" data-close="{{ e.id }}">×</button>
+              </div>
+
+              <div class="text-xs text-[var(--muted)]">
+                {{ t('city') }}: <strong>{{ e.city }}</strong> • {{ t('product') }}: <strong>{{ e.product }}</strong>
+              </div>
+            </form>
           </td>
         </tr>
         {% endfor %}
@@ -137,4 +175,103 @@
   </div>
   {% endif %}
 </section>
+
+<!-- JS: раскрытие/сворачивание и AJAX-сохранение -->
+<script>
+(function(){
+  const table = document.getElementById('pricesTable');
+  if (!table) return;
+
+  let openedId = null;
+
+  // делегирование клика по продукту
+  table.addEventListener('click', (e) => {
+    const td = e.target.closest('[data-quick-edit]');
+    if (!td) return;
+    const id = td.getAttribute('data-quick-edit');
+    toggleEditor(id);
+  });
+
+  // кнопка закрыть в редакторе
+  table.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-close]');
+    if (!btn) return;
+    const id = btn.getAttribute('data-close');
+    toggleEditor(id, false);
+  });
+
+  function toggleEditor(id, forceOpen){
+    const row = document.getElementById('editor-'+id);
+    if (!row) return;
+
+    // закрываем прежний редактор
+    if (openedId && openedId !== id){
+      const prev = document.getElementById('editor-'+openedId);
+      if (prev) prev.classList.add('hidden');
+      openedId = null;
+    }
+
+    const willOpen = (forceOpen !== undefined) ? forceOpen : row.classList.contains('hidden');
+    row.classList.toggle('hidden', !willOpen);
+    openedId = willOpen ? id : null;
+    if (willOpen){
+      const firstInput = row.querySelector('input[name="price"]');
+      if (firstInput) firstInput.focus();
+    }
+  }
+
+  // AJAX-сохранение (прогрессивное улучшение)
+  table.addEventListener('submit', async (e) => {
+    const form = e.target.closest('form.quick-form');
+    if (!form) return;
+    e.preventDefault();
+
+    const tr = form.closest('tr');
+    const id = tr.id.replace('editor-','');
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const orig = submitBtn.textContent;
+    submitBtn.disabled = true; submitBtn.textContent = '{{ t("saving") }}';
+
+    try{
+      const resp = await fetch(form.action, { method: 'POST', body: new FormData(form) });
+      // после успешного POST Flask редиректит; fetch последует за редиректом и вернёт HTML.
+      if (!resp.ok){ throw new Error('HTTP '+resp.status); }
+
+      // Обновляем значения в таблице из формы
+      const price = form.querySelector('[name="price"]').value || '';
+      const trend = form.querySelector('[name="trend"]').value || '';
+      const percent = form.querySelector('[name="percent"]').value || '';
+
+      const row = table.querySelector('tr[data-row="'+id+'"]');
+      if (row){
+        row.querySelector('[data-col="price"]').textContent = Number(price).toFixed(0);
+        row.querySelector('[data-col="percent"]').textContent = Number(percent).toFixed(0);
+
+        const trendCell = row.querySelector('[data-col="trend"]');
+        if (trendCell){
+          trendCell.innerHTML = trend === 'up'
+            ? `<span class="badge badge-green">{{ t('up') }}</span>`
+            : `<span class="badge badge-red">{{ t('down') }}</span>`;
+        }
+
+        // поставим "Updated" текущее время локально
+        const now = new Date();
+        const pad = n => String(n).padStart(2,'0');
+        const stamp = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+        row.querySelector('[data-col="updated"]').textContent = stamp;
+      }
+
+      toggleEditor(id, false);
+    }catch(err){
+      console.error(err);
+      // fallback: обычная отправка формы
+      form.submit();
+    }finally{
+      submitBtn.disabled = false; submitBtn.textContent = orig;
+    }
+  });
+})();
+</script>
 {% endblock %}
+
