@@ -430,94 +430,93 @@ def index():
         )
 
     elif tab == "routes":
-        # -------- ГРУППОВЫЕ МАРШРУТЫ ПО ПОСЛЕДНИМ ЗАПИСЯМ --------
+        # -------- ГРУППОВЫЕ МАРШРУТЫ (A -> B) ПО ПОСЛЕДНИМ ЗАПИСЯМ --------
         q_product = (request.args.get("product") or "").strip()
-        k         = max(1, min(10, request.args.get("k", type=int) or 5))     # топ-K товаров в карточке
+        k         = max(1, min(10, request.args.get("k", type=int) or 5))      # топ-K товаров в карточке
         min_items = max(1, min(10, request.args.get("min_items", type=int) or 1))
         max_items = max(min_items, min(10, request.args.get("max_items", type=int) or 10))
         sort_by   = (request.args.get("sort") or "sum_profit_desc").strip().lower()
         page      = request.args.get("page", 1, type=int) or 1
         per_page  = max(1, min(100, request.args.get("per_page", 12, type=int) or 12))
-    
-        # берём именно ПОСЛЕДНИЕ записи
+
+        # берём ИМЕННО последние строки
         L = latest_entries_subq()
-    
-        # datalist из L
+
+        # datalist из L (чтобы совпадало с тем, что реально участвует в расчёте)
         products_list = cached_list(
             "products_latest",
             lambda: [p for (p,) in db.session.query(L.c.product).distinct().order_by(L.c.product.asc()).all()]
         )
-    
-        # тянем все последние строки (с фильтром по продукту, если нужен)
+
+        # подтягиваем последние строки (с фильтром по продукту при необходимости)
         q = db.session.query(
             L.c.id, L.c.city, L.c.product, L.c.price, L.c.percent, L.c.trend,
             L.c.updated_at, L.c.created_at, L.c.is_production_city
         ).select_from(L)
-    
         if q_product:
             q = q.filter(L.c.product.ilike(f"%{q_product}%"))
-    
+
         rows = q.all()
         if not rows:
             return render_template(
                 "routes.html",
                 groups=[], products_list=products_list,
                 q_product=q_product, k=k, min_items=min_items, max_items=max_items, sort_by=sort_by,
-                pagination=None, page_numbers=[], lang=lang,
+                pagination=None, page_numbers=[], lang=lang, per_page=per_page,
             )
-    
-        # Индексация: только последние строки!
+
+        # Индексация последних строк:
         from collections import defaultdict
-        # для покупки используем только production города
-        buy_map = defaultdict(dict)   # buy_map[city][product] -> row
-        # для продажи — любые города
-        sell_map = defaultdict(dict)  # sell_map[city][product] -> row
-        cities = set()
-        products = set()
-    
+        buy_map  = defaultdict(dict)  # только production города: buy_map[city][product] -> row
+        sell_map = defaultdict(dict)  # любые города:           sell_map[city][product] -> row
+        cities_with_buy  = set()
+        cities_with_sell = set()
+
         for r in rows:
-            city = r.city
             prod = r.product
-            cities.add(city)
-            products.add(prod)
-            # запоминаем последнюю запись (L уже гарантирует «последнюю», но на всякий случай не перезаписываем)
             if r.is_production_city:
-                buy_map[city].setdefault(prod, r)
-            sell_map[city].setdefault(prod, r)
-    
-        # helper: ISO UTC с Z
+                buy_map[r.city][prod] = r
+                cities_with_buy.add(r.city)
+            sell_map[r.city][prod] = r
+            cities_with_sell.add(r.city)
+
+        # helper: ISO UTC (UTC assumed) с суффиксом Z
         def to_iso_utc(dt):
             return dt.strftime("%Y-%m-%dT%H:%M:%SZ") if dt else None
-    
+
         groups = []
-        for A in cities:
-            for B in cities:
+        # перебираем только реальные города, где есть что покупать/продавать
+        for A in cities_with_buy:
+            buy_products = buy_map.get(A, {})
+            if not buy_products:
+                continue
+            for B in cities_with_sell:
                 if A == B:
                     continue
+                sell_products = sell_map.get(B, {})
+                if not sell_products:
+                    continue
+
+                # Считаем только пересечение товаров для пары A->B
+                common_products = set(buy_products.keys()) & set(sell_products.keys())
+                if not common_products:
+                    continue
+
                 items = []
                 last_upd = None
-    
-                buy_products = buy_map.get(A, {})
-                sell_products = sell_map.get(B, {})
-                if not buy_products or not sell_products:
-                    continue
-    
-                # пересечение по товару
-                for p in products:
-                    ea = buy_products.get(p)   # покупка только из production
-                    eb = sell_products.get(p)  # продажа в любом городе
-                    if not ea or not eb:
-                        continue
-    
+                for p in common_products:
+                    ea = buy_products[p]    # покупка (production)
+                    eb = sell_products[p]   # продажа (любой город)
+
                     profit = float(eb.price) - float(ea.price)
                     if profit <= 0:
                         continue
-    
+
                     margin_pct = profit * 100.0 / max(1.0, float(ea.price))
                     upd = max((ea.updated_at or ea.created_at), (eb.updated_at or eb.created_at))
                     if (last_upd is None) or (upd > last_upd):
                         last_upd = upd
-    
+
                     items.append({
                         "product": p,
                         "buy_entry_id": int(ea.id),
@@ -534,21 +533,20 @@ def index():
                         "margin_pct": margin_pct,
                         "updated_utc_iso": to_iso_utc(upd),
                     })
-    
+
                 if not items:
                     continue
-    
-                # топ-K по прибыли
+
+                # Топ-K по прибыли для карточки
                 items.sort(key=lambda x: (x["profit"], x["margin_pct"]), reverse=True)
                 items_top = items[:k]
-                count = len(items)
-                sum_profit = sum(x["profit"] for x in items_top)
-                avg_margin = sum(x["margin_pct"] for x in items_top) / max(1, len(items_top))
-    
-                # фильтр по количеству доступных товаров на маршруте (всего, не только топ-K)
+                count = len(items)  # число доступных товаров на маршруте (всего, не только топ-K)
                 if not (min_items <= count <= max_items):
                     continue
-    
+
+                sum_profit = sum(x["profit"] for x in items_top)
+                avg_margin = sum(x["margin_pct"] for x in items_top) / max(1, len(items_top))
+
                 groups.append({
                     "pair_from": A,
                     "pair_to": B,
@@ -558,7 +556,7 @@ def index():
                     "avg_margin": avg_margin,
                     "updated_utc_iso": to_iso_utc(last_upd),
                 })
-    
+
         # сортировка групп
         if sort_by == "avg_margin_desc":
             groups.sort(key=lambda g: (g["avg_margin"], g["sum_profit"]), reverse=True)
@@ -566,13 +564,13 @@ def index():
             groups.sort(key=lambda g: (g["items_total"], g["sum_profit"]), reverse=True)
         else:  # sum_profit_desc
             groups.sort(key=lambda g: (g["sum_profit"], g["avg_margin"]), reverse=True)
-    
+
         # пагинация
         total = len(groups)
         start = (page - 1) * per_page
         end = start + per_page
         groups_page = groups[start:end]
-    
+
         class SimplePagination:
             def __init__(self, page, per_page, total):
                 self.page = page
@@ -587,16 +585,16 @@ def index():
             def prev_num(self): return max(1, self.page - 1)
             @property
             def next_num(self): return min(self.pages, self.page + 1)
-    
+
         pagination = SimplePagination(page, per_page, total)
-    
-        # окно страниц до 20
+
+        # окно страниц (до 20)
         window = 20
         start_p = max(1, page - window // 2)
         end_p = min(pagination.pages, start_p + window - 1)
         start_p = max(1, end_p - window + 1)
         page_numbers = list(range(start_p, end_p + 1))
-    
+
         return render_template(
             "routes.html",
             groups=groups_page,
@@ -608,7 +606,6 @@ def index():
             lang=lang,
             per_page=per_page,
         )
-
 
     return redirect(url_for("index", tab="prices", lang=lang))
 
