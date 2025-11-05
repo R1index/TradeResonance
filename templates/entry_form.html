@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="card p-4 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+<section class="card p-4">
   <h1 class="text-xl font-semibold mb-3">{{ title }}</h1>
 
   <form method="post" class="grid grid-cols-1 md:grid-cols-4 gap-3" id="entryForm">
@@ -11,20 +11,20 @@
     <!-- Город + Очистить (только в режиме создания) -->
     <div class="md:col-span-2">
       <div class="flex items-center justify-between">
-        <label class="label text-gray-700 dark:text-gray-300">{{ t('city') }}</label>
+        <label class="label">{{ t('city') }}</label>
         {% if not e %}
-        <button type="button" class="btn btn-outline px-2 py-1 text-xs border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" data-clear="#cityField">
+        <button type="button" class="btn btn-outline px-2 py-1 text-xs" data-clear="#cityField">
           {{ 'Clear' if lang=='en' else 'Очистить' }}
         </button>
         {% endif %}
       </div>
       {% if e %}
-        <input id="cityField" name="city" class="input bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600" value="{{ e.city }}" readonly>
+        <input id="cityField" name="city" class="input bg-gray-100" value="{{ e.city }}" readonly>
       {% else %}
         <input
           id="cityField"
           name="city"
-          class="input bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600"
+          class="input"
           list="citiesList"
           autocomplete="off" spellcheck="false"
           value="{{ request.form.get('city','') or request.args.get('city','') }}"
@@ -38,20 +38,20 @@
     <!-- Товар + Очистить (только в режиме создания) -->
     <div class="md:col-span-2">
       <div class="flex items-center justify-between">
-        <label class="label text-gray-700 dark:text-gray-300">{{ t('product') }}</label>
+        <label class="label">{{ t('product') }}</label>
         {% if not e %}
-        <button type="button" class="btn btn-outline px-2 py-1 text-xs border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" data-clear="#productField">
+        <button type="button" class="btn btn-outline px-2 py-1 text-xs" data-clear="#productField">
           {{ 'Clear' if lang=='en' else 'Очистить' }}
         </button>
         {% endif %}
       </div>
       {% if e %}
-        <input id="productField" name="product" class="input bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600" value="{{ e.product }}" readonly>
+        <input id="productField" name="product" class="input bg-gray-100" value="{{ e.product }}" readonly>
       {% else %}
         <input
           id="productField"
           name="product"
-          class="input bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600"
+          class="input"
           list="productsList"
           autocomplete="off" spellcheck="false"
           value="{{ request.form.get('product','') }}"
@@ -65,58 +65,58 @@
     <!-- Цена + Очистить + Цифровая клавиатура -->
     <div>
       <div class="flex items-center justify-between">
-        <label class="label text-gray-700 dark:text-gray-300">{{ t('price') }}</label>
-        <button type="button" class="btn btn-outline px-2 py-1 text-xs border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" data-clear="#priceField">
+        <label class="label">{{ t('price') }}</label>
+        <button type="button" class="btn btn-outline px-2 py-1 text-xs" data-clear="#priceField">
           {{ 'Clear' if lang=='en' else 'Очистить' }}
         </button>
       </div>
-      <input id="priceField" type="number" step="1" name="price" class="input mb-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600"
+      <input id="priceField" type="number" step="1" name="price" class="input mb-2"
              value="{% if e %}{{ (overrides.price if overrides is defined and overrides.price is not none else e.price) | default('', true) }}{% else %}{{ request.form.get('price','') }}{% endif %}"
              {% if not e %}required{% endif %}>
 
       <!-- Цифровая клавиатура для цены (только на десктопе) -->
       <div class="hidden md:grid grid-cols-3 gap-1 mb-2">
         {% for i in range(1, 10) %}
-        <button type="button" class="btn btn-outline p-1 text-sm border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" data-input="#priceField" data-value="{{ i }}">{{ i }}</button>
+        <button type="button" class="btn btn-outline p-1 text-sm" data-input="#priceField" data-value="{{ i }}">{{ i }}</button>
         {% endfor %}
-        <button type="button" class="btn btn-outline p-1 text-sm border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" data-input="#priceField" data-value="0">0</button>
-        <button type="button" class="btn btn-outline p-1 text-sm border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" data-backspace="#priceField">⌫</button>
+        <button type="button" class="btn btn-outline p-1 text-sm" data-input="#priceField" data-value="0">0</button>
+        <button type="button" class="btn btn-outline p-1 text-sm" data-backspace="#priceField">⌫</button>
       </div>
     </div>
 
     <!-- Процент + Очистить + Цифровая клавиатура -->
     <div>
       <div class="flex items-center justify-between">
-        <label class="label text-gray-700 dark:text-gray-300">{{ t('percent') }} %</label>
-        <button type="button" class="btn btn-outline px-2 py-1 text-xs border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" data-clear="#percentField">
+        <label class="label">{{ t('percent') }} %</label>
+        <button type="button" class="btn btn-outline px-2 py-1 text-xs" data-clear="#percentField">
           {{ 'Clear' if lang=='en' else 'Очистить' }}
         </button>
       </div>
-      <input id="percentField" type="number" step="1" name="percent" class="input mb-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600"
+      <input id="percentField" type="number" step="1" name="percent" class="input mb-2"
              value="{% if e %}{{ (overrides.percent if overrides is defined and overrides.percent is not none else e.percent) | default('0', true) }}{% else %}{{ request.form.get('percent','0') }}{% endif %}"
              {% if not e %}required{% endif %}>
 
       <!-- Цифровая клавиатура для процентов (только на десктопе) -->
       <div class="hidden md:grid grid-cols-3 gap-1 mb-2">
         {% for i in range(1, 10) %}
-        <button type="button" class="btn btn-outline p-1 text-sm border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" data-input="#percentField" data-value="{{ i }}">{{ i }}</button>
+        <button type="button" class="btn btn-outline p-1 text-sm" data-input="#percentField" data-value="{{ i }}">{{ i }}</button>
         {% endfor %}
-        <button type="button" class="btn btn-outline p-1 text-sm border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" data-input="#percentField" data-value="0">0</button>
-        <button type="button" class="btn btn-outline p-1 text-sm border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" data-backspace="#percentField">⌫</button>
+        <button type="button" class="btn btn-outline p-1 text-sm" data-input="#percentField" data-value="0">0</button>
+        <button type="button" class="btn btn-outline p-1 text-sm" data-backspace="#percentField">⌫</button>
       </div>
     </div>
 
     <!-- Тренд + стрелки -->
     <div>
       <div class="flex items-center justify-between">
-        <label class="label text-gray-700 dark:text-gray-300">{{ t('trend') }}</label>
+        <label class="label">{{ t('trend') }}</label>
         <div class="flex gap-1">
-          <button type="button" class="btn btn-outline px-2 py-1 text-xs border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" data-trend="up" title="{{ t('up') }}">▲</button>
-          <button type="button" class="btn btn-outline px-2 py-1 text-xs border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" data-trend="down" title="{{ t('down') }}">▼</button>
+          <button type="button" class="btn btn-outline px-2 py-1 text-xs" data-trend="up" title="{{ t('up') }}">▲</button>
+          <button type="button" class="btn btn-outline px-2 py-1 text-xs" data-trend="down" title="{{ t('down') }}">▼</button>
         </div>
       </div>
       {% set cur_trend = (overrides.trend if e and overrides is defined and overrides.trend else (e.trend if e else request.form.get('trend'))) or ('up') %}
-      <select id="trendSelect" name="trend" class="select bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600" required>
+      <select id="trendSelect" name="trend" class="select" required>
         <option value="up"   {{ 'selected' if cur_trend=='up'   else '' }}>{{ t('up') }}</option>
         <option value="down" {{ 'selected' if cur_trend=='down' else '' }}>{{ t('down') }}</option>
       </select>
@@ -124,8 +124,8 @@
 
     <!-- Производственный город -->
     <div class="flex items-end">
-      <label class="inline-flex items-center gap-2 text-gray-700 dark:text-gray-300">
-        <input type="checkbox" class="h-4 w-4 text-blue-600 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded" name="is_production_city"
+      <label class="inline-flex items-center gap-2">
+        <input type="checkbox" class="h-4 w-4" name="is_production_city"
                {% if e %}
                  {% if e.is_production_city %}checked{% endif %}
                {% else %}
@@ -134,7 +134,7 @@
                {% if e %}disabled{% endif %}>
         <span class="label">{{ t('is_prod_city') }}</span>
         {% if e %}
-          <span class="text-xs opacity-70 dark:opacity-80">({{ t('cannot_edit') if t('cannot_edit') else 'Cannot edit' }})</span>
+          <span class="text-xs opacity-70">({{ t('cannot_edit') if t('cannot_edit') else 'Cannot edit' }})</span>
         {% endif %}
       </label>
     </div>
@@ -142,52 +142,52 @@
     <!-- Кнопки -->
     <div class="md:col-span-4 flex gap-2 pt-2">
       {% if e %}
-        <button class="btn btn-primary bg-blue-600 hover:bg-blue-700 text-white" id="submitBtn" type="submit">{{ t('save') }}</button>
+        <button class="btn btn-primary" id="submitBtn" type="submit">{{ t('save') }}</button>
       {% else %}
-        <button class="btn btn-outline border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" type="submit" name="_action" value="find_existing" formnovalidate>
+        <button class="btn btn-outline" type="submit" name="_action" value="find_existing" formnovalidate>
           {{ 'submit/find' if lang=='en' else 'submit/find' }}
         </button>
-        <button class="btn btn-primary bg-blue-600 hover:bg-blue-700 text-white" id="submitBtn" type="submit" name="_action" value="submit_request">
+        <button class="btn btn-primary" id="submitBtn" type="submit" name="_action" value="submit_request">
           {{ t('submit') if t('submit') else 'Submit' }}
         </button>
       {% endif %}
-      <a class="btn btn-outline border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" href="{{ next_url or request.referrer or url_for('index', lang=lang) }}">← {{ t('back') }}</a>
+      <a class="btn btn-outline" href="{{ next_url or request.referrer or url_for('index', lang=lang) }}">← {{ t('back') }}</a>
     </div>
   </form>
 
   <!-- Список заявок (только для создания новых записей) -->
   {% if not e %}
   <div class="mt-8">
-    <h2 class="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">{{ t('pending_requests') }}</h2>
+    <h2 class="text-lg font-semibold mb-2">{{ t('pending_requests') }}</h2>
     {% if pending and pending|length %}
       <!-- Общее поле пароля для админских действий -->
-      <div class="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
-        <label class="label text-gray-700 dark:text-gray-300">{{ t('admin_password') }}</label>
+      <div class="mb-4 p-3 bg-gray-50 rounded">
+        <label class="label">{{ t('admin_password') }}</label>
         <div class="flex items-center gap-3">
-          <input type="password" id="adminPassGlobal" class="input bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-500" placeholder="{{ t('admin_password') }}" autocomplete="off" style="width: 14rem;">
-          <span class="opacity-70 dark:opacity-80 text-sm text-gray-600 dark:text-gray-400">{{ t('need_password_for_action') }}</span>
+          <input type="password" id="adminPassGlobal" class="input" placeholder="{{ t('admin_password') }}" autocomplete="off" style="width: 14rem;">
+          <span class="opacity-70 text-sm">{{ t('need_password_for_action') }}</span>
         </div>
       </div>
 
       <div class="space-y-2" id="pendingList">
         {% for p in pending %}
-          <div class="border border-gray-200 dark:border-gray-600 rounded p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3 bg-white dark:bg-gray-800">
-            <div class="text-sm text-gray-700 dark:text-gray-300">
-              <div><b class="text-gray-900 dark:text-gray-100">{{ p.city }}</b> — {{ p.product }}</div>
+          <div class="border rounded p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div class="text-sm">
+              <div><b>{{ p.city }}</b> — {{ p.product }}</div>
               <div>{{ t('price') }}: {{ '%.0f'|format(p.price) }} | {{ t('trend') }}: {{ t(p.trend) }} | {{ t('percent') }}: {{ '%.0f'|format(p.percent) }}%</div>
               <div>{{ t('is_prod_city') }}: {{ t('yes') if p.is_production_city else t('no') }}</div>
-              <div class="opacity-70 dark:opacity-80">#{{ p.id }} · {{ p.submitted_at.strftime('%Y-%m-%d %H:%M') if p.submitted_at else '' }}</div>
+              <div class="opacity-70">#{{ p.id }} · {{ p.submitted_at.strftime('%Y-%m-%d %H:%M') if p.submitted_at else '' }}</div>
             </div>
             <div class="flex items-center gap-2">
               <form method="post" class="approveForm">
                 <input type="hidden" name="_action" value="approve">
                 <input type="hidden" name="pending_id" value="{{ p.id }}">
-                <button class="btn btn-primary bg-blue-600 hover:bg-blue-700 text-white" type="submit">{{ t('approve') }}</button>
+                <button class="btn btn-primary" type="submit">{{ t('approve') }}</button>
               </form>
               <form method="post" class="rejectForm">
                 <input type="hidden" name="_action" value="reject">
                 <input type="hidden" name="pending_id" value="{{ p.id }}">
-                <button class="btn btn-outline border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" type="submit">{{ t('reject') }}</button>
+                <button class="btn btn-outline" type="submit">{{ t('reject') }}</button>
               </form>
             </div>
           </div>
@@ -215,7 +215,7 @@
         })();
       </script>
     {% else %}
-      <p class="opacity-70 dark:opacity-80 text-gray-600 dark:text-gray-400">{{ t('no_data') }}</p>
+      <p class="opacity-70">{{ t('no_data') }}</p>
     {% endif %}
   </div>
   {% endif %}
