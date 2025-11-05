@@ -499,69 +499,90 @@ def new_entry():
     cities_list = cached_list("cities", lambda: [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()])
     products_list = cached_list("products", lambda: [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()])
 
-    if request.method == "POST" and request.form.get("_action") == "submit_request":
+    if request.method == "POST":
+        action = request.form.get("_action")
         city = (request.form.get("city") or "").strip()
         product = (request.form.get("product") or "").strip()
-        try: 
+        try:
             price = float(request.form.get("price") or 0)
-        except: 
+        except:
             price = 0.0
         trend_v = (request.form.get("trend") or "up").strip()
-        try: 
+        try:
             percent_v = float(request.form.get("percent") or 0)
-        except: 
+        except:
             percent_v = 0.0
         is_prod = parse_bool(request.form.get("is_production_city"))
-        
+
         if not city or not product:
             flash(t("no_data"))
         else:
-            # Проверяем существование записи (даже если price = 0)
             from sqlalchemy import func
             existing_entry = Entry.query.filter(
                 func.lower(Entry.city) == func.lower(city),
                 func.lower(Entry.product) == func.lower(product)
             ).first()
-            
-            if existing_entry:
-                # Если запись существует, перенаправляем на редактирование
+
+            # Кнопка "find_existing" — всегда пытаемся перейти в редактирование, если нашли
+            if action == "find_existing" and existing_entry:
                 flash(t("edit_existing"))
-                return redirect(url_for("edit_entry", entry_id=existing_entry.id, lang=lang, next_url=request.args.get('next')))
-            
-            # Если записи нет, тогда проверяем цену
-            if price <= 0:
-                flash(t("no_data"))
-            else:
-                # Создаем заявку на добавление
-                p = PendingEntry(
-                    city=city, product=product, price=price,
-                    trend=trend_v, percent=percent_v,
-                    is_production_city=is_prod, submit_ip=request.remote_addr
-                )
-                db.session.add(p)
-                db.session.commit()
-                flash(t("request_submitted"))
+                return redirect(url_for(
+                    "edit_entry",
+                    entry_id=existing_entry.id,
+                    lang=lang,
+                    # важно: параметр должен называться 'next'
+                    next=safe_next(request.args.get("next")),
+                    # протащим значения из формы
+                    price=price if price else None,
+                    percent=percent_v if percent_v else None,
+                    trend=trend_v if trend_v else None
+                ))
+
+            # Обычная подача заявки
+            if action == "submit_request":
+                if existing_entry:
+                    flash(t("edit_existing"))
+                    return redirect(url_for(
+                        "edit_entry",
+                        entry_id=existing_entry.id,
+                        lang=lang,
+                        next=safe_next(request.args.get("next")),
+                        price=price if price else None,
+                        percent=percent_v if percent_v else None,
+                        trend=trend_v if trend_v else None
+                    ))
+
+                if price <= 0:
+                    flash(t("no_data"))
+                else:
+                    p = PendingEntry(
+                        city=city, product=product, price=price,
+                        trend=trend_v, percent=percent_v,
+                        is_production_city=is_prod, submit_ip=request.remote_addr
+                    )
+                    db.session.add(p)
+                    db.session.commit()
+                    flash(t("request_submitted"))
 
     pending = PendingEntry.query.order_by(PendingEntry.submitted_at.desc()).all()
-
     return render_template("entry_form.html", e=None, title=t("new_entry"),
                            cities_list=cities_list, products_list=products_list,
                            pending=pending, next_url=request.args.get('next'))
-
 
 @app.route("/entries/<int:entry_id>/edit", methods=["GET", "POST"])
 def edit_entry(entry_id):
     lang = get_lang()
     e = Entry.query.get_or_404(entry_id)
+
     if request.method == "POST":
-        try: 
+        try:
             e.price = float(request.form.get("price", e.price))
-        except: 
+        except:
             pass
         e.trend = (request.form.get("trend") or e.trend).strip()
-        try: 
+        try:
             e.percent = float(request.form.get("percent", e.percent))
-        except: 
+        except:
             pass
         db.session.commit()
         flash(t("updated"))
@@ -569,11 +590,20 @@ def edit_entry(entry_id):
         next_url = request.form.get("next") or url_for("index", lang=lang)
         return redirect(next_url)
 
+    # значения, пришедшие из /entries/new
+    overrides = {
+        "price": request.args.get("price"),
+        "percent": request.args.get("percent"),
+        "trend": request.args.get("trend"),
+    }
+
     cities_list = cached_list("cities", lambda: [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()])
     products_list = cached_list("products", lambda: [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()])
     next_url = safe_next(request.args.get("next")) or safe_next(request.referrer)
-    return render_template('entry_form.html', e=e, title=t('edit_entry'),
-                           cities_list=cities_list, products_list=products_list, next_url=next_url)
+
+    return render_template("entry_form.html", e=e, title=t("edit_entry"),
+                           cities_list=cities_list, products_list=products_list,
+                           next_url=next_url, overrides=overrides)
 
 @app.route("/import", methods=["GET", "POST"])
 def import_csv():
