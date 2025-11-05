@@ -309,3 +309,74 @@ details[open] > summary {
   outline: 2px solid var(--brand);
   outline-offset: 2px;
 }
+
+/* === DARK THEME FIXES === */
+
+/* Inform the browser that dark color-scheme is supported */
+html.dark, :root.dark {
+  color-scheme: dark;
+}
+
+/* Native inputs/selects/datalist popups */
+.dark input,
+.dark .input,
+.dark select,
+.dark .select,
+.dark textarea {
+  background: var(--bg-soft);
+  color: var(--fg);
+  border-color: var(--border);
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: var(--muted);
+}
+
+/* Autofill Chrome/Edge/Yandex — remove white/yellow fill */
+.dark input:-webkit-autofill,
+.dark textarea:-webkit-autofill,
+.dark select:-webkit-autofill {
+  -webkit-text-fill-color: var(--fg);
+  transition: background-color 9999s ease-in-out 0s;
+  box-shadow: 0 0 0px 1000px var(--bg-soft) inset;
+  caret-color: var(--fg);
+}
+
+/* Readonly / disabled */
+.dark input[readonly],
+.dark input:disabled,
+.dark select:disabled {
+  background: var(--bg);
+  color: var(--muted);
+  border-color: var(--border);
+}
+
+/* Hint the UA to render popups dark where supported */
+input[list] {
+  color-scheme: dark;
+}
+
+/* Outline buttons in dark */
+.dark .btn-outline {
+  background: transparent;
+  color: var(--fg);
+  border-color: var(--border);
+}
+.dark .btn-outline:hover {
+  background: var(--hover);
+}
+
+/* Cards and borders */
+.dark .card,
+.dark .border {
+  border-color: var(--border);
+  background: var(--bg-soft);
+  color: var(--fg);
+}
+
+/* Softer shadows in dark to avoid glow */
+.dark .card,
+.dark .route-card {
+  box-shadow: 0 2px 6px rgba(0,0,0,.6);
+}
