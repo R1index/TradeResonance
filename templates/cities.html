@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="card p-4">
+<section class="card p-4" id="citiesContainer">
   <div class="flex items-center justify-between mb-3">
     <h1 class="text-xl font-semibold">{{ t('nav_cities') }}</h1>
 
@@ -36,7 +36,6 @@
   <div class="space-y-2">
     {% for c in city_list %}
       {% if c.entries and c.entries|length > 0 %}
-      <!-- Без жёстких цветов: базовые стили берутся из tw-app.css (селектор details{...}) -->
       <details>
         <summary class="cursor-pointer list-none px-4 py-3 flex items-center justify-between">
           <span class="font-medium">{{ c.city }}</span>
@@ -44,7 +43,7 @@
         </summary>
         <div class="px-4 pb-4">
           <div class="overflow-x-auto">
-            <table class="min-w-full table-card">
+            <table class="min-w-full table-card city-table" data-city="{{ c.city }}">
               <thead class="text-left text-sm text-zinc-600 dark:text-zinc-400">
                 <tr>
                   <th class="py-2">{{ t('product') }}</th>
@@ -57,18 +56,23 @@
               </thead>
               <tbody class="text-sm">
                 {% for e in c.entries %}
-                <tr class="border-b border-zinc-200 dark:border-zinc-800">
-                  <td class="py-2">{{ e.product }}</td>
-                  <td class="py-2">{{ '%.0f' % e.price }}</td>
-                  <td class="py-2">
+                <!-- КЛИКАБЕЛЬНАЯ СТРОКА -->
+                <tr class="border-b border-zinc-200 dark:border-zinc-800 clickable-row"
+                    data-row="{{ e.id }}"
+                    data-quick-edit="{{ e.id }}"
+                    tabindex="0"
+                    aria-label="Quick edit {{ c.city }} - {{ e.product }}">
+                  <td class="py-2" data-col="product">{{ e.product }}</td>
+                  <td class="py-2" data-col="price">{{ '%.0f' % e.price }}</td>
+                  <td class="py-2" data-col="trend">
                     {% if e.trend=='up' %}
                       <span class="badge badge-green">{{ t('up') }}</span>
                     {% else %}
                       <span class="badge badge-red">{{ t('down') }}</span>
                     {% endif %}
                   </td>
-                  <td class="py-2">{{ '%.0f' % e.percent }}</td>
-                  <td class="py-2">
+                  <td class="py-2" data-col="percent">{{ '%.0f' % e.percent }}</td>
+                  <td class="py-2" data-col="isprod">
                     {% if e.is_production_city %}
                       <span class="badge badge-green">{{ t('yes') }}</span>
                     {% else %}
@@ -82,6 +86,41 @@
                     </a>
                   </td>
                 </tr>
+
+                <!-- СТРОКА-РЕДАКТОР (скрытая по умолчанию) -->
+                <tr class="hidden bg-[var(--bg)]" id="editor-{{ e.id }}">
+                  <td colspan="6" class="py-3">
+                    <form class="flex flex-wrap items-end gap-3 quick-form"
+                          method="post"
+                          action="{{ url_for('edit_entry', entry_id=e.id, lang=lang) }}">
+                      <input type="hidden" name="next" value="{{ request.full_path }}">
+                      <div>
+                        <label class="label">{{ t('price') }}</label>
+                        <input class="input w-32" type="number" step="1" name="price" value="{{ '%.0f' % e.price }}">
+                      </div>
+                      <div>
+                        <label class="label">{{ t('trend') }}</label>
+                        <select class="select w-32" name="trend">
+                          <option value="up"   {% if e.trend=='up' %}selected{% endif %}>{{ t('up') }}</option>
+                          <option value="down" {% if e.trend=='down' %}selected{% endif %}>{{ t('down') }}</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="label">{{ t('percent') }} %</label>
+                        <input class="input w-28" type="number" step="1" name="percent" value="{{ '%.0f' % e.percent }}">
+                      </div>
+
+                      <div class="flex gap-2">
+                        <button class="btn btn-primary" type="submit">{{ t('save') }}</button>
+                        <button class="btn btn-outline" type="button" data-close="{{ e.id }}">×</button>
+                      </div>
+
+                      <div class="text-xs text-[var(--muted)]">
+                        {{ t('city') }}: <strong>{{ c.city }}</strong> • {{ t('product') }}: <strong>{{ e.product }}</strong>
+                      </div>
+                    </form>
+                  </td>
+                </tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -93,4 +132,117 @@
   </div>
   {% endif %}
 </section>
+
+<style>
+.clickable-row {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.clickable-row:hover { background-color: rgba(59, 130, 246, 0.05); }
+.clickable-row:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+}
+</style>
+
+<script>
+(function(){
+  // Делегирование на весь контейнер с городами
+  const container = document.getElementById('citiesContainer');
+  if (!container) return;
+
+  let openedId = null;
+
+  // Клик по кликабельной строке: открыть/закрыть редактор
+  container.addEventListener('click', (e) => {
+    const row = e.target.closest('.clickable-row');
+    if (!row) return;
+
+    // не реагировать, если клик по кнопке/ссылке внутри
+    if (e.target.closest('a, button')) return;
+
+    toggleEditor(row.getAttribute('data-quick-edit'));
+  });
+
+  // Раскрытие по Enter / Space
+  container.addEventListener('keydown', (e) => {
+    const row = e.target.closest('.clickable-row');
+    if (!row) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      toggleEditor(row.getAttribute('data-quick-edit'));
+    }
+  });
+
+  // Закрытие редактора по кнопке ×
+  container.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-close]');
+    if (!btn) return;
+    toggleEditor(btn.getAttribute('data-close'), false);
+  });
+
+  function toggleEditor(id, forceOpen){
+    const row = document.getElementById('editor-'+id);
+    if (!row) return;
+
+    if (openedId && openedId !== id){
+      const prev = document.getElementById('editor-'+openedId);
+      if (prev) prev.classList.add('hidden');
+      openedId = null;
+    }
+
+    const willOpen = (forceOpen !== undefined) ? forceOpen : row.classList.contains('hidden');
+    row.classList.toggle('hidden', !willOpen);
+    openedId = willOpen ? id : null;
+
+    if (willOpen){
+      const firstInput = row.querySelector('input[name="price"]');
+      if (firstInput) firstInput.focus();
+    }
+  }
+
+  // AJAX-сохранение, как в prices.html
+  container.addEventListener('submit', async (e) => {
+    const form = e.target.closest('form.quick-form');
+    if (!form) return;
+    e.preventDefault();
+
+    const editorTr = form.closest('tr[id^="editor-"]');
+    const id = editorTr ? editorTr.id.replace('editor-','') : null;
+    if (!id) { form.submit(); return; }
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const orig = submitBtn.textContent;
+    submitBtn.disabled = true; submitBtn.textContent = '{{ t("saving") }}';
+
+    try{
+      const resp = await fetch(form.action, { method: 'POST', body: new FormData(form) });
+      if (!resp.ok) throw new Error('HTTP '+resp.status);
+
+      const price   = form.price.value || '';
+      const trend   = form.trend.value || '';
+      const percent = form.percent.value || '';
+
+      // Найти соответствующую видимую строку
+      const row = container.querySelector('tr.clickable-row[data-row="'+id+'"]');
+      if (row){
+        row.querySelector('[data-col="price"]').textContent   = Number(price).toFixed(0);
+        row.querySelector('[data-col="percent"]').textContent = Number(percent).toFixed(0);
+
+        const trendCell = row.querySelector('[data-col="trend"]');
+        trendCell.innerHTML = trend === 'up'
+          ? `<span class="badge badge-green">{{ t('up') }}</span>`
+          : `<span class="badge badge-red">{{ t('down') }}</span>`;
+      }
+
+      toggleEditor(id, false);
+    }catch(err){
+      // Фолбэк на обычную отправку (перенаправление на edit)
+      form.submit();
+    }finally{
+      submitBtn.disabled = false; submitBtn.textContent = orig;
+    }
+  });
+})();
+</script>
 {% endblock %}
