@@ -89,6 +89,7 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "cannot_edit": "Cannot edit",
         "saving": "Saving...",
         "submitting": "Submitting...",
+        "edit_existing": "Entry already exists. Redirected to edit.",
     },
     "ru": {
         "app_title": "Трейд Хелпер",
@@ -149,6 +150,7 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "cannot_edit": "Нельзя изменить",
         "saving": "Сохранение...",
         "submitting": "Отправка...",
+        "edit_existing": "Запись уже существует. Перенаправляем на редактирование.",
     }
 }
 
@@ -510,9 +512,18 @@ def new_entry():
         except: 
             percent_v = 0.0
         is_prod = parse_bool(request.form.get("is_production_city"))
+        
         if not city or not product or price <= 0:
             flash(t("no_data"))
         else:
+            # Проверяем, существует ли уже запись с таким городом и товаром
+            existing_entry = Entry.query.filter_by(city=city, product=product).first()
+            if existing_entry:
+                # Если запись существует, перенаправляем на редактирование
+                flash(t("edit_existing"))
+                return redirect(url_for("edit_entry", entry_id=existing_entry.id, lang=lang))
+            
+            # Если записи нет, создаем заявку на добавление
             p = PendingEntry(
                 city=city, product=product, price=price,
                 trend=trend_v, percent=percent_v,
