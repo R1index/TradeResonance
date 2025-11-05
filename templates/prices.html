@@ -421,7 +421,7 @@ input[type="range"] { accent-color: var(--primary, #3b82f6); }
       if (label) label.textContent = `${perc}%`;
     }
     const base = calcBaseFromForm(form);
-    const newPrice = Math.round(base * (perc/100));
+    const newPrice = Math.floor(base * (perc/100) + 1e-9);
     const priceInput = form.querySelector('input[name="price"]');
     if (priceInput && isFinite(newPrice)) priceInput.value = newPrice;
   }
