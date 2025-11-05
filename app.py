@@ -313,6 +313,7 @@ def index():
     tab = request.args.get("tab", "prices")
 
     if tab == "prices":
+        # --- фильтры
         q_city    = (request.args.get("city") or "").strip()
         q_product = (request.args.get("product") or "").strip()
         q_trend   = (request.args.get("trend") or "").strip()
@@ -323,7 +324,12 @@ def index():
         q_prod = (request.args.get("prod") or "any").strip().lower()
         q_sort = (request.args.get("sort") or "updated_desc").strip().lower()
 
+        # --- пагинация (page/per_page из query; per_page по умолчанию можно менять)
+        page = request.args.get("page", 1, type=int)
+        per_page = request.args.get("per_page", 50, type=int)
+
         query = Entry.query
+
         if q_city:
             query = query.filter(Entry.city.ilike(f"%{q_city}%"))
         if q_product:
@@ -352,20 +358,40 @@ def index():
             "updated_desc": Entry.updated_at.desc().nullslast(),
         }
         query = query.order_by(sort_map.get(q_sort, sort_map["updated_desc"]))
-        entries = query.limit(1000).all()
 
-        cities_list = cached_list("cities", lambda: [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()])
-        products_list = cached_list("products", lambda: [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()])
+        # --- ВАЖНО: вместо .limit(1000).all() используем paginate
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        entries = pagination.items
+
+        # --- окно номеров страниц максимум из 20 ссылок
+        window = 20
+        start = max(1, pagination.page - (window // 2))
+        end = min(pagination.pages, start + window - 1)
+        start = max(1, end - window + 1)
+        page_numbers = list(range(start, end + 1))
+
+        cities_list = cached_list(
+            "cities",
+            lambda: [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()]
+        )
+        products_list = cached_list(
+            "products",
+            lambda: [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()]
+        )
 
         return render_template(
             "prices.html",
             entries=entries,
+            pagination=pagination,
+            page_numbers=page_numbers,
+            per_page=per_page,
             cities_list=cities_list,
             products_list=products_list,
             q_city=q_city, q_product=q_product, q_trend=q_trend,
             q_price_min=q_price_min, q_price_max=q_price_max,
             q_percent_min=q_percent_min, q_percent_max=q_percent_max,
             q_prod=q_prod, q_sort=q_sort,
+            lang=lang,
         )
 
     elif tab == "cities":
@@ -387,8 +413,14 @@ def index():
             by_city.setdefault(r.city, []).append(r)
         city_list = [{"city": c, "entries": by_city[c]} for c in sorted(by_city.keys(), key=str.lower)]
 
-        cities_list = cached_list("cities", lambda: [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()])
-        products_list = cached_list("products", lambda: [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()])
+        cities_list = cached_list(
+            "cities",
+            lambda: [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()]
+        )
+        products_list = cached_list(
+            "products",
+            lambda: [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()]
+        )
 
         return render_template(
             "cities.html",
@@ -396,6 +428,7 @@ def index():
             cities_list=cities_list,
             products_list=products_list,
             pf=pf,
+            lang=lang,
         )
 
     elif tab == "routes":
@@ -445,7 +478,7 @@ def index():
                 buy_cte.c.buy_updated,
                 buy_cte.c.buy_created,
                 buy_cte.c.buy_is_production,
-                
+
                 sell_cte.c.sell_city,
                 sell_cte.c.sell_price,
                 sell_cte.c.sell_id,
@@ -454,7 +487,7 @@ def index():
                 sell_cte.c.sell_updated,
                 sell_cte.c.sell_created,
                 sell_cte.c.sell_is_production,
-                
+
                 ((sell_cte.c.sell_price - buy_cte.c.buy_price) / buy_cte.c.buy_price * 100).label("spread_percent"),
                 (sell_cte.c.sell_price - buy_cte.c.buy_price).label("profit")
             )
@@ -463,7 +496,7 @@ def index():
             .filter(sell_cte.c.sell_price > buy_cte.c.buy_price)
             .order_by((sell_cte.c.sell_price - buy_cte.c.buy_price).desc())
         )
-        
+
         if q_product:
             routes_query = routes_query.filter(buy_cte.c.product.ilike(f"%{q_product}%"))
 
@@ -474,7 +507,7 @@ def index():
             buy_updated = r.buy_updated or r.buy_created
             sell_updated = r.sell_updated or r.sell_created
             route_updated = max(buy_updated, sell_updated)
-            
+
             routes.append({
                 "product": r.product,
                 "buy_city": r.buy_city,
@@ -484,7 +517,7 @@ def index():
                 "buy_percent": float(r.buy_percent) if r.buy_percent is not None else None,
                 "buy_updated": buy_updated,
                 "buy_is_production": bool(r.buy_is_production),
-                
+
                 "sell_city": r.sell_city,
                 "sell_price": float(r.sell_price),
                 "sell_entry_id": int(r.sell_id),
@@ -492,17 +525,20 @@ def index():
                 "sell_percent": float(r.sell_percent) if r.sell_percent is not None else None,
                 "sell_updated": sell_updated,
                 "sell_is_production": bool(r.sell_is_production),
-                
+
                 "spread_percent": float(r.spread_percent),
                 "profit": float(r.profit),
                 "route_updated": route_updated,
             })
 
-        return render_template("routes.html",
-                               routes=routes,
-                               products_list=products_list,
-                               q_product=q_product)
-    
+        return render_template(
+            "routes.html",
+            routes=routes,
+            products_list=products_list,
+            q_product=q_product,
+            lang=lang,
+        )
+
     return redirect(url_for("index", tab="prices", lang=lang))
 
 @app.route("/entries/new", methods=["GET", "POST"])
