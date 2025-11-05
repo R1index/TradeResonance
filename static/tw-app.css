@@ -380,3 +380,36 @@ input[list] {
 .dark .route-card {
   box-shadow: 0 2px 6px rgba(0,0,0,.6);
 }
+
+/* === Final polish for dark theme === */
+
+/* Make number input arrows dark & neutral */
+.dark input[type=number]::-webkit-inner-spin-button,
+.dark input[type=number]::-webkit-outer-spin-button {
+  filter: invert(80%);
+}
+
+/* Make select dropdown arrow dark */
+.dark select {
+  background-color: var(--bg-soft);
+  background-image: url("data:image/svg+xml;utf8,<svg fill='%23a0a0a0' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><path d='M5.5 7l4.5 5 4.5-5H5.5z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 1rem;
+  -moz-appearance: none;
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 2rem;
+}
+
+/* Hide default dropdown arrow in Firefox */
+.dark select::-ms-expand {
+  display: none;
+}
+
+/* Pending list white patch fix */
+.dark #pendingList .border,
+.dark #pendingList .card {
+  background: var(--bg-soft);
+  border-color: var(--border);
+}
