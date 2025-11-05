@@ -524,9 +524,10 @@ def new_entry():
             ).first()
             
             if existing_entry:
-                # Если запись существует, перенаправляем на редактирование
+                # Если запись существует, перенаправляем на редактирование, передавая цену, процент, тренд
                 flash(t("edit_existing"))
-                return redirect(url_for("edit_entry", entry_id=existing_entry.id, lang=lang, next_url=request.args.get('next')))
+                return redirect(url_for("edit_entry", entry_id=existing_entry.id, lang=lang,
+                                        price=price, percent=percent_v, trend=trend_v, next_url=request.args.get('next')))
             
             # Если записи нет, тогда проверяем цену
             if price <= 0:
@@ -553,6 +554,12 @@ def new_entry():
 def edit_entry(entry_id):
     lang = get_lang()
     e = Entry.query.get_or_404(entry_id)
+    
+    # Если параметры переданы в URL, используем их для предварительного заполнения
+    price = request.args.get('price', e.price)
+    percent = request.args.get('percent', e.percent)
+    trend = request.args.get('trend', e.trend)
+
     if request.method == "POST":
         try: 
             e.price = float(request.form.get("price", e.price))
@@ -572,8 +579,11 @@ def edit_entry(entry_id):
     cities_list = cached_list("cities", lambda: [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()])
     products_list = cached_list("products", lambda: [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()])
     next_url = safe_next(request.args.get("next")) or safe_next(request.referrer)
+    
+    # Передаем значения в шаблон
     return render_template('entry_form.html', e=e, title=t('edit_entry'),
-                           cities_list=cities_list, products_list=products_list, next_url=next_url)
+                           cities_list=cities_list, products_list=products_list, 
+                           next_url=next_url, price=price, percent=percent, trend=trend)
 
 @app.route("/import", methods=["GET", "POST"])
 def import_csv():
