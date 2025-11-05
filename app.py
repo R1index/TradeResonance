@@ -513,25 +513,29 @@ def new_entry():
             percent_v = 0.0
         is_prod = parse_bool(request.form.get("is_production_city"))
         
-        if not city or not product or price <= 0:
+        if not city or not product:
             flash(t("no_data"))
         else:
-            # ПРОВЕРЯЕМ СУЩЕСТВОВАНИЕ ЗАПИСИ ПЕРЕД СОЗДАНИЕМ ЗАЯВКИ
+            # СНАЧАЛА ПРОВЕРЯЕМ СУЩЕСТВОВАНИЕ ЗАПИСИ (даже если price = 0)
             existing_entry = Entry.query.filter_by(city=city, product=product).first()
             if existing_entry:
                 # Если запись существует, перенаправляем на редактирование
                 flash(t("edit_existing"))
                 return redirect(url_for("edit_entry", entry_id=existing_entry.id, lang=lang))
             
-            # Если записи нет, создаем заявку на добавление
-            p = PendingEntry(
-                city=city, product=product, price=price,
-                trend=trend_v, percent=percent_v,
-                is_production_city=is_prod, submit_ip=request.remote_addr
-            )
-            db.session.add(p)
-            db.session.commit()
-            flash(t("request_submitted"))
+            # Если записи нет, тогда проверяем цену
+            if price <= 0:
+                flash(t("no_data"))
+            else:
+                # Создаем заявку на добавление
+                p = PendingEntry(
+                    city=city, product=product, price=price,
+                    trend=trend_v, percent=percent_v,
+                    is_production_city=is_prod, submit_ip=request.remote_addr
+                )
+                db.session.add(p)
+                db.session.commit()
+                flash(t("request_submitted"))
 
     if request.method == "POST" and request.form.get("_action") in {"approve", "reject"}:
         admin_pass = (request.form.get("admin_pass") or "").strip()
