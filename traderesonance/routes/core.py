@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import csv
 import io
-import json
 from datetime import datetime
 from typing import Dict, List, Optional, Set
 
@@ -255,7 +254,6 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
             latest_timestamp=latest_timestamp,
             points_count=len(timeline),
             timeline_entries=table_entries,
-            timeline_json=json.dumps(timeline, ensure_ascii=False),
             lang=lang,
         )
 

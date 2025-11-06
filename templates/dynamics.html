@@ -141,14 +141,28 @@
     return;
   }
   const ctx = canvas.getContext('2d');
-  const data = {{ timeline_json | safe }};
+  const data = {{ timeline | tojson }};
 
   const points = data
-    .filter(point => point.timestamp && Number.isFinite(point.price))
-    .map(point => ({ x: new Date(point.timestamp), y: point.price }));
+    .map(point => {
+      if (!point.timestamp) {
+        return null;
+      }
+      const price = Number(point.price);
+      const timestamp = Date.parse(point.timestamp);
+      if (!Number.isFinite(price) || Number.isNaN(timestamp)) {
+        return null;
+      }
+      return { x: timestamp, y: price };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.x - b.x);
+
   if (!points.length) {
     return;
   }
+
+  const singlePoint = points.length === 1;
 
   const chart = new Chart(ctx, {
     type: 'line',
@@ -158,9 +172,17 @@
         data: points,
         borderColor: '#3b82f6',
         backgroundColor: 'rgba(59,130,246,0.15)',
+        parsing: false,
+        spanGaps: true,
         tension: 0.25,
         fill: true,
-        pointRadius: 2,
+        showLine: !singlePoint,
+        pointRadius: singlePoint ? 4 : 2,
+        pointHoverRadius: singlePoint ? 6 : 4,
+        pointBackgroundColor: '#3b82f6',
+        pointBorderColor: '#3b82f6',
+        pointHoverBackgroundColor: '#3b82f6',
+        pointHoverBorderColor: '#3b82f6',
       }]
     },
     options: {
@@ -169,16 +191,16 @@
       scales: {
         x: {
           type: 'time',
-          adapters: {
-            date: {
-              locale: navigator?.language || 'en'
-            }
-          },
           time: {
             tooltipFormat: 'yyyy-MM-dd HH:mm',
             displayFormats: {
               hour: 'MMM d HH:mm',
               day: 'MMM d'
+            }
+          },
+          adapters: {
+            date: {
+              locale: navigator?.language || 'en'
             }
           },
           ticks: {
@@ -200,6 +222,17 @@
       plugins: {
         legend: {
           display: false
+        },
+        tooltip: {
+          callbacks: {
+            title(items) {
+              if (!items?.length) {
+                return '';
+              }
+              const date = new Date(items[0].parsed.x);
+              return date.toLocaleString();
+            }
+          }
         }
       }
     }
@@ -213,6 +246,10 @@
 
     chart.data.datasets[0].borderColor = lineColor;
     chart.data.datasets[0].backgroundColor = lineColor ? `${lineColor}26` : 'rgba(59,130,246,0.15)';
+    chart.data.datasets[0].pointBackgroundColor = lineColor;
+    chart.data.datasets[0].pointBorderColor = lineColor;
+    chart.data.datasets[0].pointHoverBackgroundColor = lineColor;
+    chart.data.datasets[0].pointHoverBorderColor = lineColor;
     chart.options.scales.x.ticks.color = axisColor;
     chart.options.scales.x.grid.color = gridColor;
     chart.options.scales.y.ticks.color = axisColor;
