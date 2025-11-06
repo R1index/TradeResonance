@@ -21,12 +21,13 @@ from sqlalchemy import func
 
 from ..extensions import db
 from ..localization import context_processor, get_lang, translate
-from ..models import Entry, PendingEntry
+from ..models import Entry, EntrySnapshot, PendingEntry
 from ..services.entries import (
     approve_pending,
     cached_list,
     dedupe_entries,
     latest_entries_subquery,
+    record_snapshot,
 )
 from ..utils import parse_bool, safe_next
 
@@ -202,31 +203,28 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
         if q_product and products_for_city and q_product not in products_for_city:
             q_product = products_for_city[0]
 
-        base_query = Entry.query
+        timeline_query = EntrySnapshot.query
         if q_city:
-            base_query = base_query.filter(Entry.city == q_city)
+            timeline_query = timeline_query.filter(EntrySnapshot.city == q_city)
         if q_product:
-            base_query = base_query.filter(Entry.product == q_product)
+            timeline_query = timeline_query.filter(EntrySnapshot.product == q_product)
 
         timeline_entries = (
-            base_query
-            .order_by(sa.func.coalesce(Entry.updated_at, Entry.created_at).asc())
-            .limit(500)
+            timeline_query
+            .order_by(EntrySnapshot.recorded_at.asc(), EntrySnapshot.id.asc())
+            .limit(1000)
             .all()
         )
 
-        def entry_ts(entry: Entry) -> Optional[datetime]:
-            return entry.updated_at or entry.created_at
-
         timeline = [
             {
-                "timestamp": entry_ts(entry).isoformat() if entry_ts(entry) else None,
-                "price": entry.price,
-                "percent": entry.percent,
-                "trend": entry.trend,
+                "timestamp": snapshot.recorded_at.isoformat(),
+                "price": snapshot.price,
+                "percent": snapshot.percent,
+                "trend": snapshot.trend,
             }
-            for entry in timeline_entries
-            if entry_ts(entry)
+            for snapshot in timeline_entries
+            if snapshot.recorded_at
         ]
 
         latest_entry = timeline_entries[-1] if timeline_entries else None
@@ -240,7 +238,7 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
             if previous_price:
                 delta_percent = (delta_price / previous_price) * 100
 
-        latest_timestamp = entry_ts(latest_entry) if latest_entry else None
+        latest_timestamp = latest_entry.recorded_at if latest_entry else None
 
         table_entries = timeline_entries[-100:]
 
@@ -634,6 +632,8 @@ def edit_entry(entry_id: int):
         entry.is_production_city = parse_bool(
             request.form.get("is_production_city", entry.is_production_city)
         )
+        db.session.flush()
+        record_snapshot(entry)
         db.session.commit()
         flash(translate("updated"))
         dedupe_entries()
@@ -708,18 +708,21 @@ def import_csv():
                     existing.percent = percent_value
                     existing.is_production_city = existing.is_production_city or is_prod
                     existing.created_at = existing.created_at or created_at
+                    db.session.flush()
+                    record_snapshot(existing, recorded_at=created_at)
                 else:
-                    db.session.add(
-                        Entry(
-                            created_at=created_at,
-                            city=city,
-                            product=product,
-                            price=price,
-                            trend=trend_value,
-                            percent=percent_value,
-                            is_production_city=is_prod,
-                        )
+                    new_entry = Entry(
+                        created_at=created_at,
+                        city=city,
+                        product=product,
+                        price=price,
+                        trend=trend_value,
+                        percent=percent_value,
+                        is_production_city=is_prod,
                     )
+                    db.session.add(new_entry)
+                    db.session.flush()
+                    record_snapshot(new_entry, recorded_at=created_at)
                 count += 1
             except Exception as exc:
                 current_app.logger.warning("Import error: %s", exc)

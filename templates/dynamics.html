@@ -87,7 +87,7 @@
         </thead>
         <tbody class="text-sm">
           {% for entry in timeline_entries|reverse %}
-          {% set ts = (entry.updated_at or entry.created_at) %}
+          {% set ts = entry.recorded_at %}
           <tr>
             <td class="py-2 font-mono text-xs">{{ ts.strftime('%Y-%m-%d %H:%M') if ts else '—' }}</td>
             <td class="py-2">{{ '%.0f' % entry.price }}</td>
