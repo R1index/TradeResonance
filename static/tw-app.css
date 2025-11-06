@@ -99,8 +99,8 @@
   font: inherit;
 }
 
-.btn:hover { 
-  background: var(--hover); 
+.btn:hover {
+  background: var(--hover);
 }
 
 .btn-primary {
@@ -109,7 +109,7 @@
   border-color: transparent;
 }
 
-.btn-primary:hover { 
+.btn-primary:hover {
   filter: brightness(.95);
 }
 
@@ -117,6 +117,20 @@
   background: transparent;
   color: var(--fg);
   border: 1px solid var(--border);
+}
+
+.btn-disabled {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  padding: .5rem .9rem;
+  border-radius: var(--radius-md);
+  background: var(--hover);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .icon-btn {
@@ -174,8 +188,96 @@
   border-top: 1px solid var(--border); 
 }
 
-.table-card tbody tr:hover { 
-  background: var(--hover); 
+.table-card tbody tr:hover {
+  background: var(--hover);
+}
+
+/* Responsive helper chips */
+.summary-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+}
+
+.summary-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.summary-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Collapsible filter container */
+.filters-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-soft);
+  margin-bottom: 1rem;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.filters-card > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.filters-card[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+
+.filters-summary::after {
+  content: "▾";
+  font-size: 0.75rem;
+  margin-left: 0.5rem;
+  transition: transform 0.2s ease;
+}
+
+.filters-card[open] .filters-summary::after {
+  transform: rotate(-180deg);
+}
+
+.filters-grid {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+@media (min-width: 768px) {
+  .filters-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .filters-grid > .md\:col-span-6 {
+    grid-column: span 6 / span 6;
+  }
+  .filters-grid > .md\:col-span-12 {
+    grid-column: span 6 / span 6;
+  }
+  .filters-grid > .md\:col-span-3 {
+    grid-column: span 3 / span 3;
+  }
+  .filters-grid > .md\:col-span-2 {
+    grid-column: span 2 / span 2;
+  }
+}
+
+@media (min-width: 1024px) {
+  .routes-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 /* Бейджи */
