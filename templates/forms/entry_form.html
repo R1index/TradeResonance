@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+  <a href="{{ url_for('web.dashboard', lang=lang) }}" class="inline-flex items-center text-sm text-muted hover:text-foreground transition">← {{ t('back') }}</a>
+
+  <article class="card shadow-sm p-6 space-y-6">
+    <header class="space-y-2">
+      <h1 class="text-2xl font-semibold">{{ t('edit_entry') if entry else t('new_entry') }}</h1>
+      <p class="text-sm text-muted">{{ 'Keep the market data clean and up-to-date' if lang=='en' else 'Поддерживайте данные рынка актуальными' }}</p>
+    </header>
+
+    <form method="post" class="space-y-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="label">{{ t('city') }}</label>
+          <input class="input" name="city" value="{{ overrides.city if overrides and overrides.city is defined else (entry.city if entry else '') }}" list="form-cities" {{ 'readonly' if entry else '' }} required>
+        </div>
+        <div>
+          <label class="label">{{ t('product') }}</label>
+          <input class="input" name="product" value="{{ overrides.product if overrides and overrides.product is defined else (entry.product if entry else '') }}" list="form-products" {{ 'readonly' if entry else '' }} required>
+        </div>
+        <div>
+          <label class="label">{{ t('price') }}</label>
+          <input class="input" type="number" step="0.01" min="0" name="price" value="{{ overrides.price if overrides and overrides.price is not none else ('%.2f' % entry.price if entry else '') }}" required>
+        </div>
+        <div>
+          <label class="label">{{ t('percent') }}</label>
+          <input class="input" type="number" step="0.01" name="percent" value="{{ overrides.percent if overrides and overrides.percent is not none else ('%.2f' % entry.percent if entry else '') }}">
+        </div>
+        <div>
+          <label class="label">{{ t('trend') }}</label>
+          <select class="select" name="trend">
+            <option value="up" {{ 'selected' if (overrides.trend if overrides and overrides.trend is not none else (entry.trend if entry else 'up')) == 'up' else '' }}>{{ t('up') }}</option>
+            <option value="down" {{ 'selected' if (overrides.trend if overrides and overrides.trend is not none else (entry.trend if entry else 'down')) == 'down' else '' }}>{{ t('down') }}</option>
+          </select>
+        </div>
+        <div class="flex items-center gap-2 mt-6">
+          <input type="checkbox" name="is_production_city" value="1" id="is-prod" {{ 'checked' if entry and entry.is_production_city else '' }}>
+          <label for="is-prod" class="text-sm">{{ t('is_prod_city') }}</label>
+        </div>
+      </div>
+
+      <datalist id="form-cities">
+        {% for city in cities_list %}<option value="{{ city }}">{% endfor %}
+      </datalist>
+      <datalist id="form-products">
+        {% for product in products_list %}<option value="{{ product }}">{% endfor %}
+      </datalist>
+
+      {% if next_url %}
+        <input type="hidden" name="next" value="{{ next_url }}">
+      {% endif %}
+
+      <div class="flex flex-wrap items-center gap-3">
+        <button type="submit" class="btn btn-primary">{{ t('save') if entry else t('submit') }}</button>
+        <a href="{{ url_for('web.dashboard', lang=lang) }}" class="btn btn-ghost">{{ t('back') }}</a>
+      </div>
+    </form>
+  </article>
+
+  {% if not entry and pending %}
+    <article class="card shadow-sm p-6 space-y-4">
+      <header class="space-y-1">
+        <h2 class="text-lg font-semibold">{{ t('pending_requests') }}</h2>
+        <p class="text-sm text-muted">{{ 'Review incoming community submissions' if lang=='en' else 'Проверьте заявки сообщества' }}</p>
+      </header>
+      <div class="space-y-4">
+        {% for item in pending %}
+          <form method="post" class="border border-divider/60 rounded-lg p-4 grid gap-3 bg-muted/5">
+            <input type="hidden" name="pending_id" value="{{ item.id }}">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 class="font-medium">{{ item.city }} • {{ item.product }}</h3>
+                <p class="text-xs text-muted">{{ item.submitted_at.strftime('%Y-%m-%d %H:%M') }}</p>
+              </div>
+              <div class="text-sm">
+                <span class="mr-3">{{ t('price') }}: <strong>{{ '%.0f' % item.price }}</strong></span>
+                <span>{{ t('percent') }}: <strong>{{ '%.0f' % item.percent }}</strong></span>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <input type="password" name="admin_pass" placeholder="{{ t('admin_password') }}" class="input w-48" required>
+              <button type="submit" name="_action" value="approve" class="btn btn-primary">{{ t('approve') }}</button>
+              <button type="submit" name="_action" value="reject" class="btn btn-ghost">{{ t('reject') }}</button>
+            </div>
+          </form>
+        {% endfor %}
+      </div>
+    </article>
+  {% endif %}
+</section>
+{% endblock %}

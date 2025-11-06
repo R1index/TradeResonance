@@ -1,6 +1,7 @@
 """Simple localisation helpers used across templates and routes."""
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Dict
 from flask import request, session
 
@@ -64,6 +65,10 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "cannot_edit": "Cannot edit",
         "saving": "Saving...",
         "submitting": "Submitting...",
+        "dedupe": "Deduplicate",
+        "items": "items",
+        "pairs": "pairs",
+        "redirect": "Redirect to",
     },
     "ru": {
         "app_title": "Трейд Хелпер",
@@ -123,6 +128,10 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "cannot_edit": "Нельзя изменить",
         "saving": "Сохранение...",
         "submitting": "Отправка...",
+        "dedupe": "Удалить дубликаты",
+        "items": "тов.",
+        "pairs": "пар",
+        "redirect": "Перейти после",
     },
 }
 
@@ -142,4 +151,8 @@ def translate(key: str) -> str:
 
 def context_processor():
     """Context processor injecting translation helpers into templates."""
-    return {"t": translate, "lang": get_lang()}
+    return {
+        "t": translate,
+        "lang": get_lang(),
+        "current_year": datetime.utcnow().year,
+    }

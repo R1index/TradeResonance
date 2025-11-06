@@ -1,103 +1,97 @@
 <!doctype html>
-<html lang="{{ 'en' if lang=='en' else 'ru' }}" class="h-full">
+<html lang="{{ lang or 'ru' }}" class="h-full">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ t('app_title') }}</title>
+    <meta name="color-scheme" content="light dark">
 
-    <!-- 1) Ранний бут темы (до Tailwind), дефолт — светлая -->
     <script>
       (function () {
         try {
-          const saved = localStorage.getItem('theme'); // 'dark' | 'light' | null
-          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-          const enableDark = saved ? saved === 'dark' : prefersDark;
+          const prefers = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          const stored = localStorage.getItem('tr-theme');
+          const theme = stored || (prefers ? 'dark' : 'light');
           const root = document.documentElement;
-          if (enableDark) root.classList.add('dark'); else root.classList.remove('dark');
-
-          // подсказка для нативных контролов
-          let meta = document.querySelector('meta[name="color-scheme"]');
-          if (!meta) { meta = document.createElement('meta'); meta.name = 'color-scheme'; document.head.appendChild(meta); }
-          meta.content = enableDark ? 'dark light' : 'light dark';
-        } catch {}
+          root.classList.toggle('dark', theme === 'dark');
+          document.documentElement.dataset.theme = theme;
+        } catch (err) {
+          console.warn('Theme init failed', err);
+        }
       })();
     </script>
 
-    <!-- 2) Tailwind (darkMode: 'class') -->
     <script>
       window.tailwind = { config: { darkMode: 'class' } };
     </script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
 
-    <!-- 3) Наши стили компонентов -->
     <link rel="stylesheet" href="{{ url_for('static', filename='tw-app.css') }}">
+    {% block head %}{% endblock %}
   </head>
-
-  <body class="min-h-full bg-[var(--bg)] text-[var(--fg)] transition-colors">
-    <!-- флэш-тосты -->
-    <div id="toast-zone" class="fixed top-4 right-4 z-50 space-y-2"></div>
-    {% set flash_msg = (get_flashed_messages() or [])|first %}
-    <div data-flash='{{ {"message": flash_msg, "type": "success"} | tojson if flash_msg else "" }}' class="hidden"></div>
-
-    <!-- Хедер -->
-    <header class="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--header-bg)]/70 backdrop-blur">
-      <div class="mx-auto max-w-7xl px-3 sm:px-6 py-3 flex items-center justify-between">
-        <a href="{{ url_for('index', lang=lang) }}" class="flex items-center gap-2 font-semibold tracking-tight text-lg">
-          <span>🧭</span><span>{{ t('app_title') }}</span>
-        </a>
-
-        <nav class="hidden md:flex items-center gap-1">
-          <a class="tab {{ 'tab-active' if request.args.get('tab','prices')=='prices' else '' }}" href="{{ url_for('index', tab='prices', lang=lang) }}">{{ t('nav_prices') }}</a>
-          <a class="tab {{ 'tab-active' if request.args.get('tab')=='cities' else '' }}" href="{{ url_for('index', tab='cities', lang=lang) }}">{{ t('nav_cities') }}</a>
-          <a class="tab {{ 'tab-active' if request.args.get('tab')=='routes' else '' }}" href="{{ url_for('index', tab='routes', lang=lang) }}">{{ t('nav_routes') }}</a>
-          <a class="tab" href="{{ url_for('new_entry', lang=lang) }}">{{ t('nav_add') }}</a>
-          <a class="tab" href="{{ url_for('import_csv', lang=lang) }}">{{ t('nav_import') }}</a>
-        </nav>
-
-        <div class="flex items-center gap-3">
-          <!-- UTC / Local -->
-          <div class="hidden sm:flex flex-col items-end leading-4">
-            <div class="text-[11px] sm:text-xs font-mono text-[var(--muted)]" title="Coordinated Universal Time">
-              UTC <span id="clockUTC">--:--:--</span>
+  <body class="min-h-full bg-surface text-foreground antialiased">
+    <div class="min-h-screen flex flex-col">
+      <header class="border-b border-divider/60 bg-surface/80 backdrop-blur supports-[backdrop-filter]:bg-surface/70 sticky top-0 z-40">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
+          <a href="{{ url_for('web.dashboard', lang=lang) }}" class="flex items-center gap-3 text-lg font-semibold hover:text-accent transition">
+            <span class="text-2xl">🧭</span>
+            <span>{{ t('app_title') }}</span>
+          </a>
+          <nav class="hidden md:flex items-center gap-2 text-sm" hx-boost="true">
+            <a href="{{ url_for('web.dashboard', tab='prices', lang=lang) }}" class="nav-pill {{ 'nav-pill-active' if tab=='prices' else '' }}">{{ t('nav_prices') }}</a>
+            <a href="{{ url_for('web.dashboard', tab='cities', lang=lang) }}" class="nav-pill {{ 'nav-pill-active' if tab=='cities' else '' }}">{{ t('nav_cities') }}</a>
+            <a href="{{ url_for('web.dashboard', tab='routes', lang=lang) }}" class="nav-pill {{ 'nav-pill-active' if tab=='routes' else '' }}">{{ t('nav_routes') }}</a>
+            <a href="{{ url_for('web.new_entry', lang=lang) }}" class="nav-pill">{{ t('nav_add') }}</a>
+            <a href="{{ url_for('web.import_csv', lang=lang) }}" class="nav-pill">{{ t('nav_import') }}</a>
+          </nav>
+          <div class="flex items-center gap-2">
+            <div class="hidden sm:flex items-center text-xs font-mono text-muted">
+              <span class="mr-3" title="Coordinated Universal Time">UTC <span id="clock-utc">--:--:--</span></span>
+              <span><span id="clock-tz">UTC</span> <span id="clock-local">--:--:--</span></span>
             </div>
-            <div class="text-[11px] sm:text-xs font-mono text-[var(--muted-2)]">
-              <span id="clockLocalTz">LOCAL</span> <span id="clockLocal">--:--:--</span>
+            <div class="flex border border-divider/70 rounded-full overflow-hidden text-xs">
+              <a href="?lang=en" class="lang-pill {{ 'lang-pill-active' if lang=='en' else '' }}">EN</a>
+              <a href="?lang=ru" class="lang-pill {{ 'lang-pill-active' if lang=='ru' else '' }}">RU</a>
             </div>
-          </div>
-
-          <div class="hidden sm:flex rounded-lg overflow-hidden border border-[var(--border)]">
-            <a class="px-3 py-1.5 hover:bg-[var(--hover)] {{ 'bg-[var(--hover)]' if lang=='en' else '' }}" href="?lang=en">EN</a>
-            <a class="px-3 py-1.5 hover:bg-[var(--hover)] {{ 'bg-[var(--hover)]' if lang=='ru' else '' }}" href="?lang=ru">RU</a>
-          </div>
-          <button id="themeToggle" class="icon-btn" title="Toggle theme" aria-label="Toggle theme">🌓</button>
-          <button class="icon-btn md:hidden" id="menuBtn" aria-label="Menu" aria-expanded="false">☰</button>
-        </div>
-      </div>
-
-      <!-- мобильное меню -->
-      <div id="mobileMenu" class="md:hidden hidden border-t border-[var(--border)] bg-[var(--bg-soft)]">
-        <div class="mx-auto max-w-7xl px-3 sm:px-6 py-2 grid gap-2">
-          <div class="flex items-center justify-between text-xs font-mono text-[var(--muted)]">
-            <span>UTC <span id="mClockUTC">--:--:--</span></span>
-            <span><span id="mClockLocalTz">LOCAL</span> <span id="mClockLocal">--:--:--</span></span>
-          </div>
-          <a class="tab block" href="{{ url_for('index', tab='prices', lang=lang) }}">{{ t('nav_prices') }}</a>
-          <a class="tab block" href="{{ url_for('index', tab='cities', lang=lang) }}">{{ t('nav_cities') }}</a>
-          <a class="tab block" href="{{ url_for('index', tab='routes', lang=lang) }}">{{ t('nav_routes') }}</a>
-          <a class="tab block" href="{{ url_for('new_entry', lang=lang) }}">{{ t('nav_add') }}</a>
-          <a class="tab block" href="{{ url_for('import_csv', lang=lang) }}">{{ t('nav_import') }}</a>
-          <div class="flex gap-2">
-            <a class="btn btn-outline flex-1 text-center" href="?lang=en">EN</a>
-            <a class="btn btn-outline flex-1 text-center" href="?lang=ru">RU</a>
+            <button type="button" id="theme-toggle" class="icon-btn" aria-label="Toggle theme">🌗</button>
+            <button type="button" class="icon-btn md:hidden" data-drawer-toggle aria-expanded="false">☰</button>
           </div>
         </div>
-      </div>
-    </header>
+        <div class="md:hidden hidden border-t border-divider/70" id="mobile-drawer">
+          <nav class="px-4 py-4 space-y-2 text-sm" hx-boost="true">
+            <a href="{{ url_for('web.dashboard', tab='prices', lang=lang) }}" class="mobile-link">{{ t('nav_prices') }}</a>
+            <a href="{{ url_for('web.dashboard', tab='cities', lang=lang) }}" class="mobile-link">{{ t('nav_cities') }}</a>
+            <a href="{{ url_for('web.dashboard', tab='routes', lang=lang) }}" class="mobile-link">{{ t('nav_routes') }}</a>
+            <a href="{{ url_for('web.new_entry', lang=lang) }}" class="mobile-link">{{ t('nav_add') }}</a>
+            <a href="{{ url_for('web.import_csv', lang=lang) }}" class="mobile-link">{{ t('nav_import') }}</a>
+          </nav>
+        </div>
+      </header>
 
-    <main class="mx-auto max-w-7xl px-3 sm:px-6 py-6 space-y-6">
-      {% block content %}{% endblock %}
-    </main>
+      <main class="flex-1">
+        {% with flashes = get_flashed_messages(with_categories=true) %}
+          {% if flashes %}
+            <div id="flash-data" data-flashes='{{ flashes | tojson }}'></div>
+          {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+      </main>
 
+      <footer class="border-t border-divider/60 bg-muted/10">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 text-xs text-muted flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <span>Resonance Solstice helper • {{ current_year }}</span>
+          <span class="flex items-center gap-1">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3h7l2 3h9v12H3z"/><path d="M3 12h18"/></svg>
+            <span>Railway ready</span>
+          </span>
+        </div>
+      </footer>
+    </div>
+
+    <div id="toast-root" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
     <script src="{{ url_for('static', filename='tw-app.js') }}"></script>
+    {% block scripts %}{% endblock %}
   </body>
 </html>

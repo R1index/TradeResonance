@@ -1,0 +1,176 @@
+<section class="card shadow-sm">
+  <div class="p-6 space-y-6">
+    <header class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div>
+        <h2 class="text-xl font-semibold">{{ t('nav_prices') }}</h2>
+        <p class="text-sm text-muted">{{ 'Filter by city, product or performance metrics' if lang=='en' else 'Фильтруйте по городу, товару и показателям эффективности' }}</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <a href="{{ export_url }}" class="btn btn-ghost">CSV</a>
+        <a href="{{ url_for('web.new_entry', lang=lang) }}" class="btn btn-primary">{{ t('nav_add') }}</a>
+      </div>
+    </header>
+
+    <dl class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+      <div class="stat">
+        <dt class="stat-label">{{ 'Entries' if lang=='en' else 'Записей' }}</dt>
+        <dd class="stat-value">{{ price_page.totals.entries }}</dd>
+      </div>
+      <div class="stat">
+        <dt class="stat-label">{{ t('nav_cities') }}</dt>
+        <dd class="stat-value">{{ price_page.totals.cities }}</dd>
+      </div>
+      <div class="stat">
+        <dt class="stat-label">{{ t('product') }}</dt>
+        <dd class="stat-value">{{ price_page.totals.products }}</dd>
+      </div>
+    </dl>
+
+    <form
+      id="price-filter"
+      class="filter-grid"
+      hx-get="{{ url_for('web.dashboard', tab='prices', lang=lang) }}"
+      hx-target="#tab-panel"
+      hx-push-url="true"
+    >
+      <input type="hidden" name="tab" value="prices">
+      <div>
+        <label class="label" for="filter-city">{{ t('city') }}</label>
+        <input class="input" id="filter-city" name="city" value="{{ filters.city }}" list="cities-list" placeholder="{{ t('city') }}">
+        <datalist id="cities-list">
+          {% for city in cities_list %}<option value="{{ city }}">{% endfor %}
+        </datalist>
+      </div>
+      <div>
+        <label class="label" for="filter-product">{{ t('product') }}</label>
+        <input class="input" id="filter-product" name="product" value="{{ filters.product }}" list="products-list" placeholder="{{ t('product') }}">
+        <datalist id="products-list">
+          {% for product in products_list %}<option value="{{ product }}">{% endfor %}
+        </datalist>
+      </div>
+      <div>
+        <label class="label">{{ t('trend') }}</label>
+        <select class="select" name="trend">
+          <option value="">—</option>
+          <option value="up" {{ 'selected' if filters.trend=='up' else '' }}>{{ t('up') }}</option>
+          <option value="down" {{ 'selected' if filters.trend=='down' else '' }}>{{ t('down') }}</option>
+        </select>
+      </div>
+      <div>
+        <label class="label">{{ t('price') }} ≥</label>
+        <input class="input" type="number" step="1" name="price_min" value="{{ filters.price_min if filters.price_min is not none else '' }}">
+      </div>
+      <div>
+        <label class="label">{{ t('price') }} ≤</label>
+        <input class="input" type="number" step="1" name="price_max" value="{{ filters.price_max if filters.price_max is not none else '' }}">
+      </div>
+      <div>
+        <label class="label">{{ t('percent') }} ≥</label>
+        <input class="input" type="number" step="1" name="percent_min" value="{{ filters.percent_min if filters.percent_min is not none else '' }}">
+      </div>
+      <div>
+        <label class="label">{{ t('percent') }} ≤</label>
+        <input class="input" type="number" step="1" name="percent_max" value="{{ filters.percent_max if filters.percent_max is not none else '' }}">
+      </div>
+      <div>
+        <label class="label">{{ t('is_prod_city') }}</label>
+        <select class="select" name="prod">
+          <option value="any" {{ 'selected' if filters.production=='any' else '' }}>—</option>
+          <option value="yes" {{ 'selected' if filters.production=='yes' else '' }}>{{ t('yes') }}</option>
+          <option value="no" {{ 'selected' if filters.production=='no' else '' }}>{{ t('no') }}</option>
+        </select>
+      </div>
+      <div>
+        <label class="label">Sort</label>
+        <select class="select" name="sort">
+          <option value="updated_desc" {{ 'selected' if filters.sort=='updated_desc' else '' }}>Updated ↓</option>
+          <option value="updated_asc" {{ 'selected' if filters.sort=='updated_asc' else '' }}>Updated ↑</option>
+          <option value="price_desc" {{ 'selected' if filters.sort=='price_desc' else '' }}>Price ↓</option>
+          <option value="price_asc" {{ 'selected' if filters.sort=='price_asc' else '' }}>Price ↑</option>
+          <option value="percent_desc" {{ 'selected' if filters.sort=='percent_desc' else '' }}>Percent ↓</option>
+          <option value="percent_asc" {{ 'selected' if filters.sort=='percent_asc' else '' }}>Percent ↑</option>
+        </select>
+      </div>
+      <div>
+        <label class="label">Per page</label>
+        <input class="input" type="number" name="per_page" min="1" max="500" value="{{ price_page.pagination.per_page }}">
+      </div>
+      <div class="col-span-full flex gap-2">
+        <button type="submit" class="btn btn-primary">{{ t('filters') }}</button>
+        <a href="{{ url_for('web.dashboard', tab='prices', lang=lang) }}" class="btn btn-ghost">Reset</a>
+      </div>
+    </form>
+
+    {% if not price_page.items %}
+      <p class="text-muted text-sm">{{ t('no_data') }}</p>
+    {% else %}
+      <div class="overflow-x-auto">
+        <table class="min-w-full table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>{{ t('city') }}</th>
+              <th>{{ t('product') }}</th>
+              <th>{{ t('price') }}</th>
+              <th>{{ t('trend') }}</th>
+              <th>{{ t('percent') }} %</th>
+              <th>{{ t('is_prod_city') }}</th>
+              <th>{{ 'Updated' if lang=='en' else 'Обновлено' }}</th>
+              <th>{{ t('actions') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for entry in price_page.items %}
+              <tr>
+                <td>{{ entry.id }}</td>
+                <td>{{ entry.city }}</td>
+                <td>{{ entry.product }}</td>
+                <td>{{ '%.0f' % entry.price }}</td>
+                <td>
+                  {% if entry.trend == 'up' %}
+                    <span class="badge badge-positive">{{ t('up') }}</span>
+                  {% else %}
+                    <span class="badge badge-negative">{{ t('down') }}</span>
+                  {% endif %}
+                </td>
+                <td>{{ '%.0f' % entry.percent }}</td>
+                <td>
+                  {% if entry.is_production_city %}
+                    <span class="badge badge-positive">{{ t('yes') }}</span>
+                  {% else %}
+                    <span class="badge">{{ t('no') }}</span>
+                  {% endif %}
+                </td>
+                <td>{{ (entry.updated_at or entry.created_at).strftime('%Y-%m-%d %H:%M') if entry.updated_at or entry.created_at else '—' }}</td>
+                <td>
+                  <a href="{{ url_for('web.edit_entry', entry_id=entry.id, lang=lang, next=request.full_path) }}" class="btn btn-ghost">{{ t('edit') }}</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% set pagination = price_page.pagination %}
+      {% if pagination.pages > 1 %}
+        <nav class="pagination" aria-label="Pagination">
+          {% if pagination.has_prev %}
+            <a hx-get="{{ url_for('web.dashboard', tab='prices', lang=lang, page=pagination.prev_page, per_page=pagination.per_page) }}" hx-target="#tab-panel" hx-push-url="true" hx-include="#price-filter" class="page-link">«</a>
+          {% endif %}
+          {% for page_num in pagination.window %}
+            <a
+              hx-get="{{ url_for('web.dashboard', tab='prices', lang=lang, page=page_num, per_page=pagination.per_page) }}"
+              hx-target="#tab-panel"
+              hx-push-url="true"
+              hx-include="#price-filter"
+              class="page-link {{ 'page-link-active' if page_num == pagination.page else '' }}"
+            >{{ page_num }}</a>
+          {% endfor %}
+          {% if pagination.has_next %}
+            <a hx-get="{{ url_for('web.dashboard', tab='prices', lang=lang, page=pagination.next_page, per_page=pagination.per_page) }}" hx-target="#tab-panel" hx-push-url="true" hx-include="#price-filter" class="page-link">»</a>
+          {% endif %}
+        </nav>
+      {% endif %}
+    {% endif %}
+  </div>
+</section>

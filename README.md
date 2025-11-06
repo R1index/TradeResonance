@@ -1,6 +1,14 @@
-# Trade Helper (Flask + Postgres) — Tailwind UI + Deduplication
-- One row per (city, product): dedupe on startup and on import/create; unique index.
-- EN/RU, responsive UI, dark/light theme, toasts, routes, cities accordion, filters.
+# Trade Resonance
+
+Modernised Flask + HTMX interface for tracking trade data in Resonance Solstice.
+
+## Highlights
+
+- Fresh responsive shell built with Tailwind, theme toggling and mobile drawer.
+- HTMX-powered dashboard with live filters for prices, city breakdowns and trade routes.
+- English and Russian localisation baked in, including flash-toasts rendered client side.
+- CSV import/export, duplicate cleanup and admin approvals handled from the UI.
+- Database helpers centralised in `traderesonance/services/entries.py` with caching and pagination.
 
 ## Run
 ```bash

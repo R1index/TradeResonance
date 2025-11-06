@@ -1,238 +1,110 @@
-// Конфигурация и константы
-const CONFIG = {
-  theme: {
-    light: 'light',
-    dark: 'dark',
-    storageKey: 'theme'
-  },
-  toast: {
-    duration: 3000,
-    animation: {
-      in: 'slideIn',
-      out: 'slideOut'
+(function () {
+  const root = document.documentElement;
+
+  function setTheme(theme) {
+    root.classList.toggle('dark', theme === 'dark');
+    root.dataset.theme = theme;
+    try {
+      localStorage.setItem('tr-theme', theme);
+    } catch (err) {
+      console.warn('Could not persist theme', err);
     }
   }
-};
 
-// Утилиты
-const DomUtils = {
-  $(selector) {
-    return document.querySelector(selector);
-  },
-  
-  $$(selector) {
-    return document.querySelectorAll(selector);
-  },
-  
-  createElement(tag, classes = '', content = '') {
-    const el = document.createElement(tag);
-    if (classes) el.className = classes;
-    if (content) el.textContent = content;
-    return el;
-  }
-};
-
-const TimeUtils = {
-  formatDate(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
-    
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-  },
-  
-  getTimezoneAbbreviation(timeZone) {
-    try {
-      const formatter = new Intl.DateTimeFormat([], { 
-        timeZone, 
-        timeZoneName: 'short' 
+  document.addEventListener('DOMContentLoaded', () => {
+    const toggle = document.getElementById('theme-toggle');
+    if (toggle) {
+      toggle.addEventListener('click', () => {
+        const next = root.classList.contains('dark') ? 'light' : 'dark';
+        setTheme(next);
       });
-      const parts = formatter.formatToParts(new Date());
-      const timeZonePart = parts.find(part => part.type === 'timeZoneName');
-      return timeZonePart ? timeZonePart.value : timeZone;
-    } catch {
-      return timeZone;
     }
-  }
-};
 
-// Модуль темы
-const ThemeManager = {
-  init() {
-    this.button = DomUtils.$('#themeToggle');
-    if (!this.button) return;
-    
-    this.loadTheme();
-    this.bindEvents();
-  },
-  
-  loadTheme() {
-    const saved = localStorage.getItem(CONFIG.theme.storageKey);
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const theme = saved || (prefersDark ? CONFIG.theme.dark : CONFIG.theme.light);
-    
-    this.setTheme(theme);
-  },
-  
-  setTheme(theme) {
-    const root = document.documentElement;
-    const isDark = theme === CONFIG.theme.dark;
-    
-    root.classList.toggle('dark', isDark);
-    localStorage.setItem(CONFIG.theme.storageKey, theme);
-    
-    this.updateMetaTheme(isDark);
-  },
-  
-  updateMetaTheme(isDark) {
-    let meta = DomUtils.$('meta[name="color-scheme"]');
-    if (!meta) {
-      meta = DomUtils.createElement('meta');
-      meta.name = 'color-scheme';
-      document.head.appendChild(meta);
+    const drawerBtn = document.querySelector('[data-drawer-toggle]');
+    const drawer = document.getElementById('mobile-drawer');
+    if (drawerBtn && drawer) {
+      drawerBtn.addEventListener('click', () => {
+        const expanded = drawerBtn.getAttribute('aria-expanded') === 'true';
+        drawerBtn.setAttribute('aria-expanded', String(!expanded));
+        drawer.classList.toggle('hidden', expanded);
+      });
     }
-    meta.content = isDark ? 'dark light' : 'light dark';
-  },
-  
-  bindEvents() {
-    this.button.addEventListener('click', (e) => {
-      e.preventDefault();
-      const isDark = document.documentElement.classList.contains('dark');
-      this.setTheme(isDark ? CONFIG.theme.light : CONFIG.theme.dark);
-    });
-  }
-};
 
-// Модуль мобильного меню
-const MobileMenu = {
-  init() {
-    this.menuButton = DomUtils.$('#menuBtn');
-    this.mobileMenu = DomUtils.$('#mobileMenu');
-    
-    if (!this.menuButton || !this.mobileMenu) return;
-    
-    this.bindEvents();
-  },
-  
-  bindEvents() {
-    this.menuButton.addEventListener('click', (e) => {
-      e.preventDefault();
-      this.toggle();
-    }, { passive: false });
-  },
-  
-  toggle() {
-    this.mobileMenu.classList.toggle('hidden');
-    const isExpanded = this.menuButton.getAttribute('aria-expanded') === 'true';
-    this.menuButton.setAttribute('aria-expanded', (!isExpanded).toString());
-  }
-};
+    hydrateFlashMessages();
+    startClocks();
+  });
 
-// Модуль часов
-const ClockManager = {
-  init() {
-    this.elements = {
-      utc: DomUtils.$('#clockUTC'),
-      local: DomUtils.$('#clockLocal'),
-      localTz: DomUtils.$('#clockLocalTz'),
-      mUTC: DomUtils.$('#mClockUTC'),
-      mLocal: DomUtils.$('#mClockLocal'),
-      mLocalTz: DomUtils.$('#mClockLocalTz')
-    };
-    
-    this.setupTimezone();
-    this.start();
-  },
-  
-  setupTimezone() {
-    const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local';
-    const localLabel = TimeUtils.getTimezoneAbbreviation(localTz);
-    
-    if (this.elements.localTz) this.elements.localTz.textContent = localLabel;
-    if (this.elements.mLocalTz) this.elements.mLocalTz.textContent = localLabel;
-  },
-  
-  update() {
-    const now = new Date();
-    const utc = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
-    
-    const formattedUTC = TimeUtils.formatDate(utc);
-    const formattedLocal = TimeUtils.formatDate(now);
-    
-    // Обновляем все активные элементы
-    Object.entries(this.elements).forEach(([key, element]) => {
-      if (!element) return;
-      
-      if (key.includes('utc') || key === 'mUTC') {
-        element.textContent = formattedUTC;
-      } else if (key.includes('local') || key === 'mLocal') {
-        element.textContent = formattedLocal;
-      }
-    });
-  },
-  
-  start() {
-    this.update();
-    this.interval = setInterval(() => this.update(), 1000);
-  }
-};
-
-// Модуль уведомлений
-const ToastManager = {
-  init() {
-    this.zone = DomUtils.$('#toast-zone');
-    this.processFlashMessages();
-  },
-  
-  processFlashMessages() {
-    const holder = DomUtils.$('[data-flash]');
-    if (!holder?.dataset.flash) return;
-    
+  function hydrateFlashMessages() {
+    const flashNode = document.getElementById('flash-data');
+    if (!flashNode) return;
+    let flashes = [];
     try {
-      const { message, type } = JSON.parse(holder.dataset.flash);
-      if (message) {
-        this.show(message, type);
-      }
-    } catch (error) {
-      console.warn('Invalid flash message format:', error);
+      flashes = JSON.parse(flashNode.dataset.flashes || '[]');
+    } catch (err) {
+      console.warn('Failed to parse flashes', err);
     }
-  },
-  
-  show(message, type = 'info') {
-    if (!this.zone) return;
-    
-    const toast = DomUtils.createElement('div', 'card px-4 py-3 text-sm toast');
-    toast.textContent = message;
-    
-    // Добавляем тип, если нужно стилизовать
-    if (type !== 'info') {
-      toast.classList.add(`toast-${type}`);
+    flashNode.remove();
+    flashes.forEach((item) => toast(item[1] || item));
+  }
+
+  function toast(message, type = 'info') {
+    if (!message) return;
+    const container = document.getElementById('toast-root');
+    if (!container) return;
+    const el = document.createElement('div');
+    el.role = 'status';
+    el.textContent = message;
+    if (type === 'error') {
+      el.style.borderColor = 'var(--danger-bg)';
     }
-    
-    this.zone.appendChild(toast);
-    
-    // Автоматическое скрытие
+    container.appendChild(el);
     setTimeout(() => {
-      toast.classList.add('fade-out');
-      setTimeout(() => toast.remove(), 300);
-    }, CONFIG.toast.duration);
+      el.classList.add('opacity-0', 'translate-x-4');
+      setTimeout(() => el.remove(), 250);
+    }, 4200);
   }
-};
 
-// Инициализация приложения
-document.addEventListener('DOMContentLoaded', () => {
-  ThemeManager.init();
-  MobileMenu.init();
-  ClockManager.init();
-  ToastManager.init();
-});
+  function startClocks() {
+    const utcEl = document.getElementById('clock-utc');
+    const localEl = document.getElementById('clock-local');
+    const tzEl = document.getElementById('clock-tz');
+    if (!utcEl || !localEl || !tzEl) return;
 
-// Очистка при размонтировании (если нужно)
-window.addEventListener('beforeunload', () => {
-  if (ClockManager.interval) {
-    clearInterval(ClockManager.interval);
+    const update = () => {
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const utcHours = pad(now.getUTCHours());
+      const utcMinutes = pad(now.getUTCMinutes());
+      const utcSeconds = pad(now.getUTCSeconds());
+      utcEl.textContent = `${utcHours}:${utcMinutes}:${utcSeconds}`;
+
+      const localHours = pad(now.getHours());
+      const localMinutes = pad(now.getMinutes());
+      const localSeconds = pad(now.getSeconds());
+      localEl.textContent = `${localHours}:${localMinutes}:${localSeconds}`;
+      tzEl.textContent = Intl.DateTimeFormat().resolvedOptions().timeZone.toUpperCase();
+
+      const mUtc = document.getElementById('mClockUTC');
+      const mLocal = document.getElementById('mClockLocal');
+      const mTz = document.getElementById('mClockLocalTz');
+      if (mUtc) mUtc.textContent = utcEl.textContent;
+      if (mLocal) mLocal.textContent = localEl.textContent;
+      if (mTz) mTz.textContent = tzEl.textContent;
+    };
+
+    update();
+    setInterval(update, 1000);
   }
-});
+
+  if (window.htmx) {
+    document.body.addEventListener('htmx:afterSwap', (event) => {
+      if (event.target && event.target.id === 'tab-panel') {
+        hydrateFlashMessages();
+      }
+    });
+
+    document.body.addEventListener('htmx:responseError', () => {
+      toast('Request failed', 'error');
+    });
+  }
+})();

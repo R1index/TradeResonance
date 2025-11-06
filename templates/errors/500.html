@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-16 text-center space-y-6">
+  <div class="text-6xl">⚙️</div>
+  <h1 class="text-3xl font-semibold">500</h1>
+  <p class="text-muted">{{ 'Something went wrong on our side. The incident has been logged.' if lang=='en' else 'Что-то пошло не так. Мы уже работаем над исправлением.' }}</p>
+  <a href="{{ url_for('web.dashboard', lang=lang) }}" class="btn btn-primary">{{ t('back') }}</a>
+</section>
+{% endblock %}
