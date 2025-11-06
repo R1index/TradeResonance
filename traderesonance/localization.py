@@ -30,6 +30,8 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "down": "down",
         "city": "City",
         "product": "Product",
+        "product_image": "Product image",
+        "product_image_hint": "PNG/JPEG files will be cropped and resized to 200×200 automatically",
         "is_prod_city": "Production city",
         "yes": "Yes",
         "no": "No",
@@ -74,6 +76,7 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "cannot_edit": "Cannot edit",
         "saving": "Saving...",
         "submitting": "Submitting...",
+        "invalid_image": "Could not process image. Please upload a valid PNG or JPEG file.",
     },
     "ru": {
         "app_title": "Трейд Хелпер",
@@ -99,6 +102,8 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "down": "падение",
         "city": "Город",
         "product": "Товар",
+        "product_image": "Изображение товара",
+        "product_image_hint": "PNG/JPEG автоматически обрезаются и масштабируются до 200×200",
         "is_prod_city": "Производственный город",
         "yes": "Да",
         "no": "Нет",
@@ -143,6 +148,7 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "cannot_edit": "Нельзя изменить",
         "saving": "Сохранение...",
         "submitting": "Отправка...",
+        "invalid_image": "Не удалось обработать изображение. Загрузите корректный файл PNG или JPEG.",
     },
 }
 

@@ -44,7 +44,7 @@
         <div>
           <label class="label">{{ t('product') }}</label>
           <input class="input" name="product" placeholder="{{ t('product') }}"
-                 value="{{ q_product or '' }}" list="productsList" id="productInput" autocomplete="off">
+                 value="{{ q_product or '' }}" list="productsList" id="productInput" autocomplete="off" data-product-autocomplete>
           <datalist id="productsList">
             {% for p in products_list %}<option value="{{ p }}">{% endfor %}
           </datalist>
@@ -192,7 +192,16 @@
             {% for it in g.entries %}
             <tr class="border-b border-zinc-200 dark:border-zinc-800 align-top">
               <td class="py-2" data-label="{{ t('product') }}">
-                <div class="font-medium">{{ it.product }}</div>
+                <div class="flex items-center gap-3">
+                  <div class="product-thumb product-thumb--table">
+                    {% if it.image_path %}
+                      <img src="{{ url_for('static', filename=it.image_path) }}" alt="{{ it.product }}">
+                    {% else %}
+                      <span>📦</span>
+                    {% endif %}
+                  </div>
+                  <div class="font-medium">{{ it.product }}</div>
+                </div>
               </td>
 
               <td class="py-2" data-label="{{ t('route_buy') }}">

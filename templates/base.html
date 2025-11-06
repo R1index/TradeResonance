@@ -98,6 +98,9 @@
       {% block content %}{% endblock %}
     </main>
 
+    {% if product_suggestions is defined %}
+    <script id="product-suggestions-data" type="application/json">{{ product_suggestions | tojson }}</script>
+    {% endif %}
     <script src="{{ url_for('static', filename='tw-app.js') }}"></script>
   </body>
 </html>
