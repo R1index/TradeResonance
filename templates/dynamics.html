@@ -27,9 +27,7 @@
         <span class="summary-value text-lg font-semibold">
           {% if latest_entry %}
             {{ '%.0f' % latest_entry.price }}
-          {% else %}
-            —
-          {% endif %}
+          {% else %}—{% endif %}
         </span>
       </div>
       <div class="summary-chip">
@@ -37,9 +35,7 @@
         <span class="summary-value">
           {% if delta_price is not none %}
             {{ '+' if delta_price > 0 else '' }}{{ '%.0f' % delta_price }}
-          {% else %}
-            —
-          {% endif %}
+          {% else %}—{% endif %}
         </span>
       </div>
       <div class="summary-chip">
@@ -47,9 +43,7 @@
         <span class="summary-value">
           {% if delta_percent is not none %}
             {{ '+' if delta_percent > 0 else '' }}{{ '%.1f' % delta_percent }}%
-          {% else %}
-            —
-          {% endif %}
+          {% else %}—{% endif %}
         </span>
       </div>
     </div>
@@ -63,9 +57,7 @@
           {{ points_count }} {{ t('points') }} · {{ t('trend')|capitalize }}:
           {% if last_point %}
             {{ t('up') if last_point.trend == 'up' else t('down') }}
-          {% else %}
-            —
-          {% endif %}
+          {% else %}—{% endif %}
         </p>
       {% else %}
         <div class="p-6 text-center text-[var(--muted)] border border-dashed border-[var(--border)] rounded-xl">
@@ -143,7 +135,7 @@
   const ctx = canvas.getContext('2d');
   const rawData = {{ timeline | tojson }};
 
-  // Надёжный парсер дат: поддерживает "YYYY-MM-DD HH:mm[:ss]" и ISO
+  // Надёжный парсер дат: "YYYY-MM-DD HH:mm[:ss]" и ISO
   const parseWhen = (s) => {
     if (!s) return NaN;
     const normalized = (typeof s === 'string' && s.includes(' '))
@@ -156,38 +148,35 @@
   const basePoints = (Array.isArray(rawData) ? rawData : [])
     .map(p => {
       const price = Number(p?.price);
-      const timestamp = parseWhen(p?.timestamp);
-      if (!Number.isFinite(price) || Number.isNaN(timestamp)) return null;
-      return { x: timestamp, y: price, synthetic: false, label: p.timestamp };
+      const ts = parseWhen(p?.timestamp);
+      if (!Number.isFinite(price) || Number.isNaN(ts)) return null;
+      return { x: ts, y: price, synthetic: false, label: p.timestamp };
     })
     .filter(Boolean)
     .sort((a, b) => a.x - b.x);
 
   if (!basePoints.length) return;
 
-  const makePaddingPoints = (point) => {
+  const makePaddingPoints = (p) => {
     const hour = 60 * 60 * 1000;
     return [
-      { x: point.x - hour, y: point.y, synthetic: true, label: point.label },
-      point,
-      { x: point.x + hour, y: point.y, synthetic: true, label: point.label },
+      { x: p.x - hour, y: p.y, synthetic: true, label: p.label },
+      p,
+      { x: p.x + hour, y: p.y, synthetic: true, label: p.label },
     ];
   };
   const chartPoints = basePoints.length === 1 ? makePaddingPoints(basePoints[0]) : basePoints;
+  const singlePoint = basePoints.length === 1;
 
   const hexToRgba = (hex, alpha) => {
     if (!hex) return `rgba(59,130,246,${alpha})`;
-    const sanitized = hex.replace('#', '').trim();
-    const full = sanitized.length === 3
-      ? sanitized.split('').map(ch => ch + ch).join('')
-      : sanitized.slice(0, 6);
+    const s = hex.replace('#','').trim();
+    const full = s.length === 3 ? s.split('').map(ch => ch+ch).join('') : s.slice(0,6);
     const num = Number.parseInt(full, 16);
     if (!Number.isFinite(num)) return `rgba(59,130,246,${alpha})`;
-    const r = (num >> 16) & 255, g = (num >> 8) & 255, b = num & 255;
+    const r = (num>>16)&255, g=(num>>8)&255, b=num&255;
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
-
-  const singlePoint = basePoints.length === 1;
 
   const chart = new Chart(ctx, {
     type: 'line',
@@ -200,10 +189,16 @@
         backgroundColor: 'rgba(59,130,246,0.2)',
         parsing: false,
         spanGaps: false,
-        tension: 0.15,
+
+        // Плавная линия
+        stepped: false,
+        tension: 0.35,
+        cubicInterpolationMode: 'monotone',
+        borderJoinStyle: 'round',
+        borderCapStyle: 'round',
+
         fill: true,
         showLine: true,
-        stepped: singlePoint ? false : 'before',
         pointRadius: c => (c.raw?.synthetic ? 0 : singlePoint ? 6 : 3),
         pointHoverRadius: c => (c.raw?.synthetic ? 0 : singlePoint ? 8 : 5),
         pointBackgroundColor: '#3b82f6',
@@ -214,6 +209,7 @@
       }]
     },
     options: {
+      animation: { duration: 800, easing: 'easeOutQuart' },
       responsive: true,
       maintainAspectRatio: false,
       layout: { padding: { top: 16, bottom: 8, left: 8, right: 8 } },
@@ -244,8 +240,8 @@
                 const d = new Date(parseWhen(original));
                 return Number.isNaN(d.getTime()) ? '' : d.toLocaleString();
               }
-              const fallback = new Date(items[0].parsed.x);
-              return Number.isNaN(fallback.getTime()) ? '' : fallback.toLocaleString();
+              const fb = new Date(items[0].parsed.x);
+              return Number.isNaN(fb.getTime()) ? '' : fb.toLocaleString();
             }
           }
         }
@@ -281,7 +277,7 @@
     chart.options.scales.y.grid.color = gridColor;
     chart.options.color = axisColor;
 
-    chart.update('none');
+    chart.update('none'); // без анимации при смене темы
   };
 
   applyThemeToChart();
