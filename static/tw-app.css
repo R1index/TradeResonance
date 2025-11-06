@@ -186,23 +186,24 @@
   color: var(--fg);
 }
 
-.table-card thead { 
-  background: var(--hover); 
+.table-card thead {
+  background: var(--hover);
 }
 
-.table-card th, .table-card td { 
-  padding: .6rem .75rem; 
+.table-card th,
+.table-card td {
+  padding: .6rem .75rem;
 }
 
-.table-card tbody tr { 
-  border-top: 1px solid var(--border); 
+.table-card tbody tr {
+  border-top: 1px solid var(--border);
 }
 
 .table-card tbody tr:hover {
   background: var(--hover);
 }
 
-/* Responsive helper chips */
+/* Табличные утилиты и бейджи */
 .summary-chip {
   display: flex;
   align-items: center;
@@ -222,6 +223,155 @@
 .summary-value {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  font-size: .75rem;
+  padding: .2rem .5rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--bg-soft);
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.badge-green {
+  background: var(--chip-green-bg);
+  color: var(--chip-green-fg);
+}
+
+.badge-red {
+  background: var(--chip-red-bg);
+  color: var(--chip-red-fg);
+}
+
+.badge-gray {
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--muted);
+}
+
+.clickable-row {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.clickable-row:hover {
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+.clickable-row:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+}
+
+.city-emoji {
+  font-size: 1rem;
+}
+
+.pricing-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-lg);
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.16);
+}
+
+.dark .pricing-group {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.28);
+}
+
+.pricing-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 4.5rem;
+}
+
+.pricing-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.pricing-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+}
+
+.pricing-value.percent {
+  color: var(--brand);
+}
+
+.dark .pricing-value.percent {
+  color: #38bdf8;
+}
+
+.pricing-badge .badge {
+  font-size: 0.75rem;
+}
+
+.pricing-divider {
+  width: 1px;
+  height: 2.5rem;
+  background: rgba(148, 163, 184, 0.35);
+}
+
+.btn-icon {
+  padding: 0.25rem 0.5rem;
+  min-width: 2rem;
+  text-align: center;
+}
+
+.btn-trend {
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  color: #fff;
+  font-weight: 600;
+  transition: var(--transition);
+}
+
+.btn-up {
+  background: var(--ok);
+}
+
+.btn-down {
+  background: var(--bad);
+}
+
+.btn-trend:hover,
+.btn-trend:focus {
+  filter: brightness(0.95);
+}
+
+.btn-trend.is-active {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55) inset;
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+input[type="range"] {
+  accent-color: var(--brand);
 }
 
 /* Collapsible filter container */
@@ -290,33 +440,100 @@
   }
 }
 
-/* Бейджи */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: .3rem;
-  font-size: .75rem;
-  padding: .2rem .5rem;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  background: var(--bg-soft);
-  color: var(--fg);
-  font-weight: 500;
+@media (max-width: 640px) {
+  .summary-chip {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+
+  .pricing-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .pricing-divider {
+    display: none;
+  }
 }
 
-.badge-green { 
-  background: var(--chip-green-bg); 
-  color: var(--chip-green-fg); 
+@media (max-width: 640px) {
+  .stacked-table.table-card {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  .stacked-table thead {
+    display: none;
+  }
+
+  .stacked-table tbody {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .stacked-table tbody tr {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    padding: 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-soft);
+    box-shadow: var(--shadow);
+  }
+
+  .stacked-table tbody tr td {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .stacked-table tbody tr td::before {
+    content: attr(data-label);
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .stacked-table tbody tr td[data-label=""],
+  .stacked-table tbody tr td[data-label=""]::before {
+    content: '';
+    display: none;
+  }
+
+  .stacked-table tbody tr td[data-actions] {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .stacked-table tbody tr td[data-actions]::before {
+    display: block;
+    width: 100%;
+  }
+
+  .stacked-table tbody tr[data-editor-row="true"] {
+    padding: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .stacked-table tbody tr[data-editor-row="true"] td {
+    display: block;
+    padding: 0.75rem 0;
+    gap: 0;
+  }
 }
 
-.badge-red { 
-  background: var(--chip-red-bg); 
-  color: var(--chip-red-fg); 
-}
-
-/* Details */
-details {
-  background: var(--bg-soft);
+  /* Details */
+  details {
+    background: var(--bg-soft);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   overflow: hidden;
