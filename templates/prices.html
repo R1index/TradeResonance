@@ -123,10 +123,7 @@
           <th class="py-2">ID</th>
           <th class="py-2">{{ t('city') }}</th>
           <th class="py-2">{{ t('product') }}</th>
-          <th class="py-2">{{ t('price') }}</th>
-          <th class="py-2">{{ t('trend') }}</th>
-          <th class="py-2">{{ t('percent') }} %</th>
-          <th class="py-2">{{ t('is_prod_city') }}</th>
+          <th class="py-2">{{ t('price') }} / {{ t('trend') }} / {{ t('percent') }}%</th>
           <th class="py-2">{{ 'Updated' if lang=='en' else 'Обновлено' }}</th>
           <th class="py-2">{{ t('actions') }}</th>
         </tr>
@@ -141,18 +138,39 @@
             tabindex="0"
             aria-label="Quick edit {{ e.city }} - {{ e.product }}">
           <td class="py-2">{{ e.id }}</td>
-          <td class="py-2">{{ e.city }}</td>
-          <td class="py-2">{{ e.product }}</td>
-          <td class="py-2" data-col="price">{{ '%.0f' % e.price }}</td>
-          <td class="py-2" data-col="trend">
-            {% if e.trend=='up' %}
-              <span class="badge badge-green">{{ t('up') }}</span>
-            {% else %}
-              <span class="badge badge-red">{{ t('down') }}</span>
-            {% endif %}
+          <td class="py-2">
+            <span class="inline-flex items-center gap-1">
+              {% if e.is_production_city %}
+                <span class="city-emoji" role="img" aria-label="{{ t('is_prod_city') }}">🏭</span>
+              {% endif %}
+              <span>{{ e.city }}</span>
+            </span>
           </td>
-          <td class="py-2" data-col="percent">{{ '%.0f' % e.percent }}</td>
-          <td class="py-2">{{ t('yes') if e.is_production_city else t('no') }}</td>
+          <td class="py-2">{{ e.product }}</td>
+          <td class="py-2" data-col="pricing">
+            <div class="pricing-group">
+              <div class="pricing-item">
+                <span class="pricing-value" data-field="price">{{ '%.0f' % e.price }}</span>
+                <span class="pricing-label">{{ t('price') }}</span>
+              </div>
+              <div class="pricing-divider" aria-hidden="true"></div>
+              <div class="pricing-item">
+                <span class="pricing-badge" data-field="trend">
+                  {% if e.trend=='up' %}
+                    <span class="badge badge-green">{{ t('up') }}</span>
+                  {% else %}
+                    <span class="badge badge-red">{{ t('down') }}</span>
+                  {% endif %}
+                </span>
+                <span class="pricing-label">{{ t('trend') }}</span>
+              </div>
+              <div class="pricing-divider" aria-hidden="true"></div>
+              <div class="pricing-item">
+                <span class="pricing-value percent" data-field="percent">{{ '%.0f' % e.percent }}%</span>
+                <span class="pricing-label">{{ t('percent') }}</span>
+              </div>
+            </div>
+          </td>
 
           {# Пишем UTC-ISO с 'Z'. Предполагается, что updated_at хранится в UTC. #}
           <td class="py-2" data-col="updated"
@@ -166,7 +184,7 @@
 
         <!-- строка-редактор -->
         <tr class="hidden bg-[var(--bg)]" id="editor-{{ e.id }}">
-          <td colspan="9" class="py-3">
+          <td colspan="6" class="py-3">
             <form class="flex flex-wrap items-end gap-3 quick-form"
                   method="post"
                   action="{{ url_for('edit_entry', entry_id=e.id, lang=lang) }}"
@@ -303,6 +321,56 @@
 .clickable-row:focus {
   outline: 2px solid #3b82f6;
   outline-offset: -2px;
+}
+.city-emoji { font-size: 1rem; }
+.pricing-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.75rem;
+  background: rgba(59, 130, 246, 0.05);
+  border: 1px solid rgba(59, 130, 246, 0.1);
+}
+@media (prefers-color-scheme: dark) {
+  .pricing-group {
+    background: rgba(59, 130, 246, 0.08);
+    border-color: rgba(59, 130, 246, 0.2);
+  }
+}
+.pricing-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 4.5rem;
+}
+.pricing-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pricing-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+}
+.pricing-value.percent {
+  color: var(--primary, #2563eb);
+}
+@media (prefers-color-scheme: dark) {
+  .pricing-value.percent { color: #38bdf8; }
+}
+.pricing-badge .badge { font-size: 0.75rem; }
+.pricing-divider {
+  width: 1px;
+  height: 2.5rem;
+  background: rgba(148, 163, 184, 0.35);
+}
+@media (max-width: 640px) {
+  .pricing-divider { display: none; }
+  .pricing-group { gap: 0.75rem; }
 }
 /* Ползунок */
 input[type="range"] { accent-color: var(--primary, #3b82f6); }
@@ -448,6 +516,35 @@ input[type="range"] { accent-color: var(--primary, #3b82f6); }
     if (priceInput && isFinite(newPrice)) priceInput.value = newPrice;
   }
 
+  const sliderThrottleState = new WeakMap();
+  const SLIDER_THROTTLE_MS = 90;
+
+  function scheduleSliderUpdate(slider, form){
+    let state = sliderThrottleState.get(slider);
+    if (!state){
+      state = { lastRun: 0, timer: null };
+      sliderThrottleState.set(slider, state);
+    }
+
+    const now = performance.now();
+    const invoke = () => {
+      state.lastRun = performance.now();
+      if (state.timer){
+        clearTimeout(state.timer);
+        state.timer = null;
+      }
+      const perc = clampPercent(Number(slider.value));
+      applyPercent(form, perc, 'slider');
+    };
+
+    if (now - state.lastRun >= SLIDER_THROTTLE_MS){
+      invoke();
+    } else {
+      if (state.timer) clearTimeout(state.timer);
+      state.timer = setTimeout(invoke, SLIDER_THROTTLE_MS - (now - state.lastRun));
+    }
+  }
+
   table.addEventListener('input', (e) => {
     const num = e.target.closest('input[name="percent"]');
     if (!num) return;
@@ -461,8 +558,14 @@ input[type="range"] { accent-color: var(--primary, #3b82f6); }
     if (!slider) return;
     const form = slider.closest('form.quick-form');
     if (!form) return;
-    const perc = clampPercent(Number(slider.value));
-    applyPercent(form, perc, 'slider');
+    scheduleSliderUpdate(slider, form);
+  });
+  table.addEventListener('change', (e) => {
+    const slider = e.target.closest('input[type="range"][data-bind-to]');
+    if (!slider) return;
+    const form = slider.closest('form.quick-form');
+    if (!form) return;
+    scheduleSliderUpdate(slider, form);
   });
   table.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-delta]');
@@ -522,12 +625,18 @@ input[type="range"] { accent-color: var(--primary, #3b82f6); }
 
       const row = table.querySelector('tr[data-row="'+id+'"]');
       if (row){
-        row.querySelector('[data-col="price"]').textContent   = Number(price).toFixed(0);
-        row.querySelector('[data-col="percent"]').textContent = Number(percent).toFixed(0);
-        const trendCell = row.querySelector('[data-col="trend"]');
-        trendCell.innerHTML = trend === 'up'
-          ? `<span class="badge badge-green">{{ t('up') }}</span>`
-          : `<span class="badge badge-red">{{ t('down') }}</span>`;
+        const priceNode = row.querySelector('[data-field="price"]');
+        if (priceNode) priceNode.textContent = Number(price).toFixed(0);
+
+        const percentNode = row.querySelector('[data-field="percent"]');
+        if (percentNode) percentNode.textContent = `${Number(percent).toFixed(0)}%`;
+
+        const trendNode = row.querySelector('[data-field="trend"]');
+        if (trendNode) {
+          trendNode.innerHTML = trend === 'up'
+            ? `<span class="badge badge-green">{{ t('up') }}</span>`
+            : `<span class="badge badge-red">{{ t('down') }}</span>`;
+        }
 
         // Пишем момент сохранения в UTC (ISO с Z) и сразу рендерим относительное
         const updatedCell = row.querySelector('[data-col="updated"]');
