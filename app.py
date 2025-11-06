@@ -409,7 +409,7 @@ def index():
 
         rows = q.order_by(L.c.city.asc(), L.c.product.asc()).all()
 
-        by_city = {}
+        by_city: Dict[str, List[sa.engine.Row]] = {}
         for r in rows:
             by_city.setdefault(r.city, []).append(r)
         city_list = [{"city": c, "entries": by_city[c]} for c in sorted(by_city.keys(), key=str.lower)]
@@ -433,75 +433,143 @@ def index():
         )
 
     # =========================
-    # 3️⃣ ВКЛАДКА ROUTES
+    # 3️⃣ ВКЛАДКА ROUTES (расширенные фильтры)
     # =========================
     elif tab == "routes":
-        q_product = (request.args.get("product") or "").strip()
-        k = max(1, min(10, request.args.get("k", type=int) or 5))
+        # ---- входные параметры
+        q_product   = (request.args.get("product") or "").strip()
+        q_buy_city  = (request.args.get("buy_city") or "").strip()
+        q_sell_city = (request.args.get("sell_city") or "").strip()
+        buy_only_prod = (request.args.get("buy_only_prod") in ("1","true","on","yes","y","да"))
+
+        k         = max(1, min(10, request.args.get("k", type=int) or 5))
         min_items = max(1, min(10, request.args.get("min_items", type=int) or 1))
         max_items = max(min_items, min(10, request.args.get("max_items", type=int) or 10))
-        sort_by = (request.args.get("sort") or "sum_profit_desc").strip().lower()
-        page = request.args.get("page", 1, type=int)
-        per_page = max(1, min(100, request.args.get("per_page", 12, type=int)))
+        sort_by   = (request.args.get("sort") or "sum_profit_desc").strip().lower()
+        page      = request.args.get("page", 1, type=int)
+        per_page  = max(1, min(100, request.args.get("per_page", 12, type=int)))
 
+        min_profit       = request.args.get("min_profit", type=float)
+        min_margin       = request.args.get("min_margin", type=float)
+        min_buy_percent  = request.args.get("min_buy_percent", type=float)
+        min_sell_percent = request.args.get("min_sell_percent", type=float)
+        buy_trend        = (request.args.get("buy_trend") or "any").strip().lower()
+        sell_trend       = (request.args.get("sell_trend") or "any").strip().lower()
+        max_age_value    = request.args.get("max_age_value", type=int)
+        max_age_unit     = (request.args.get("max_age_unit") or "h").strip().lower()  # m/h/d
+
+        # последние записи (по city+product)
         L = latest_entries_subq()
+
         products_list = cached_list(
             "products_latest",
             lambda: [p for (p,) in db.session.query(L.c.product).distinct().order_by(L.c.product.asc()).all()]
         )
+        cities_list = cached_list(
+            "cities_latest",
+            lambda: [c for (c,) in db.session.query(L.c.city).distinct().order_by(L.c.city.asc()).all()]
+        )
 
+        # тянем все последние строки
         q = db.session.query(
             L.c.id, L.c.city, L.c.product, L.c.price, L.c.percent, L.c.trend,
             L.c.updated_at, L.c.created_at, L.c.is_production_city
         ).select_from(L)
         if q_product:
             q = q.filter(L.c.product.ilike(f"%{q_product}%"))
-
         rows = q.all()
         if not rows:
             return render_template(
                 "routes.html",
-                groups=[], products_list=products_list,
-                q_product=q_product, k=k, min_items=min_items, max_items=max_items, sort_by=sort_by,
-                pagination=None, page_numbers=[], lang=lang,
+                groups=[], products_list=products_list, cities_list=cities_list,
+                q_product=q_product, q_buy_city=q_buy_city, q_sell_city=q_sell_city,
+                buy_only_prod=buy_only_prod,
+                min_profit=min_profit, min_margin=min_margin,
+                min_buy_percent=min_buy_percent, min_sell_percent=min_sell_percent,
+                buy_trend=buy_trend, sell_trend=sell_trend,
+                max_age_value=max_age_value, max_age_unit=max_age_unit,
+                k=k, min_items=min_items, max_items=max_items, sort_by=sort_by,
+                pagination=None, page_numbers=[], lang=lang, per_page=per_page,
             )
 
+        # индексы
         from collections import defaultdict
-        buy_map, sell_map, cities, products = defaultdict(dict), defaultdict(dict), set(), set()
+        buy_map = defaultdict(dict)   # [city][product] -> row
+        sell_map = defaultdict(dict)  # [city][product] -> row
+        cities = set()
+        products = set()
         for r in rows:
-            cities.add(r.city)
-            products.add(r.product)
-            if r.is_production_city:
+            cities.add(r.city); products.add(r.product)
+            if buy_only_prod:
+                if r.is_production_city:
+                    buy_map[r.city].setdefault(r.product, r)
+            else:
                 buy_map[r.city].setdefault(r.product, r)
             sell_map[r.city].setdefault(r.product, r)
 
+        # helper: UTC ISO с Z
         def to_iso_utc(dt):
             return dt.strftime("%Y-%m-%dT%H:%M:%SZ") if dt else None
 
+        # сборка групп
         groups = []
         for A in cities:
             for B in cities:
                 if A == B:
                     continue
+
+                # грубый фильтр по подстроке города
+                if q_buy_city and q_buy_city.lower() not in A.lower():
+                    continue
+                if q_sell_city and q_sell_city.lower() not in B.lower():
+                    continue
+
+                items = []
+                last_upd = None
+
                 buy_products = buy_map.get(A, {})
                 sell_products = sell_map.get(B, {})
                 if not buy_products or not sell_products:
                     continue
 
-                items, last_upd = [], None
                 for p in products:
-                    ea, eb = buy_products.get(p), sell_products.get(p)
+                    ea = buy_products.get(p)   # покупка
+                    eb = sell_products.get(p)  # продажа
                     if not ea or not eb:
                         continue
+
+                    # фильтры по тренду
+                    if buy_trend in ("up","down") and ea.trend != buy_trend:
+                        continue
+                    if sell_trend in ("up","down") and eb.trend != sell_trend:
+                        continue
+
                     profit = float(eb.price) - float(ea.price)
-                    if profit <= 0:
+                    if min_profit is not None and profit < min_profit:
                         continue
                     margin_pct = profit * 100.0 / max(1.0, float(ea.price))
-                    upd_buy = ea.updated_at or ea.created_at
+                    if min_margin is not None and margin_pct < min_margin:
+                        continue
+
+                    if min_buy_percent is not None and ea.percent is not None and float(ea.percent) < min_buy_percent:
+                        continue
+                    if min_sell_percent is not None and eb.percent is not None and float(eb.percent) < min_sell_percent:
+                        continue
+
+                    upd_buy  = ea.updated_at or ea.created_at
                     upd_sell = eb.updated_at or eb.created_at
                     upd = max(upd_buy, upd_sell)
+
+                    # свежесть данных (UTC)
+                    if max_age_value:
+                        mul = {"m":60, "h":3600, "d":86400}.get(max_age_unit, 3600)
+                        max_age_sec = max_age_value * mul
+                        if (datetime.utcnow() - upd).total_seconds() > max_age_sec:
+                            continue
+
                     if (last_upd is None) or (upd > last_upd):
                         last_upd = upd
+
                     items.append({
                         "product": p,
                         "buy_entry_id": int(ea.id),
@@ -514,20 +582,22 @@ def index():
                         "sell_percent": float(eb.percent) if eb.percent is not None else None,
                         "buy_trend": ea.trend,
                         "sell_trend": eb.trend,
-                        "profit": profit,
-                        "margin_pct": margin_pct,
-                        "updated_utc_iso": to_iso_utc(upd),
                         "buy_updated_iso": to_iso_utc(upd_buy),
                         "sell_updated_iso": to_iso_utc(upd_sell),
+                        "profit": profit,
+                        "margin_pct": margin_pct,
                     })
 
                 if not items:
                     continue
+
+                # топ-K по прибыли
                 items.sort(key=lambda x: (x["profit"], x["margin_pct"]), reverse=True)
                 items_top = items[:k]
                 count = len(items)
                 sum_profit = sum(x["profit"] for x in items_top)
                 avg_margin = sum(x["margin_pct"] for x in items_top) / max(1, len(items_top))
+
                 if not (min_items <= count <= max_items):
                     continue
 
@@ -541,21 +611,27 @@ def index():
                     "updated_utc_iso": to_iso_utc(last_upd),
                 })
 
+        # сортировка групп
         if sort_by == "avg_margin_desc":
             groups.sort(key=lambda g: (g["avg_margin"], g["sum_profit"]), reverse=True)
         elif sort_by == "count_desc":
             groups.sort(key=lambda g: (g["items_total"], g["sum_profit"]), reverse=True)
-        else:
+        elif sort_by == "fresh_desc":
+            groups.sort(key=lambda g: (g["updated_utc_iso"] or ""), reverse=True)
+        else:  # sum_profit_desc
             groups.sort(key=lambda g: (g["sum_profit"], g["avg_margin"]), reverse=True)
 
+        # пагинация по группам
         total = len(groups)
-        start = (page - 1) * per_page
-        end = start + per_page
-        groups_page = groups[start:end]
+        start_i = (page - 1) * per_page
+        end_i = start_i + per_page
+        groups_page = groups[start_i:end_i]
 
         class SimplePagination:
             def __init__(self, page, per_page, total):
-                self.page, self.per_page, self.total = page, per_page, total
+                self.page = page
+                self.per_page = per_page
+                self.total = total
                 self.pages = max(1, (total + per_page - 1) // per_page)
             @property
             def has_prev(self): return self.page > 1
@@ -567,6 +643,8 @@ def index():
             def next_num(self): return min(self.pages, self.page + 1)
 
         pagination = SimplePagination(page, per_page, total)
+
+        # окно страниц до 20
         window = 20
         start_p = max(1, page - window // 2)
         end_p = min(pagination.pages, start_p + window - 1)
@@ -577,17 +655,29 @@ def index():
             "routes.html",
             groups=groups_page,
             products_list=products_list,
+            cities_list=cities_list,
             q_product=q_product,
+            q_buy_city=q_buy_city,
+            q_sell_city=q_sell_city,
+            buy_only_prod=buy_only_prod,
+            min_profit=min_profit,
+            min_margin=min_margin,
+            min_buy_percent=min_buy_percent,
+            min_sell_percent=min_sell_percent,
+            buy_trend=buy_trend,
+            sell_trend=sell_trend,
+            max_age_value=max_age_value,
+            max_age_unit=max_age_unit,
             k=k, min_items=min_items, max_items=max_items, sort_by=sort_by,
-            pagination=pagination, page_numbers=page_numbers,
-            lang=lang, per_page=per_page,
+            pagination=pagination,
+            page_numbers=page_numbers,
+            lang=lang,
+            per_page=per_page,
         )
 
-    # =========================
-    # 4️⃣ Редирект по умолчанию
-    # =========================
+    # fallback
     return redirect(url_for("index", tab="prices", lang=lang))
-
+    
 @app.route("/entries/new", methods=["GET", "POST"])
 def new_entry():
     lang = get_lang()
