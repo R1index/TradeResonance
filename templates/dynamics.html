@@ -133,34 +133,37 @@
 </section>
 
 {% if timeline %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js" integrity="sha384-gwSq8JDIO6p3i2t23G1UFUJp3HWe3QfC32bFHmwd4yVnGpndtQGOjlXpvtux3Iur" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js" integrity="sha384-sqzk5d6rUv9GctZDGx3gBiGyo23/0xcIr6HKwvWNOFbh8fMZmJbRRn7vjmBbPMhK" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js" crossorigin="anonymous"></script>
 <script>
+(() => {
   const canvas = document.getElementById('priceChart');
-  if (!canvas) {
-    return;
-  }
+  if (!canvas) return;
+
   const ctx = canvas.getContext('2d');
   const rawData = {{ timeline | tojson }};
 
-  const basePoints = rawData
-    .map(point => {
-      if (!point.timestamp) {
-        return null;
-      }
-      const price = Number(point.price);
-      const timestamp = Date.parse(point.timestamp);
-      if (!Number.isFinite(price) || Number.isNaN(timestamp)) {
-        return null;
-      }
-      return { x: timestamp, y: price, synthetic: false, label: point.timestamp };
+  // Надёжный парсер дат: поддерживает "YYYY-MM-DD HH:mm[:ss]" и ISO
+  const parseWhen = (s) => {
+    if (!s) return NaN;
+    const normalized = (typeof s === 'string' && s.includes(' '))
+      ? s.replace(' ', 'T')
+      : s;
+    const t = Date.parse(normalized);
+    return Number.isNaN(t) ? NaN : t;
+  };
+
+  const basePoints = (Array.isArray(rawData) ? rawData : [])
+    .map(p => {
+      const price = Number(p?.price);
+      const timestamp = parseWhen(p?.timestamp);
+      if (!Number.isFinite(price) || Number.isNaN(timestamp)) return null;
+      return { x: timestamp, y: price, synthetic: false, label: p.timestamp };
     })
     .filter(Boolean)
     .sort((a, b) => a.x - b.x);
 
-  if (!basePoints.length) {
-    return;
-  }
+  if (!basePoints.length) return;
 
   const makePaddingPoints = (point) => {
     const hour = 60 * 60 * 1000;
@@ -170,24 +173,17 @@
       { x: point.x + hour, y: point.y, synthetic: true, label: point.label },
     ];
   };
-
   const chartPoints = basePoints.length === 1 ? makePaddingPoints(basePoints[0]) : basePoints;
 
   const hexToRgba = (hex, alpha) => {
-    if (!hex) {
-      return `rgba(59,130,246,${alpha})`;
-    }
+    if (!hex) return `rgba(59,130,246,${alpha})`;
     const sanitized = hex.replace('#', '').trim();
     const full = sanitized.length === 3
       ? sanitized.split('').map(ch => ch + ch).join('')
       : sanitized.slice(0, 6);
     const num = Number.parseInt(full, 16);
-    if (!Number.isFinite(num)) {
-      return `rgba(59,130,246,${alpha})`;
-    }
-    const r = (num >> 16) & 255;
-    const g = (num >> 8) & 255;
-    const b = num & 255;
+    if (!Number.isFinite(num)) return `rgba(59,130,246,${alpha})`;
+    const r = (num >> 16) & 255, g = (num >> 8) & 255, b = num & 255;
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
 
@@ -208,8 +204,8 @@
         fill: true,
         showLine: true,
         stepped: singlePoint ? false : 'before',
-        pointRadius: ctx => (ctx.raw?.synthetic ? 0 : singlePoint ? 6 : 3),
-        pointHoverRadius: ctx => (ctx.raw?.synthetic ? 0 : singlePoint ? 8 : 5),
+        pointRadius: c => (c.raw?.synthetic ? 0 : singlePoint ? 6 : 3),
+        pointHoverRadius: c => (c.raw?.synthetic ? 0 : singlePoint ? 8 : 5),
         pointBackgroundColor: '#3b82f6',
         pointBorderColor: '#3b82f6',
         pointHoverBackgroundColor: '#3b82f6',
@@ -220,69 +216,33 @@
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      layout: {
-        padding: {
-          top: 16,
-          bottom: 8,
-          left: 8,
-          right: 8,
-        }
-      },
+      layout: { padding: { top: 16, bottom: 8, left: 8, right: 8 } },
       scales: {
         x: {
           type: 'time',
           time: {
             tooltipFormat: 'yyyy-MM-dd HH:mm',
-            displayFormats: {
-              hour: 'MMM d HH:mm',
-              day: 'MMM d'
-            }
+            displayFormats: { hour: 'MMM d HH:mm', day: 'MMM d' }
           },
-          adapters: {
-            date: {
-              locale: navigator?.language || 'en'
-            }
-          },
-          ticks: {
-            color: '#6b7280',
-            maxRotation: 0,
-            autoSkipPadding: 16,
-          },
-          grid: {
-            color: '#e5e7eb',
-            drawBorder: false,
-          }
+          ticks: { color: '#6b7280', maxRotation: 0, autoSkipPadding: 16 },
+          grid: { color: '#e5e7eb', drawBorder: false }
         },
         y: {
-          ticks: {
-            color: '#6b7280',
-            padding: 6,
-          },
-          grid: {
-            color: '#e5e7eb',
-            drawBorder: false,
-          }
+          ticks: { color: '#6b7280', padding: 6 },
+          grid: { color: '#e5e7eb', drawBorder: false }
         }
       },
       plugins: {
-        legend: {
-          display: false
-        },
+        legend: { display: false },
         tooltip: {
-          filter(context) {
-            return !context.raw?.synthetic;
-          },
+          filter: (ctx) => !ctx.raw?.synthetic,
           callbacks: {
             title(items) {
-              if (!items?.length) {
-                return '';
-              }
+              if (!items?.length) return '';
               const original = items[0].raw?.label;
               if (original) {
-                const date = new Date(original);
-                if (!Number.isNaN(date.getTime())) {
-                  return date.toLocaleString();
-                }
+                const d = new Date(parseWhen(original));
+                return Number.isNaN(d.getTime()) ? '' : d.toLocaleString();
               }
               const fallback = new Date(items[0].parsed.x);
               return Number.isNaN(fallback.getTime()) ? '' : fallback.toLocaleString();
@@ -298,10 +258,7 @@
     const axisColor = styles.getPropertyValue('--muted').trim() || '#6b7280';
     const gridColor = styles.getPropertyValue('--border').trim() || '#e5e7eb';
     const lineColor = styles.getPropertyValue('--brand').trim() || '#3b82f6';
-    if (!chart.chartArea) {
-      requestAnimationFrame(applyThemeToChart);
-      return;
-    }
+    if (!chart.chartArea) { requestAnimationFrame(applyThemeToChart); return; }
 
     const fillTop = hexToRgba(lineColor, 0.25);
     const fillBottom = hexToRgba(lineColor, 0);
@@ -310,17 +267,20 @@
     gradient.addColorStop(0, fillTop);
     gradient.addColorStop(1, fillBottom);
 
-    chart.data.datasets[0].borderColor = lineColor;
-    chart.data.datasets[0].backgroundColor = gradient;
-    chart.data.datasets[0].pointBackgroundColor = lineColor;
-    chart.data.datasets[0].pointBorderColor = lineColor;
-    chart.data.datasets[0].pointHoverBackgroundColor = lineColor;
-    chart.data.datasets[0].pointHoverBorderColor = lineColor;
+    const ds = chart.data.datasets[0];
+    ds.borderColor = lineColor;
+    ds.backgroundColor = gradient;
+    ds.pointBackgroundColor = lineColor;
+    ds.pointBorderColor = lineColor;
+    ds.pointHoverBackgroundColor = lineColor;
+    ds.pointHoverBorderColor = lineColor;
+
     chart.options.scales.x.ticks.color = axisColor;
     chart.options.scales.x.grid.color = gridColor;
     chart.options.scales.y.ticks.color = axisColor;
     chart.options.scales.y.grid.color = gridColor;
     chart.options.color = axisColor;
+
     chart.update('none');
   };
 
@@ -330,15 +290,9 @@
   });
 
   const form = document.getElementById('dynamicsForm');
-  const citySelect = document.getElementById('citySelect');
-  const productSelect = document.getElementById('productSelect');
-
-  citySelect?.addEventListener('change', () => {
-    form.submit();
-  });
-  productSelect?.addEventListener('change', () => {
-    form.submit();
-  });
+  document.getElementById('citySelect')?.addEventListener('change', () => form.submit());
+  document.getElementById('productSelect')?.addEventListener('change', () => form.submit());
+})();
 </script>
 {% endif %}
 {% endblock %}
