@@ -1,0 +1,207 @@
+<section class="card shadow-sm">
+  <div class="p-6 space-y-6">
+    <header class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+      <div>
+        <h2 class="text-xl font-semibold">{{ t('nav_routes') }}</h2>
+        <p class="text-sm text-muted">{{ 'Discover profitable buy/sell pairs across the world' if lang=='en' else 'Находите прибыльные пары для покупки и продажи' }}</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="badge">{{ route_page.pagination.total }} {{ t('pairs') }}</span>
+        <a href="{{ url_for('web.export_csv', lang=lang) }}" class="btn btn-ghost">CSV</a>
+      </div>
+    </header>
+
+    <form
+      id="routes-filter"
+      class="filter-grid"
+      hx-get="{{ url_for('web.dashboard', tab='routes', lang=lang) }}"
+      hx-target="#tab-panel"
+      hx-push-url="true"
+    >
+      <input type="hidden" name="tab" value="routes">
+      <div>
+        <label class="label">{{ t('product') }}</label>
+        <input class="input" name="product" value="{{ filters.product }}" list="routes-product-list" placeholder="{{ t('product') }}">
+        <datalist id="routes-product-list">
+          {% for product in products_list %}<option value="{{ product }}">{% endfor %}
+        </datalist>
+      </div>
+      <div>
+        <label class="label">{{ t('route_buy') }}</label>
+        <input class="input" name="buy_city" value="{{ filters.buy_city }}" list="routes-city-list" placeholder="{{ t('city') }}">
+      </div>
+      <div>
+        <label class="label">{{ t('route_sell') }}</label>
+        <input class="input" name="sell_city" value="{{ filters.sell_city }}" list="routes-city-list" placeholder="{{ t('city') }}">
+        <datalist id="routes-city-list">
+          {% for city in cities_list %}<option value="{{ city }}">{% endfor %}
+        </datalist>
+      </div>
+      <div>
+        <label class="label">{{ 'Buy only production city' if lang=='en' else 'Покупка только в городе-производителе' }}</label>
+        <label class="toggle">
+          <input type="checkbox" name="buy_only_prod" value="1" {{ 'checked' if filters.buy_only_prod else '' }}>
+          <span>{{ t('yes') }}</span>
+        </label>
+      </div>
+      <div>
+        <label class="label">{{ t('profit') }} ≥</label>
+        <input class="input" type="number" step="1" name="min_profit" value="{{ filters.min_profit if filters.min_profit is not none else '' }}">
+      </div>
+      <div>
+        <label class="label">{{ t('spread') }} % ≥</label>
+        <input class="input" type="number" step="1" name="min_margin" value="{{ filters.min_margin if filters.min_margin is not none else '' }}">
+      </div>
+      <div>
+        <label class="label">{{ t('percent') }} {{ t('route_buy') }}</label>
+        <input class="input" type="number" step="1" name="min_buy_percent" value="{{ filters.min_buy_percent if filters.min_buy_percent is not none else '' }}">
+      </div>
+      <div>
+        <label class="label">{{ t('percent') }} {{ t('route_sell') }}</label>
+        <input class="input" type="number" step="1" name="min_sell_percent" value="{{ filters.min_sell_percent if filters.min_sell_percent is not none else '' }}">
+      </div>
+      <div>
+        <label class="label">{{ 'Buy trend' if lang=='en' else 'Тренд покупки' }}</label>
+        <select class="select" name="buy_trend">
+          <option value="">—</option>
+          <option value="up" {{ 'selected' if filters.buy_trend=='up' else '' }}>{{ t('up') }}</option>
+          <option value="down" {{ 'selected' if filters.buy_trend=='down' else '' }}>{{ t('down') }}</option>
+        </select>
+      </div>
+      <div>
+        <label class="label">{{ 'Sell trend' if lang=='en' else 'Тренд продажи' }}</label>
+        <select class="select" name="sell_trend">
+          <option value="">—</option>
+          <option value="up" {{ 'selected' if filters.sell_trend=='up' else '' }}>{{ t('up') }}</option>
+          <option value="down" {{ 'selected' if filters.sell_trend=='down' else '' }}>{{ t('down') }}</option>
+        </select>
+      </div>
+      <div class="flex items-end gap-2">
+        <div class="flex-1">
+          <label class="label">{{ 'Freshness' if lang=='en' else 'Актуальность' }}</label>
+          <input class="input" type="number" min="1" name="max_age_value" value="{{ filters.max_age_value if filters.max_age_value is not none else '' }}">
+        </div>
+        <select class="select w-32 mt-5" name="max_age_unit">
+          <option value="m" {{ 'selected' if filters.max_age_unit=='m' else '' }}>min</option>
+          <option value="h" {{ 'selected' if filters.max_age_unit=='h' else '' }}>h</option>
+          <option value="d" {{ 'selected' if filters.max_age_unit=='d' else '' }}>d</option>
+        </select>
+      </div>
+      <div>
+        <label class="label">Top K</label>
+        <input class="input" type="number" name="k" min="1" max="10" value="{{ filters.top_k }}">
+      </div>
+      <div>
+        <label class="label">{{ 'Items range' if lang=='en' else 'Диапазон позиций' }}</label>
+        <div class="flex items-center gap-2">
+          <input class="input" type="number" name="min_items" min="1" value="{{ filters.min_items }}">
+          <span class="text-muted">—</span>
+          <input class="input" type="number" name="max_items" min="1" value="{{ filters.max_items }}">
+        </div>
+      </div>
+      <div>
+        <label class="label">Sort</label>
+        <select class="select" name="sort_by">
+          <option value="sum_profit_desc" {{ 'selected' if filters.sort_by=='sum_profit_desc' else '' }}>{{ 'Profit ↓' if lang=='en' else 'Профит ↓' }}</option>
+          <option value="avg_margin_desc" {{ 'selected' if filters.sort_by=='avg_margin_desc' else '' }}>{{ 'Margin ↓' if lang=='en' else 'Маржа ↓' }}</option>
+          <option value="count_desc" {{ 'selected' if filters.sort_by=='count_desc' else '' }}>{{ 'Items ↓' if lang=='en' else 'Товары ↓' }}</option>
+          <option value="fresh_desc" {{ 'selected' if filters.sort_by=='fresh_desc' else '' }}>{{ 'Freshness' if lang=='en' else 'Свежесть' }}</option>
+        </select>
+      </div>
+      <div>
+        <label class="label">Per page</label>
+        <input class="input" type="number" min="1" max="100" name="per_page" value="{{ filters.per_page }}">
+      </div>
+      <div class="col-span-full flex gap-2">
+        <button type="submit" class="btn btn-primary">{{ t('filters') }}</button>
+        <a href="{{ url_for('web.dashboard', tab='routes', lang=lang) }}" class="btn btn-ghost">Reset</a>
+      </div>
+    </form>
+
+    {% if not route_page.groups %}
+      <p class="text-muted text-sm">{{ t('no_data') }}</p>
+    {% else %}
+      <div class="space-y-4">
+        {% for group in route_page.groups %}
+          <article class="border border-divider/70 rounded-xl p-4 space-y-3">
+            <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h3 class="text-lg font-semibold">{{ group.buy_city }} → {{ group.sell_city }}</h3>
+                <p class="text-xs text-muted">{{ 'Last sync' if lang=='en' else 'Обновлено' }}: {{ group.updated_at.strftime('%Y-%m-%d %H:%M') }}</p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2 text-sm">
+                <span class="badge badge-positive">+{{ '%.0f' % group.sum_profit }}</span>
+                <span class="badge">{{ '%.1f' % group.avg_margin }}%</span>
+                <span class="badge">{{ group.items_total }} {{ t('items') }}</span>
+              </div>
+            </header>
+            <div class="overflow-x-auto">
+              <table class="min-w-full table">
+                <thead>
+                  <tr>
+                    <th>{{ t('product') }}</th>
+                    <th>{{ t('route_buy') }}</th>
+                    <th>{{ t('route_sell') }}</th>
+                    <th>{{ t('profit') }}</th>
+                    <th>{{ t('spread') }}</th>
+                    <th>{{ t('trend') }}</th>
+                    <th>{{ t('actions') }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in group.entries %}
+                    <tr>
+                      <td>{{ item.product }}</td>
+                      <td>
+                        <div class="flex flex-col">
+                          <span class="font-medium">{{ group.buy_city }}</span>
+                          <span class="text-xs text-muted">{{ '%.0f' % item.buy_price }} • {{ '%.0f' % item.buy_percent }}%</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="flex flex-col">
+                          <span class="font-medium">{{ group.sell_city }}</span>
+                          <span class="text-xs text-muted">{{ '%.0f' % item.sell_price }} • {{ '%.0f' % item.sell_percent }}%</span>
+                        </div>
+                      </td>
+                      <td>{{ '%.0f' % item.margin }}</td>
+                      <td>{{ '%.1f' % item.margin_percent }}%</td>
+                      <td>
+                        <span class="badge {{ 'badge-positive' if item.sell_trend == 'up' else 'badge-negative' }}">{{ t(item.sell_trend) }}</span>
+                      </td>
+                      <td class="whitespace-nowrap space-x-2">
+                        <a href="{{ url_for('web.edit_entry', entry_id=item.buy_entry_id, lang=lang) }}" class="btn btn-ghost text-xs">{{ t('route_buy') }}</a>
+                        <a href="{{ url_for('web.edit_entry', entry_id=item.sell_entry_id, lang=lang) }}" class="btn btn-ghost text-xs">{{ t('route_sell') }}</a>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+
+      {% set pagination = route_page.pagination %}
+      {% if pagination.pages > 1 %}
+        <nav class="pagination" aria-label="Routes pagination">
+          {% if pagination.has_prev %}
+            <a hx-get="{{ url_for('web.dashboard', tab='routes', lang=lang, page=pagination.prev_page, per_page=pagination.per_page) }}" hx-target="#tab-panel" hx-push-url="true" hx-include="#routes-filter" class="page-link">«</a>
+          {% endif %}
+          {% for page_num in pagination.window %}
+            <a
+              hx-get="{{ url_for('web.dashboard', tab='routes', lang=lang, page=page_num, per_page=pagination.per_page) }}"
+              hx-target="#tab-panel"
+              hx-push-url="true"
+              hx-include="#routes-filter"
+              class="page-link {{ 'page-link-active' if page_num == pagination.page else '' }}"
+            >{{ page_num }}</a>
+          {% endfor %}
+          {% if pagination.has_next %}
+            <a hx-get="{{ url_for('web.dashboard', tab='routes', lang=lang, page=pagination.next_page, per_page=pagination.per_page) }}" hx-target="#tab-panel" hx-push-url="true" hx-include="#routes-filter" class="page-link">»</a>
+          {% endif %}
+        </nav>
+      {% endif %}
+    {% endif %}
+  </div>
+</section>

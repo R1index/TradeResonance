@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-6" id="dashboard-root">
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold tracking-tight">{{ t('app_title') }}</h1>
+      <p class="text-sm text-muted mt-1">{{ 'Live insights into Resonance Solstice trading routes' if lang=='en' else 'Актуальные данные по торговым маршрутам Resonance Solstice' }}</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2 text-sm">
+      <a href="{{ url_for('web.export_csv', lang=lang) }}" class="btn btn-ghost" title="Export all data">CSV</a>
+      <form method="post" action="{{ url_for('web.admin_dedupe') }}" class="flex items-center gap-2" hx-boost="false">
+        <input type="password" name="admin_pass" placeholder="{{ t('admin_password') }}" class="input w-36" required>
+        <button type="submit" class="btn btn-ghost">{{ t('dedupe') }}</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="relative">
+    <nav class="flex flex-wrap items-center gap-2 text-sm" role="tablist">
+      {% for name, label in [('prices', t('nav_prices')), ('cities', t('nav_cities')), ('routes', t('nav_routes'))] %}
+        <a
+          href="{{ url_for('web.dashboard', tab=name, lang=lang) }}"
+          class="tab-link {{ 'tab-link-active' if tab==name else '' }}"
+          hx-get="{{ url_for('web.dashboard', tab=name, lang=lang) }}"
+          hx-target="#tab-panel"
+          hx-push-url="true"
+          role="tab"
+          aria-selected="{{ 'true' if tab==name else 'false' }}"
+        >{{ label }}</a>
+      {% endfor %}
+    </nav>
+  </div>
+
+  <section id="tab-panel" class="space-y-6" hx-target="this" hx-swap="innerHTML">
+    {% include tab_template %}
+  </section>
+</section>
+{% endblock %}
