@@ -391,7 +391,7 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
                     {
                         "pair_from": buy_city,
                         "pair_to": sell_city,
-                        "items": top_items,
+                        "entries": top_items,
                         "items_total": len(items),
                         "sum_profit": sum_profit,
                         "avg_margin": avg_margin,
