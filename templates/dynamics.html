@@ -133,8 +133,8 @@
 </section>
 
 {% if timeline %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js" integrity="sha384-gwSq8JDIO6p3i2t23G1UFUJp3HWe3QfC32bFHmwd4yVnGpndtQGOjlXpvtux3Iur" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js" integrity="sha384-sqzk5d6rUv9GctZDGx3gBiGyo23/0xcIr6HKwvWNOFbh8fMZmJbRRn7vjmBbPMhK" crossorigin="anonymous"></script>
 <script>
   const canvas = document.getElementById('priceChart');
   if (!canvas) {
@@ -142,16 +142,20 @@
   }
   const ctx = canvas.getContext('2d');
   const data = {{ timeline_json | safe }};
-  const labels = data.map(point => new Date(point.timestamp));
-  const prices = data.map(point => point.price);
+
+  const points = data
+    .filter(point => point.timestamp && Number.isFinite(point.price))
+    .map(point => ({ x: new Date(point.timestamp), y: point.price }));
+  if (!points.length) {
+    return;
+  }
 
   const chart = new Chart(ctx, {
     type: 'line',
     data: {
-      labels,
       datasets: [{
         label: "{{ t('price') }}",
-        data: prices,
+        data: points,
         borderColor: '#3b82f6',
         backgroundColor: 'rgba(59,130,246,0.15)',
         tension: 0.25,
@@ -165,6 +169,11 @@
       scales: {
         x: {
           type: 'time',
+          adapters: {
+            date: {
+              locale: navigator?.language || 'en'
+            }
+          },
           time: {
             tooltipFormat: 'yyyy-MM-dd HH:mm',
             displayFormats: {
@@ -174,6 +183,9 @@
           },
           ticks: {
             color: '#6b7280'
+          },
+          grid: {
+            color: '#e5e7eb'
           }
         },
         y: {
@@ -205,6 +217,7 @@
     chart.options.scales.x.grid.color = gridColor;
     chart.options.scales.y.ticks.color = axisColor;
     chart.options.scales.y.grid.color = gridColor;
+    chart.options.color = axisColor;
     chart.update('none');
   };
 
