@@ -179,7 +179,7 @@
       </div>
 
       <div class="overflow-x-auto">
-        <table class="min-w-full table-card">
+        <table class="min-w-full table-card stacked-table">
           <thead class="text-left text-sm text-zinc-600 dark:text-zinc-400">
             <tr>
               <th class="py-2 w-[30%]">{{ t('product') }}</th>
@@ -191,11 +191,11 @@
           <tbody class="text-sm">
             {% for it in g.entries %}
             <tr class="border-b border-zinc-200 dark:border-zinc-800 align-top">
-              <td class="py-2">
+              <td class="py-2" data-label="{{ t('product') }}">
                 <div class="font-medium">{{ it.product }}</div>
               </td>
 
-              <td class="py-2">
+              <td class="py-2" data-label="{{ t('route_buy') }}">
                 <div class="flex flex-wrap items-center gap-2">
                   <span class="font-medium">{{ it.buy_city }}</span>
                   <span>• {{ '%.0f' % it.buy_price }}</span>
@@ -213,7 +213,7 @@
                 </div>
               </td>
 
-              <td class="py-2">
+              <td class="py-2" data-label="{{ t('route_sell') }}">
                 <div class="flex flex-wrap items-center gap-2">
                   <span class="font-medium">{{ it.sell_city }}</span>
                   <span>• {{ '%.0f' % it.sell_price }}</span>
@@ -231,7 +231,7 @@
                 </div>
               </td>
 
-              <td class="py-2 text-right whitespace-nowrap">
+              <td class="py-2 text-right whitespace-nowrap" data-label="{{ 'Profit' if lang=='en' else 'Прибыль' }}">
                 <div class="font-medium">+{{ '%.0f' % it.profit }}</div>
                 <div class="text-[11px] text-[var(--muted)]">{{ '%.1f' % it.margin_pct }}%</div>
               </td>

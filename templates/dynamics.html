@@ -68,7 +68,7 @@
 
     {% if timeline_entries %}
     <div class="overflow-x-auto">
-      <table class="min-w-full table-card">
+      <table class="min-w-full table-card stacked-table">
         <thead class="text-left text-sm text-[var(--muted)]">
           <tr>
             <th class="py-2">{{ t('updated_at') }}</th>
@@ -81,10 +81,10 @@
           {% for entry in timeline_entries|reverse %}
           {% set ts = entry.recorded_at %}
           <tr>
-            <td class="py-2 font-mono text-xs">{{ ts.strftime('%Y-%m-%d %H:%M') if ts else '—' }}</td>
-            <td class="py-2">{{ '%.0f' % entry.price }}</td>
-            <td class="py-2">{{ '%.0f' % entry.percent }}</td>
-            <td class="py-2">
+            <td class="py-2 font-mono text-xs" data-label="{{ t('updated_at') }}">{{ ts.strftime('%Y-%m-%d %H:%M') if ts else '—' }}</td>
+            <td class="py-2" data-label="{{ t('price') }}">{{ '%.0f' % entry.price }}</td>
+            <td class="py-2" data-label="{{ t('percent') }} %">{{ '%.0f' % entry.percent }}</td>
+            <td class="py-2" data-label="{{ t('trend') }}">
               {% if entry.trend == 'up' %}
                 <span class="badge badge-green">{{ t('up') }}</span>
               {% else %}

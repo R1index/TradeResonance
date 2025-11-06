@@ -117,7 +117,7 @@
     <p class="text-zinc-500">{{ t('no_data') }}</p>
   {% else %}
   <div class="overflow-x-auto">
-    <table class="min-w-full table-card" id="pricesTable">
+    <table class="min-w-full table-card stacked-table" id="pricesTable">
       <thead class="text-left text-sm text-zinc-600 dark:text-zinc-400">
         <tr>
           <th class="py-2">ID</th>
@@ -137,8 +137,8 @@
             data-quick-edit="{{ e.id }}" 
             tabindex="0"
             aria-label="Quick edit {{ e.city }} - {{ e.product }}">
-          <td class="py-2">{{ e.id }}</td>
-          <td class="py-2">
+          <td class="py-2" data-label="ID">{{ e.id }}</td>
+          <td class="py-2" data-label="{{ t('city') }}">
             <span class="inline-flex items-center gap-1">
               {% if e.is_production_city %}
                 <span class="city-emoji" role="img" aria-label="{{ t('is_prod_city') }}">🏭</span>
@@ -146,8 +146,8 @@
               <span>{{ e.city }}</span>
             </span>
           </td>
-          <td class="py-2">{{ e.product }}</td>
-          <td class="py-2" data-col="pricing">
+          <td class="py-2" data-label="{{ t('product') }}">{{ e.product }}</td>
+          <td class="py-2" data-col="pricing" data-label="{{ t('price') }} / {{ t('trend') }} / {{ t('percent') }}%">
             <div class="pricing-group">
               <div class="pricing-item">
                 <span class="pricing-value" data-field="price">{{ '%.0f' % e.price }}</span>
@@ -173,18 +173,18 @@
           </td>
 
           {# Пишем UTC-ISO с 'Z'. Предполагается, что updated_at хранится в UTC. #}
-          <td class="py-2" data-col="updated"
+          <td class="py-2" data-label="{{ 'Updated' if lang=='en' else 'Обновлено' }}" data-col="updated"
               data-updated-iso="{{ (e.updated_at or e.created_at).strftime('%Y-%m-%dT%H:%M:%SZ') }}">
           </td>
 
-          <td class="py-2">
+          <td class="py-2" data-label="{{ t('actions') }}" data-actions>
             <a class="btn btn-outline" href="{{ url_for('edit_entry', entry_id=e.id, lang=lang) }}">{{ t('edit') }}</a>
           </td>
         </tr>
 
         <!-- строка-редактор -->
-        <tr class="hidden bg-[var(--bg)]" id="editor-{{ e.id }}">
-          <td colspan="6" class="py-3">
+        <tr class="hidden bg-[var(--bg)]" id="editor-{{ e.id }}" data-editor-row="true">
+          <td colspan="6" class="py-3" data-label="">
             <form class="flex flex-wrap items-end gap-3 quick-form"
                   method="post"
                   action="{{ url_for('edit_entry', entry_id=e.id, lang=lang) }}"
@@ -311,80 +311,6 @@
   {% endif %}
   {% endif %}
 </section>
-
-<style>
-.clickable-row {
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-.clickable-row:hover { background-color: rgba(59, 130, 246, 0.05); }
-.clickable-row:focus {
-  outline: 2px solid #3b82f6;
-  outline-offset: -2px;
-}
-.city-emoji { font-size: 1rem; }
-.pricing-group {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.75rem;
-  background: rgba(59, 130, 246, 0.05);
-  border: 1px solid rgba(59, 130, 246, 0.1);
-}
-@media (prefers-color-scheme: dark) {
-  .pricing-group {
-    background: rgba(59, 130, 246, 0.08);
-    border-color: rgba(59, 130, 246, 0.2);
-  }
-}
-.pricing-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  min-width: 4.5rem;
-}
-.pricing-label {
-  font-size: 0.65rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.pricing-value {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: inherit;
-}
-.pricing-value.percent {
-  color: var(--primary, #2563eb);
-}
-@media (prefers-color-scheme: dark) {
-  .pricing-value.percent { color: #38bdf8; }
-}
-.pricing-badge .badge { font-size: 0.75rem; }
-.pricing-divider {
-  width: 1px;
-  height: 2.5rem;
-  background: rgba(148, 163, 184, 0.35);
-}
-@media (max-width: 640px) {
-  .pricing-divider { display: none; }
-  .pricing-group { gap: 0.75rem; }
-}
-/* Ползунок */
-input[type="range"] { accent-color: var(--primary, #3b82f6); }
-/* Кнопки + / - */
-.btn-icon { padding: 0.25rem 0.5rem; min-width: 2rem; text-align: center; }
-/* Тренд-кнопки */
-.btn-trend { padding: 0.4rem 0.75rem; border-radius: 0.5rem; border: 1px solid transparent; }
-.btn-up   { background: #16a34a; color:#fff; }
-.btn-down { background: #dc2626; color:#fff; }
-.btn-trend:is(:hover,:focus) { filter: brightness(0.95); }
-.btn-trend.is-active { box-shadow: 0 0 0 2px rgba(255,255,255,0.6) inset; border-color: rgba(255,255,255,0.7); }
-/* Скрытый select (остается для POST/доступности) */
-.sr-only { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0; }
-</style>
 
 <script>
 (function(){
