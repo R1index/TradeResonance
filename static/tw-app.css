@@ -166,6 +166,16 @@
   box-shadow: var(--focus-ring);
 }
 
+.label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+
 /* Таблица */
 .table-card {
   width: 100%;

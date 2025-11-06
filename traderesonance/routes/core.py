@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 import sqlalchemy as sa
 from flask import (
@@ -173,42 +174,90 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
             lang=lang,
         )
 
-    if tab == "cities":
-        pf = (request.args.get("pf") or "any").strip().lower()
-        if pf not in ("any", "only_prod", "only_nonprod"):
-            pf = "any"
+    if tab == "dynamics":
+        q_city = (request.args.get("city") or "").strip()
+        q_product = (request.args.get("product") or "").strip()
 
-        latest = latest_entries_subquery()
-        q = db.session.query(latest).select_from(latest)
-        if pf == "only_prod":
-            q = q.filter(latest.c.is_production_city.is_(True))
-        elif pf == "only_nonprod":
-            q = q.filter(latest.c.is_production_city.is_(False))
+        combos = (
+            db.session.query(Entry.city, Entry.product)
+            .distinct()
+            .order_by(Entry.city.asc(), Entry.product.asc())
+            .all()
+        )
 
-        rows = q.order_by(latest.c.city.asc(), latest.c.product.asc()).all()
-        by_city: Dict[str, List[sa.engine.Row]] = {}
-        for row in rows:
-            by_city.setdefault(row.city, []).append(row)
-        city_list = [
-            {"city": city, "entries": by_city[city]}
-            for city in sorted(by_city.keys(), key=str.lower)
+        city_to_products: Dict[str, Set[str]] = {}
+        for city, product in combos:
+            city_to_products.setdefault(city, set()).add(product)
+
+        all_cities = sorted(city_to_products.keys(), key=str.lower)
+        if not q_city and all_cities:
+            q_city = all_cities[0]
+
+        products_for_city = sorted(
+            city_to_products.get(q_city, set()),
+            key=str.lower,
+        )
+        if not q_product and products_for_city:
+            q_product = products_for_city[0]
+        if q_product and products_for_city and q_product not in products_for_city:
+            q_product = products_for_city[0]
+
+        base_query = Entry.query
+        if q_city:
+            base_query = base_query.filter(Entry.city == q_city)
+        if q_product:
+            base_query = base_query.filter(Entry.product == q_product)
+
+        timeline_entries = (
+            base_query
+            .order_by(sa.func.coalesce(Entry.updated_at, Entry.created_at).asc())
+            .limit(500)
+            .all()
+        )
+
+        def entry_ts(entry: Entry) -> Optional[datetime]:
+            return entry.updated_at or entry.created_at
+
+        timeline = [
+            {
+                "timestamp": entry_ts(entry).isoformat() if entry_ts(entry) else None,
+                "price": entry.price,
+                "percent": entry.percent,
+                "trend": entry.trend,
+            }
+            for entry in timeline_entries
+            if entry_ts(entry)
         ]
 
-        cities_list = cached_list(
-            "cities",
-            lambda: [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()],
-        )
-        products_list = cached_list(
-            "products",
-            lambda: [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()],
-        )
+        latest_entry = timeline_entries[-1] if timeline_entries else None
+        previous_entry = timeline_entries[-2] if len(timeline_entries) > 1 else None
+        latest_price = latest_entry.price if latest_entry else None
+        previous_price = previous_entry.price if previous_entry else None
+        delta_price = None
+        delta_percent = None
+        if latest_price is not None and previous_price is not None:
+            delta_price = latest_price - previous_price
+            if previous_price:
+                delta_percent = (delta_price / previous_price) * 100
+
+        latest_timestamp = entry_ts(latest_entry) if latest_entry else None
+
+        table_entries = timeline_entries[-100:]
 
         return render_template(
-            "cities.html",
-            city_list=city_list,
-            cities_list=cities_list,
-            products_list=products_list,
-            pf=pf,
+            "dynamics.html",
+            timeline=timeline,
+            city=q_city,
+            product=q_product,
+            all_cities=all_cities,
+            products_for_city=products_for_city,
+            delta_price=delta_price,
+            delta_percent=delta_percent,
+            latest_entry=latest_entry,
+            latest_timestamp=latest_timestamp,
+            points_count=len(timeline),
+            timeline_entries=table_entries,
+            timeline_json=json.dumps(timeline, ensure_ascii=False),
             lang=lang,
         )
 
