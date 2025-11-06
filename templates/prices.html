@@ -1,9 +1,27 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="card p-4">
-  <div class="flex items-center justify-between mb-4">
-    <h1 class="text-xl font-semibold">{{ t('nav_prices') }}</h1>
-    <div class="flex gap-2">
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+    <div>
+      <h1 class="text-xl font-semibold">{{ t('nav_prices') }}</h1>
+      {% if totals %}
+      <div class="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm text-[var(--muted)]">
+        <div class="summary-chip">
+          <span class="summary-label">{{ 'Entries' if lang=='en' else 'Записей' }}</span>
+          <span class="summary-value">{{ totals.entries }}</span>
+        </div>
+        <div class="summary-chip">
+          <span class="summary-label">{{ t('nav_cities') }}</span>
+          <span class="summary-value">{{ totals.cities }}</span>
+        </div>
+        <div class="summary-chip">
+          <span class="summary-label">{{ t('product') }}</span>
+          <span class="summary-value">{{ totals.products }}</span>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    <div class="flex flex-wrap gap-2">
       <a class="btn btn-outline"
          href="{{ url_for('export_csv') }}?city={{ q_city }}&product={{ q_product }}&trend={{ q_trend }}
          &price_min={{ q_price_min }}&price_max={{ q_price_max }}
@@ -16,80 +34,84 @@
   </div>
 
   <!-- ФИЛЬТРЫ -->
-  <form class="grid grid-cols-1 md:grid-cols-6 gap-3 mb-3" method="get" id="filtersForm">
-    <input type="hidden" name="tab" value="prices">
+  {% set filters_active = q_city or q_product or q_trend or q_price_min is not none or q_price_max is not none or q_percent_min is not none or q_percent_max is not none or q_prod != 'any' or q_sort != 'updated_desc' or per_page != 15 %}
+  <details class="filters-card" {% if filters_active %}open{% endif %}>
+    <summary class="filters-summary">{{ t('filters') }}</summary>
+    <form class="filters-grid" method="get" id="filtersForm">
+      <input type="hidden" name="tab" value="prices">
 
-    <div>
-      <label class="label">{{ t('city') }}</label>
-      <input class="input" name="city" placeholder="{{ t('city') }}" value="{{ q_city }}" list="citiesList">
-      <datalist id="citiesList">{% for c in cities_list %}<option value="{{ c }}">{% endfor %}</datalist>
-    </div>
+      <div>
+        <label class="label">{{ t('city') }}</label>
+        <input class="input" name="city" placeholder="{{ t('city') }}" value="{{ q_city }}" list="citiesList">
+        <datalist id="citiesList">{% for c in cities_list %}<option value="{{ c }}">{% endfor %}</datalist>
+      </div>
 
-    <div>
-      <label class="label">{{ t('product') }}</label>
-      <input class="input" name="product" placeholder="{{ t('product') }}" value="{{ q_product }}" list="productsList">
-      <datalist id="productsList">{% for p in products_list %}<option value="{{ p }}">{% endfor %}</datalist>
-    </div>
+      <div>
+        <label class="label">{{ t('product') }}</label>
+        <input class="input" name="product" placeholder="{{ t('product') }}" value="{{ q_product }}" list="productsList">
+        <datalist id="productsList">{% for p in products_list %}<option value="{{ p }}">{% endfor %}</datalist>
+      </div>
 
-    <div>
-      <label class="label">{{ t('trend') }}</label>
-      <select class="select" name="trend">
-        <option value="">{{ t('trend') }}</option>
-        <option value="up"   {% if q_trend=='up' %}selected{% endif %}>{{ t('up') }}</option>
-        <option value="down" {% if q_trend=='down' %}selected{% endif %}>{{ t('down') }}</option>
-      </select>
-    </div>
+      <div>
+        <label class="label">{{ t('trend') }}</label>
+        <select class="select" name="trend">
+          <option value="">{{ t('trend') }}</option>
+          <option value="up"   {% if q_trend=='up' %}selected{% endif %}>{{ t('up') }}</option>
+          <option value="down" {% if q_trend=='down' %}selected{% endif %}>{{ t('down') }}</option>
+        </select>
+      </div>
 
-    <div>
-      <label class="label">{{ t('price') }} ≥</label>
-      <input class="input" type="number" step="1" name="price_min" value="{{ q_price_min or '' }}">
-    </div>
-    <div>
-      <label class="label">{{ t('price') }} ≤</label>
-      <input class="input" type="number" step="1" name="price_max" value="{{ q_price_max or '' }}">
-    </div>
+      <div>
+        <label class="label">{{ t('price') }} ≥</label>
+        <input class="input" type="number" step="1" name="price_min" value="{{ q_price_min or '' }}">
+      </div>
+      <div>
+        <label class="label">{{ t('price') }} ≤</label>
+        <input class="input" type="number" step="1" name="price_max" value="{{ q_price_max or '' }}">
+      </div>
 
-    <div>
-      <label class="label">{{ t('percent') }}% ≥</label>
-      <input class="input" type="number" step="1" name="percent_min" value="{{ q_percent_min or '' }}">
-    </div>
-    <div>
-      <label class="label">{{ t('percent') }}% ≤</label>
-      <input class="input" type="number" step="1" name="percent_max" value="{{ q_percent_max or '' }}">
-    </div>
+      <div>
+        <label class="label">{{ t('percent') }}% ≥</label>
+        <input class="input" type="number" step="1" name="percent_min" value="{{ q_percent_min or '' }}">
+      </div>
+      <div>
+        <label class="label">{{ t('percent') }}% ≤</label>
+        <input class="input" type="number" step="1" name="percent_max" value="{{ q_percent_max or '' }}">
+      </div>
 
-    <div>
-      <label class="label">{{ t('is_prod_city') }}</label>
-      <select class="select" name="prod">
-        <option value="any" {% if q_prod=='any' %}selected{% endif %}>—</option>
-        <option value="yes" {% if q_prod=='yes' %}selected{% endif %}>{{ t('yes') }}</option>
-        <option value="no"  {% if q_prod=='no'  %}selected{% endif %}>{{ t('no') }}</option>
-      </select>
-    </div>
+      <div>
+        <label class="label">{{ t('is_prod_city') }}</label>
+        <select class="select" name="prod">
+          <option value="any" {% if q_prod=='any' %}selected{% endif %}>—</option>
+          <option value="yes" {% if q_prod=='yes' %}selected{% endif %}>{{ t('yes') }}</option>
+          <option value="no"  {% if q_prod=='no'  %}selected{% endif %}>{{ t('no') }}</option>
+        </select>
+      </div>
 
-    <div>
-      <label class="label">Sort</label>
-      <select class="select" name="sort">
-        <option value="updated_desc" {% if q_sort=='updated_desc' %}selected{% endif %}>Updated ↓</option>
-        <option value="updated_asc"  {% if q_sort=='updated_asc'  %}selected{% endif %}>Updated ↑</option>
-        <option value="price_desc"   {% if q_sort=='price_desc'   %}selected{% endif %}>Price ↓</option>
-        <option value="price_asc"    {% if q_sort=='price_asc'    %}selected{% endif %}>Price ↑</option>
-        <option value="percent_desc" {% if q_sort=='percent_desc' %}selected{% endif %}>Percent ↓</option>
-        <option value="percent_asc"  {% if q_sort=='percent_asc'  %}selected{% endif %}>Percent ↑</option>
-      </select>
-    </div>
+      <div>
+        <label class="label">Sort</label>
+        <select class="select" name="sort">
+          <option value="updated_desc" {% if q_sort=='updated_desc' %}selected{% endif %}>Updated ↓</option>
+          <option value="updated_asc"  {% if q_sort=='updated_asc'  %}selected{% endif %}>Updated ↑</option>
+          <option value="price_desc"   {% if q_sort=='price_desc'   %}selected{% endif %}>Price ↓</option>
+          <option value="price_asc"    {% if q_sort=='price_asc'    %}selected{% endif %}>Price ↑</option>
+          <option value="percent_desc" {% if q_sort=='percent_desc' %}selected{% endif %}>Percent ↓</option>
+          <option value="percent_asc"  {% if q_sort=='percent_asc'  %}selected{% endif %}>Percent ↑</option>
+        </select>
+      </div>
 
     <!-- опционально: выбор размера страницы -->
-    <div>
-      <label class="label">Per page</label>
-      <input class="input" type="number" min="1" max="500" name="per_page" value="{{ per_page }}">
-    </div>
+      <div>
+        <label class="label">Per page</label>
+        <input class="input" type="number" min="1" max="500" name="per_page" value="{{ per_page }}">
+      </div>
 
-    <div class="md:col-span-6 flex gap-2">
-      <button class="btn btn-outline" type="submit">{{ t('filters') }}</button>
-      <a class="btn btn-outline" href="{{ url_for('index', tab='prices', lang=lang) }}">Reset</a>
-    </div>
-  </form>
+      <div class="md:col-span-6 flex gap-2">
+        <button class="btn btn-primary" type="submit">{{ t('filters') }}</button>
+        <a class="btn btn-outline" href="{{ url_for('index', tab='prices', lang=lang) }}">Reset</a>
+      </div>
+    </form>
+  </details>
 
   {% if not entries %}
     <p class="text-zinc-500">{{ t('no_data') }}</p>
