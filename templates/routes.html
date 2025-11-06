@@ -4,11 +4,12 @@
   <div class="flex items-start justify-between gap-3 mb-4">
     <h1 class="text-xl font-semibold">{{ t('nav_routes') }}</h1>
 
-    <form method="get" class="grid grid-cols-1 md:grid-cols-6 gap-3 items-end" id="routesFilter">
+    <form method="get" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end" id="routesFilter">
       <input type="hidden" name="tab" value="routes">
       <input type="hidden" name="lang" value="{{ lang }}">
 
-      <div class="md:col-span-2">
+      <!-- Product -->
+      <div class="md:col-span-3">
         <label class="label">{{ t('product') }}</label>
         <input class="input" name="product" placeholder="{{ t('product') }}"
                value="{{ q_product or '' }}" list="productsList" id="productInput" autocomplete="off">
@@ -17,11 +18,31 @@
         </datalist>
       </div>
 
+      <!-- From / To cities -->
       <div>
-        <label class="label">{{ 'Items on route (top K)' if lang=='en' else 'Товаров на маршруте (топ K)' }}</label>
-        <input class="input" type="number" name="k" min="1" max="10" value="{{ k }}">
+        <label class="label">{{ 'Buy city' if lang=='en' else 'Город покупки' }}</label>
+        <input class="input" name="buy_city" value="{{ q_buy_city or '' }}" list="citiesList" autocomplete="off">
+      </div>
+      <div>
+        <label class="label">{{ 'Sell city' if lang=='en' else 'Город продажи' }}</label>
+        <input class="input" name="sell_city" value="{{ q_sell_city or '' }}" list="citiesList" autocomplete="off">
+      </div>
+      <datalist id="citiesList">
+        {% for c in cities_list %}<option value="{{ c }}">{% endfor %}
+      </datalist>
+
+      <!-- Only production for buy -->
+      <div class="flex items-center gap-2 mt-6">
+        <input id="onlyProd" type="checkbox" class="checkbox" name="buy_only_prod" value="1"
+               {% if buy_only_prod %}checked{% endif %}>
+        <label for="onlyProd" class="text-sm">{{ 'Buy only from production cities' if lang=='en' else 'Покупка только из прод-города' }}</label>
       </div>
 
+      <!-- K / min / max items -->
+      <div>
+        <label class="label">{{ 'Top K per route' if lang=='en' else 'Топ K на маршруте' }}</label>
+        <input class="input" type="number" name="k" min="1" max="10" value="{{ k }}">
+      </div>
       <div>
         <label class="label">{{ 'Min items' if lang=='en' else 'Мин. товаров' }}</label>
         <input class="input" type="number" name="min_items" min="1" max="10" value="{{ min_items }}">
@@ -31,6 +52,56 @@
         <input class="input" type="number" name="max_items" min="1" max="10" value="{{ max_items }}">
       </div>
 
+      <!-- Numeric filters -->
+      <div>
+        <label class="label">{{ 'Min profit' if lang=='en' else 'Мин. прибыль' }}</label>
+        <input class="input" type="number" name="min_profit" step="1" value="{{ min_profit or '' }}">
+      </div>
+      <div>
+        <label class="label">{{ 'Min margin %' if lang=='en' else 'Мин. маржа %' }}</label>
+        <input class="input" type="number" name="min_margin" step="1" value="{{ min_margin or '' }}">
+      </div>
+      <div>
+        <label class="label">{{ 'Buy % ≥' if lang=='en' else '% покупки ≥' }}</label>
+        <input class="input" type="number" name="min_buy_percent" min="0" max="200" step="1" value="{{ min_buy_percent or '' }}">
+      </div>
+      <div>
+        <label class="label">{{ 'Sell % ≥' if lang=='en' else '% продажи ≥' }}</label>
+        <input class="input" type="number" name="min_sell_percent" min="0" max="200" step="1" value="{{ min_sell_percent or '' }}">
+      </div>
+
+      <!-- Trend filters -->
+      <div>
+        <label class="label">{{ 'Buy trend' if lang=='en' else 'Тренд покупки' }}</label>
+        <select class="select" name="buy_trend">
+          <option value="any" {% if buy_trend=='any' %}selected{% endif %}>—</option>
+          <option value="up" {% if buy_trend=='up' %}selected{% endif %}>{{ t('up') }}</option>
+          <option value="down" {% if buy_trend=='down' %}selected{% endif %}>{{ t('down') }}</option>
+        </select>
+      </div>
+      <div>
+        <label class="label">{{ 'Sell trend' if lang=='en' else 'Тренд продажи' }}</label>
+        <select class="select" name="sell_trend">
+          <option value="any" {% if sell_trend=='any' %}selected{% endif %}>—</option>
+          <option value="up" {% if sell_trend=='up' %}selected{% endif %}>{{ t('up') }}</option>
+          <option value="down" {% if sell_trend=='down' %}selected{% endif %}>{{ t('down') }}</option>
+        </select>
+      </div>
+
+      <!-- Freshness -->
+      <div class="md:col-span-2">
+        <label class="label">{{ 'Max age (UTC)' if lang=='en' else 'Макс. давность (UTC)' }}</label>
+        <div class="flex gap-2">
+          <input class="input w-24" type="number" name="max_age_value" min="0" step="1" value="{{ max_age_value or '' }}">
+          <select class="select" name="max_age_unit">
+            <option value="m" {% if max_age_unit=='m' %}selected{% endif %}>{{ 'minutes' if lang=='en' else 'минут' }}</option>
+            <option value="h" {% if max_age_unit=='h' %}selected{% endif %}>{{ 'hours' if lang=='en' else 'часов' }}</option>
+            <option value="d" {% if max_age_unit=='d' %}selected{% endif %}>{{ 'days' if lang=='en' else 'дней' }}</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Sort + per page -->
       <div>
         <label class="label">Sort</label>
         <select class="select" name="sort">
@@ -43,6 +114,9 @@
           <option value="count_desc" {% if sort_by=='count_desc' %}selected{% endif %}>
             {{ 'Items count ↓' if lang=='en' else 'Кол-во товаров ↓' }}
           </option>
+          <option value="fresh_desc" {% if sort_by=='fresh_desc' %}selected{% endif %}>
+            {{ 'Fresh first ↓' if lang=='en' else 'Сначала свежие ↓' }}
+          </option>
         </select>
       </div>
 
@@ -51,7 +125,7 @@
         <input class="input" type="number" min="1" max="100" name="per_page" value="{{ per_page }}">
       </div>
 
-      <div class="md:col-span-6 flex gap-2">
+      <div class="md:col-span-12 flex gap-2">
         <button class="btn btn-outline" type="submit">{{ t('filters') }}</button>
         <a class="btn btn-outline" href="{{ url_for('index', tab='routes', lang=lang) }}">Reset</a>
       </div>
@@ -155,11 +229,15 @@
   <nav class="mt-4 flex flex-wrap items-center justify-center gap-2" aria-label="Pagination">
     {% if pagination.page > 1 %}
       <a class="btn btn-outline px-3" href="{{ url_for('index', tab='routes', lang=lang,
-            product=q_product, k=k, min_items=min_items, max_items=max_items, sort=sort_by,
-            per_page=pagination.per_page, page=1) }}">&laquo; First</a>
+            product=q_product, buy_city=q_buy_city, sell_city=q_sell_city, buy_only_prod=1 if buy_only_prod else 0,
+            min_profit=min_profit, min_margin=min_margin, min_buy_percent=min_buy_percent, min_sell_percent=min_sell_percent,
+            buy_trend=buy_trend, sell_trend=sell_trend, max_age_value=max_age_value, max_age_unit=max_age_unit,
+            k=k, min_items=min_items, max_items=max_items, sort=sort_by, per_page=pagination.per_page, page=1) }}">&laquo; First</a>
       <a class="btn btn-outline px-3" href="{{ url_for('index', tab='routes', lang=lang,
-            product=q_product, k=k, min_items=min_items, max_items=max_items, sort=sort_by,
-            per_page=pagination.per_page, page=pagination.prev_num) }}">&lsaquo; Prev</a>
+            product=q_product, buy_city=q_buy_city, sell_city=q_sell_city, buy_only_prod=1 if buy_only_prod else 0,
+            min_profit=min_profit, min_margin=min_margin, min_buy_percent=min_buy_percent, min_sell_percent=min_sell_percent,
+            buy_trend=buy_trend, sell_trend=sell_trend, max_age_value=max_age_value, max_age_unit=max_age_unit,
+            k=k, min_items=min_items, max_items=max_items, sort=sort_by, per_page=pagination.per_page, page=pagination.prev_num) }}">&lsaquo; Prev</a>
     {% else %}
       <span class="btn btn-disabled px-3">&laquo; First</span>
       <span class="btn btn-disabled px-3">&lsaquo; Prev</span>
@@ -170,18 +248,24 @@
         <span class="btn btn-primary px-3">{{ p }}</span>
       {% else %}
         <a class="btn btn-outline px-3" href="{{ url_for('index', tab='routes', lang=lang,
-              product=q_product, k=k, min_items=min_items, max_items=max_items, sort=sort_by,
-              per_page=pagination.per_page, page=p) }}">{{ p }}</a>
+              product=q_product, buy_city=q_buy_city, sell_city=q_sell_city, buy_only_prod=1 if buy_only_prod else 0,
+              min_profit=min_profit, min_margin=min_margin, min_buy_percent=min_buy_percent, min_sell_percent=min_sell_percent,
+              buy_trend=buy_trend, sell_trend=sell_trend, max_age_value=max_age_value, max_age_unit=max_age_unit,
+              k=k, min_items=min_items, max_items=max_items, sort=sort_by, per_page=pagination.per_page, page=p) }}">{{ p }}</a>
       {% endif %}
     {% endfor %}
 
     {% if pagination.has_next %}
       <a class="btn btn-outline px-3" href="{{ url_for('index', tab='routes', lang=lang,
-            product=q_product, k=k, min_items=min_items, max_items=max_items, sort=sort_by,
-            per_page=pagination.per_page, page=pagination.next_num) }}">Next &rsaquo;</a>
+            product=q_product, buy_city=q_buy_city, sell_city=q_sell_city, buy_only_prod=1 if buy_only_prod else 0,
+            min_profit=min_profit, min_margin=min_margin, min_buy_percent=min_buy_percent, min_sell_percent=min_sell_percent,
+            buy_trend=buy_trend, sell_trend=sell_trend, max_age_value=max_age_value, max_age_unit=max_age_unit,
+            k=k, min_items=min_items, max_items=max_items, sort=sort_by, per_page=pagination.per_page, page=pagination.next_num) }}">Next &rsaquo;</a>
       <a class="btn btn-outline px-3" href="{{ url_for('index', tab='routes', lang=lang,
-            product=q_product, k=k, min_items=min_items, max_items=max_items, sort=sort_by,
-            per_page=pagination.per_page, page=pagination.pages) }}">Last &raquo;</a>
+            product=q_product, buy_city=q_buy_city, sell_city=q_sell_city, buy_only_prod=1 if buy_only_prod else 0,
+            min_profit=min_profit, min_margin=min_margin, min_buy_percent=min_buy_percent, min_sell_percent=min_sell_percent,
+            buy_trend=buy_trend, sell_trend=sell_trend, max_age_value=max_age_value, max_age_unit=max_age_unit,
+            k=k, min_items=min_items, max_items=max_items, sort=sort_by, per_page=pagination.per_page, page=pagination.pages) }}">Last &raquo;</a>
     {% else %}
       <span class="btn btn-disabled px-3">Next &rsaquo;</span>
       <span class="btn btn-disabled px-3">Last &raquo;</span>
@@ -208,6 +292,10 @@
       prod.addEventListener('keydown', e => { if (e.key === 'Enter') { toPage1(); f.submit(); }});
       prod.addEventListener('change', () => { toPage1(); f.submit(); });
     }
+    // авто-сабмит по change для чекбокса и select'ов
+    f.querySelectorAll('select, input[type=checkbox]').forEach(el=>{
+      el.addEventListener('change', ()=>{ toPage1(); f.submit(); });
+    });
   }
 
   function relLabel(dateIso, isEn){
@@ -240,3 +328,4 @@
 })();
 </script>
 {% endblock %}
+
