@@ -74,6 +74,10 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "cannot_edit": "Cannot edit",
         "saving": "Saving...",
         "submitting": "Submitting...",
+        "product_image": "Product image",
+        "current_image": "Current image",
+        "product_image_hint": "200x200 PNG/JPG; other sizes will be resized automatically.",
+        "invalid_image": "Could not process image. Please upload a valid picture.",
     },
     "ru": {
         "app_title": "Трейд Хелпер",
@@ -143,6 +147,10 @@ STRINGS: Dict[str, Dict[str, str]] = {
         "cannot_edit": "Нельзя изменить",
         "saving": "Сохранение...",
         "submitting": "Отправка...",
+        "product_image": "Изображение товара",
+        "current_image": "Текущее изображение",
+        "product_image_hint": "PNG/JPG 200×200; другие размеры будут обрезаны автоматически.",
+        "invalid_image": "Не удалось обработать изображение. Загрузите корректный файл.",
     },
 }
 
@@ -162,4 +170,4 @@ def translate(key: str) -> str:
 
 def context_processor():
     """Context processor injecting translation helpers into templates."""
-    return {"t": translate, "lang": get_lang()}
+    return {"t": translate, "lang": get_lang(), "product_suggestions": []}

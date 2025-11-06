@@ -3,7 +3,7 @@
 <section class="card p-4">
   <h1 class="text-xl font-semibold mb-3">{{ title }}</h1>
 
-  <form method="post" class="grid grid-cols-1 md:grid-cols-4 gap-3" id="entryForm">
+  <form method="post" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-4 gap-3" id="entryForm">
     <input type="hidden" name="next" value="{{ next_url or request.referrer }}">
 
     {# скрытый _action убран — действие выбирается кнопками ниже #}
@@ -53,13 +53,25 @@
           name="product"
           class="input"
           list="productsList"
-          autocomplete="off" spellcheck="false"
+          autocomplete="off" spellcheck="false" data-product-autocomplete
           value="{{ request.form.get('product','') }}"
           required>
         <datalist id="productsList">
           {% for p in products_list %}<option value="{{ p }}">{% endfor %}
         </datalist>
       {% endif %}
+    </div>
+
+    <div class="md:col-span-2">
+      <label class="label">{{ t('product_image') }}</label>
+      {% if e and e.image_path %}
+        <div class="flex items-center gap-3 mb-2">
+          <img src="{{ url_for('static', filename=e.image_path) }}" alt="{{ e.product }}" class="product-preview">
+          <span class="text-xs text-[var(--muted)]">{{ t('current_image') }}</span>
+        </div>
+      {% endif %}
+      <input type="file" name="product_image" accept="image/*" class="input-file">
+      <p class="text-xs text-[var(--muted)] mt-1">{{ t('product_image_hint') }}</p>
     </div>
 
     <!-- Цена + Очистить + Цифровая клавиатура -->

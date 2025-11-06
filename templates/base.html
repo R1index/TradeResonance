@@ -98,6 +98,9 @@
       {% block content %}{% endblock %}
     </main>
 
+    <script>
+      window.PRODUCT_SUGGESTIONS = {{ (product_suggestions or []) | tojson }};
+    </script>
     <script src="{{ url_for('static', filename='tw-app.js') }}"></script>
   </body>
 </html>
