@@ -141,9 +141,9 @@
     return;
   }
   const ctx = canvas.getContext('2d');
-  const data = {{ timeline | tojson }};
+  const rawData = {{ timeline | tojson }};
 
-  const points = data
+  const basePoints = rawData
     .map(point => {
       if (!point.timestamp) {
         return null;
@@ -153,41 +153,81 @@
       if (!Number.isFinite(price) || Number.isNaN(timestamp)) {
         return null;
       }
-      return { x: timestamp, y: price };
+      return { x: timestamp, y: price, synthetic: false, label: point.timestamp };
     })
     .filter(Boolean)
     .sort((a, b) => a.x - b.x);
 
-  if (!points.length) {
+  if (!basePoints.length) {
     return;
   }
 
-  const singlePoint = points.length === 1;
+  const makePaddingPoints = (point) => {
+    const hour = 60 * 60 * 1000;
+    return [
+      { x: point.x - hour, y: point.y, synthetic: true, label: point.label },
+      point,
+      { x: point.x + hour, y: point.y, synthetic: true, label: point.label },
+    ];
+  };
+
+  const chartPoints = basePoints.length === 1 ? makePaddingPoints(basePoints[0]) : basePoints;
+
+  const hexToRgba = (hex, alpha) => {
+    if (!hex) {
+      return `rgba(59,130,246,${alpha})`;
+    }
+    const sanitized = hex.replace('#', '').trim();
+    const full = sanitized.length === 3
+      ? sanitized.split('').map(ch => ch + ch).join('')
+      : sanitized.slice(0, 6);
+    const num = Number.parseInt(full, 16);
+    if (!Number.isFinite(num)) {
+      return `rgba(59,130,246,${alpha})`;
+    }
+    const r = (num >> 16) & 255;
+    const g = (num >> 8) & 255;
+    const b = num & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
+
+  const singlePoint = basePoints.length === 1;
 
   const chart = new Chart(ctx, {
     type: 'line',
     data: {
       datasets: [{
         label: "{{ t('price') }}",
-        data: points,
+        data: chartPoints,
         borderColor: '#3b82f6',
-        backgroundColor: 'rgba(59,130,246,0.15)',
+        borderWidth: 2.5,
+        backgroundColor: 'rgba(59,130,246,0.2)',
         parsing: false,
-        spanGaps: true,
-        tension: 0.25,
+        spanGaps: false,
+        tension: 0.15,
         fill: true,
-        showLine: !singlePoint,
-        pointRadius: singlePoint ? 4 : 2,
-        pointHoverRadius: singlePoint ? 6 : 4,
+        showLine: true,
+        stepped: singlePoint ? false : 'before',
+        pointRadius: ctx => (ctx.raw?.synthetic ? 0 : singlePoint ? 6 : 3),
+        pointHoverRadius: ctx => (ctx.raw?.synthetic ? 0 : singlePoint ? 8 : 5),
         pointBackgroundColor: '#3b82f6',
         pointBorderColor: '#3b82f6',
         pointHoverBackgroundColor: '#3b82f6',
         pointHoverBorderColor: '#3b82f6',
+        pointBorderWidth: 0,
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      layout: {
+        padding: {
+          top: 16,
+          bottom: 8,
+          left: 8,
+          right: 8,
+        }
+      },
       scales: {
         x: {
           type: 'time',
@@ -204,18 +244,23 @@
             }
           },
           ticks: {
-            color: '#6b7280'
+            color: '#6b7280',
+            maxRotation: 0,
+            autoSkipPadding: 16,
           },
           grid: {
-            color: '#e5e7eb'
+            color: '#e5e7eb',
+            drawBorder: false,
           }
         },
         y: {
           ticks: {
-            color: '#6b7280'
+            color: '#6b7280',
+            padding: 6,
           },
           grid: {
-            color: '#e5e7eb'
+            color: '#e5e7eb',
+            drawBorder: false,
           }
         }
       },
@@ -224,13 +269,23 @@
           display: false
         },
         tooltip: {
+          filter(context) {
+            return !context.raw?.synthetic;
+          },
           callbacks: {
             title(items) {
               if (!items?.length) {
                 return '';
               }
-              const date = new Date(items[0].parsed.x);
-              return date.toLocaleString();
+              const original = items[0].raw?.label;
+              if (original) {
+                const date = new Date(original);
+                if (!Number.isNaN(date.getTime())) {
+                  return date.toLocaleString();
+                }
+              }
+              const fallback = new Date(items[0].parsed.x);
+              return Number.isNaN(fallback.getTime()) ? '' : fallback.toLocaleString();
             }
           }
         }
@@ -243,9 +298,20 @@
     const axisColor = styles.getPropertyValue('--muted').trim() || '#6b7280';
     const gridColor = styles.getPropertyValue('--border').trim() || '#e5e7eb';
     const lineColor = styles.getPropertyValue('--brand').trim() || '#3b82f6';
+    if (!chart.chartArea) {
+      requestAnimationFrame(applyThemeToChart);
+      return;
+    }
+
+    const fillTop = hexToRgba(lineColor, 0.25);
+    const fillBottom = hexToRgba(lineColor, 0);
+    const { chartArea } = chart;
+    const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+    gradient.addColorStop(0, fillTop);
+    gradient.addColorStop(1, fillBottom);
 
     chart.data.datasets[0].borderColor = lineColor;
-    chart.data.datasets[0].backgroundColor = lineColor ? `${lineColor}26` : 'rgba(59,130,246,0.15)';
+    chart.data.datasets[0].backgroundColor = gradient;
     chart.data.datasets[0].pointBackgroundColor = lineColor;
     chart.data.datasets[0].pointBorderColor = lineColor;
     chart.data.datasets[0].pointHoverBackgroundColor = lineColor;
