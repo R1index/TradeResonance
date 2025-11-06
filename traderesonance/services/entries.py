@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Callable, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, TypeVar, cast
 
 import sqlalchemy as sa
 from sqlalchemy import text
@@ -11,19 +11,54 @@ from ..extensions import db
 from ..models import Entry, EntrySnapshot, PendingEntry
 
 
-CacheBuilder = Callable[[], List[str]]
-_cache: Dict[str, Tuple[datetime, List[str]]] = {}
+T = TypeVar("T")
 
 
-def cached_list(key: str, factory: CacheBuilder, ttl_seconds: int = 60) -> List[str]:
+CacheBuilder = Callable[[], T]
+_cache: Dict[str, Tuple[datetime, Any]] = {}
+
+
+def cached_value(key: str, factory: CacheBuilder, ttl_seconds: int = 60) -> T:
     now = datetime.utcnow()
     if key in _cache:
         ts, value = _cache[key]
         if now - ts < timedelta(seconds=ttl_seconds):
-            return value
+            return cast(T, value)
     value = factory()
     _cache[key] = (now, value)
     return value
+
+
+def cached_list(key: str, factory: Callable[[], List[str]], ttl_seconds: int = 60) -> List[str]:
+    return cached_value(key, factory, ttl_seconds)
+
+
+def cached_product_images(ttl_seconds: int = 60) -> Dict[str, str]:
+    def _factory() -> Dict[str, str]:
+        rows = (
+            db.session.query(
+                Entry.product,
+                Entry.image_path,
+                Entry.updated_at,
+                Entry.created_at,
+            )
+            .filter(Entry.image_path.isnot(None))
+            .order_by(Entry.updated_at.desc().nullslast(), Entry.created_at.desc())
+            .all()
+        )
+        result: Dict[str, str] = {}
+        for product, image_path, _, _ in rows:
+            if not image_path:
+                continue
+            if product not in result:
+                result[product] = image_path
+        return result
+
+    return cached_value("product_images", _factory, ttl_seconds)
+
+
+def invalidate_cache(key: str) -> None:
+    _cache.pop(key, None)
 
 
 def record_snapshot(entry: Entry, *, recorded_at: Optional[datetime] = None) -> None:

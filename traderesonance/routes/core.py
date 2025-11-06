@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 from datetime import datetime
-from typing import Dict, List, Optional, Set
+from pathlib import Path
+from typing import Dict, List, Optional, Set, Tuple
 
 import sqlalchemy as sa
 from flask import (
@@ -16,6 +18,7 @@ from flask import (
     request,
     url_for,
 )
+from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy import func
 
 from ..extensions import db
@@ -24,7 +27,9 @@ from ..models import Entry, EntrySnapshot, PendingEntry
 from ..services.entries import (
     approve_pending,
     cached_list,
+    cached_product_images,
     dedupe_entries,
+    invalidate_cache,
     latest_entries_subquery,
     record_snapshot,
 )
@@ -73,6 +78,24 @@ def _redirect_to_edit(
     if trend not in (None, ""):
         params["trend"] = trend
     return redirect(url_for("edit_entry", **params))
+
+
+def _product_slug(name: str) -> str:
+    base = re.sub(r"[^a-z0-9]+", "-", (name or "").lower())
+    slug = re.sub(r"-+", "-", base).strip("-")
+    return slug[:80] or "product"
+
+
+def _product_media_context(products: List[str]) -> Tuple[Dict[str, str], List[Dict[str, Optional[str]]]]:
+    product_images = cached_product_images()
+    image_urls: Dict[str, str] = {}
+    for product, rel_path in product_images.items():
+        image_urls[product] = url_for("static", filename=rel_path)
+    suggestions = [
+        {"name": product, "image": image_urls.get(product)}
+        for product in products
+    ]
+    return image_urls, suggestions
 
 
 # ---------------------------------------------------------------------------
@@ -144,6 +167,10 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
             "products",
             lambda: [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()],
         )
+        product_image_urls, product_suggestions = _product_media_context(products_list)
+
+        for entry in entries:
+            entry.image_url = product_image_urls.get(entry.product)
 
         total_entries = pagination.total
         total_cities = len(cities_list)
@@ -171,6 +198,7 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
                 "cities": total_cities,
                 "products": total_products,
             },
+            product_suggestions=product_suggestions,
             lang=lang,
         )
 
@@ -289,6 +317,7 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
             "cities_latest",
             lambda: [c for (c,) in db.session.query(latest.c.city).distinct().order_by(latest.c.city.asc()).all()],
         )
+        product_image_urls, product_suggestions = _product_media_context(products_list)
 
         query = (
             db.session.query(
@@ -333,6 +362,7 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
                 page_numbers=[],
                 lang=lang,
                 per_page=per_page,
+                product_suggestions=product_suggestions,
             )
 
         from collections import defaultdict
@@ -413,6 +443,7 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
                             "sell_updated_iso": to_iso_utc(sell_dt),
                             "buy_updated_dt": buy_dt,
                             "sell_updated_dt": sell_dt,
+                            "image_url": product_image_urls.get(product),
                         }
                     )
 
@@ -503,6 +534,7 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
             page_numbers=page_numbers,
             lang=lang,
             per_page=per_page,
+            product_suggestions=product_suggestions,
         )
 
     return redirect(url_for("index", tab="prices", lang=lang))
@@ -518,6 +550,7 @@ def new_entry():
         "products",
         lambda: [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()],
     )
+    _, product_suggestions = _product_media_context(products_list)
 
     if request.method == "POST":
         action = (request.form.get("_action") or "submit_request").strip()
@@ -610,6 +643,7 @@ def new_entry():
         products_list=products_list,
         pending=pending,
         next_url=request.args.get("next"),
+        product_suggestions=product_suggestions,
     )
 
 
@@ -630,6 +664,36 @@ def edit_entry(entry_id: int):
         entry.is_production_city = parse_bool(
             request.form.get("is_production_city", entry.is_production_city)
         )
+
+        image_file = request.files.get("product_image")
+        if image_file and image_file.filename:
+            upload_folder = Path(
+                current_app.config.get(
+                    "PRODUCT_IMAGE_UPLOAD_FOLDER", current_app.static_folder
+                )
+            )
+            upload_folder.mkdir(parents=True, exist_ok=True)
+            target_size = current_app.config.get("PRODUCT_IMAGE_SIZE", (200, 200))
+            image_subdir = current_app.config.get("PRODUCT_IMAGE_SUBDIR", "product-images")
+            filename = f"{_product_slug(entry.product)}.png"
+            save_path = upload_folder / filename
+            try:
+                image_file.stream.seek(0)
+                with Image.open(image_file.stream) as img:
+                    converted = img.convert("RGBA")
+                    resized = ImageOps.fit(converted, target_size, Image.LANCZOS)
+                    resized.save(save_path, format="PNG")
+            except (UnidentifiedImageError, OSError) as exc:
+                current_app.logger.warning("Image upload failed for %s: %s", entry.product, exc)
+                flash(translate("invalid_image"))
+            else:
+                relative_path = f"{image_subdir}/{filename}"
+                Entry.query.filter(func.lower(Entry.product) == func.lower(entry.product)).update(
+                    {Entry.image_path: relative_path}, synchronize_session=False
+                )
+                entry.image_path = relative_path
+                invalidate_cache("product_images")
+
         db.session.flush()
         record_snapshot(entry)
         db.session.commit()
@@ -652,6 +716,7 @@ def edit_entry(entry_id: int):
         "products",
         lambda: [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()],
     )
+    _, product_suggestions = _product_media_context(products_list)
     next_url = safe_next(request.args.get("next")) or safe_next(request.referrer)
 
     return render_template(
@@ -662,6 +727,7 @@ def edit_entry(entry_id: int):
         products_list=products_list,
         next_url=next_url,
         overrides=overrides,
+        product_suggestions=product_suggestions,
     )
 
 

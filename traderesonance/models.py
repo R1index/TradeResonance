@@ -21,6 +21,7 @@ class Entry(db.Model):
     trend = db.Column(db.String(10), nullable=False)
     percent = db.Column(db.Float, nullable=False, default=0.0)
     is_production_city = db.Column(db.Boolean, nullable=False, default=False)
+    image_path = db.Column(db.String(255))
 
     def updated_or_created(self) -> Optional[datetime]:
         return self.updated_at or self.created_at

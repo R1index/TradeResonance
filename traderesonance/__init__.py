@@ -24,6 +24,13 @@ def create_app(config_override: Optional[Dict[str, Any]] = None) -> Flask:
     if config_override:
         app.config.update(config_override)
 
+    images_subdir = "product-images"
+    upload_dir = BASE_DIR / "static" / images_subdir
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    app.config.setdefault("PRODUCT_IMAGE_SUBDIR", images_subdir)
+    app.config.setdefault("PRODUCT_IMAGE_UPLOAD_FOLDER", str(upload_dir))
+    app.config.setdefault("PRODUCT_IMAGE_SIZE", (200, 200))
+
     db.init_app(app)
     setup_database(app)
     register_routes(app)
