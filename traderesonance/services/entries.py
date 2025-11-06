@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Callable, Dict, Iterable, List, Tuple
+from typing import Callable, Dict, Iterable, List, Optional, Tuple
 
 import sqlalchemy as sa
 from sqlalchemy import text
 
 from ..extensions import db
-from ..models import Entry, PendingEntry
+from ..models import Entry, EntrySnapshot, PendingEntry
 
 
 CacheBuilder = Callable[[], List[str]]
@@ -24,6 +24,44 @@ def cached_list(key: str, factory: CacheBuilder, ttl_seconds: int = 60) -> List[
     value = factory()
     _cache[key] = (now, value)
     return value
+
+
+def record_snapshot(entry: Entry, *, recorded_at: Optional[datetime] = None) -> None:
+    """Persist a historical snapshot for the provided entry state."""
+
+    if not entry:
+        return
+
+    recorded_at = recorded_at or datetime.utcnow()
+
+    last_snapshot = (
+        EntrySnapshot.query.filter(
+            EntrySnapshot.city == entry.city,
+            EntrySnapshot.product == entry.product,
+        )
+        .order_by(EntrySnapshot.recorded_at.desc(), EntrySnapshot.id.desc())
+        .first()
+    )
+
+    if last_snapshot and (
+        last_snapshot.price == entry.price
+        and last_snapshot.percent == entry.percent
+        and last_snapshot.trend == entry.trend
+        and last_snapshot.is_production_city == entry.is_production_city
+    ):
+        return
+
+    snapshot = EntrySnapshot(
+        entry_id=entry.id,
+        recorded_at=recorded_at,
+        city=entry.city,
+        product=entry.product,
+        price=entry.price,
+        trend=entry.trend,
+        percent=entry.percent,
+        is_production_city=entry.is_production_city,
+    )
+    db.session.add(snapshot)
 
 
 def latest_entries_subquery() -> sa.sql.Select:
@@ -58,6 +96,8 @@ def approve_pending(entry: PendingEntry) -> None:
         existing.trend = entry.trend
         existing.percent = entry.percent
         existing.is_production_city = existing.is_production_city or entry.is_production_city
+        db.session.flush()
+        record_snapshot(existing)
     else:
         created = Entry(
             city=entry.city,
@@ -68,6 +108,8 @@ def approve_pending(entry: PendingEntry) -> None:
             is_production_city=entry.is_production_city,
         )
         db.session.add(created)
+        db.session.flush()
+        record_snapshot(created)
     db.session.delete(entry)
     db.session.commit()
     dedupe_entries()
@@ -105,6 +147,23 @@ def setup_database(app) -> None:
     with app.app_context():
         db.create_all()
         dedupe_entries()
+
+        created_snapshots = 0
+        for entry in Entry.query.all():
+            has_snapshot = (
+                EntrySnapshot.query.filter(
+                    EntrySnapshot.city == entry.city,
+                    EntrySnapshot.product == entry.product,
+                )
+                .order_by(EntrySnapshot.recorded_at.desc(), EntrySnapshot.id.desc())
+                .first()
+            )
+            if not has_snapshot:
+                record_snapshot(entry, recorded_at=entry.updated_or_created() or datetime.utcnow())
+                created_snapshots += 1
+        if created_snapshots:
+            db.session.commit()
+
         database_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
         try:
             if database_uri.startswith("sqlite"):

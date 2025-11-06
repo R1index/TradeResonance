@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="grid gap-6 lg:grid-cols-[2fr_1fr]">
+  <div class="card p-5 space-y-6">
+    <header class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <p class="text-sm uppercase tracking-wide text-[var(--muted)]">{{ t('nav_dynamics') }}</p>
+        <h1 class="text-2xl font-semibold">
+          {{ product or t('product') }} · {{ city or t('city') }}
+        </h1>
+      </div>
+      {% if latest_entry %}
+      <div class="text-sm text-[var(--muted)] sm:text-right">
+        <span class="block">{{ t('updated_at') }}</span>
+        <span class="font-mono text-[var(--fg)]">
+          {{ latest_timestamp.strftime('%Y-%m-%d %H:%M') if latest_timestamp else '—' }}
+        </span>
+      </div>
+      {% endif %}
+    </header>
+
+    {% set last_point = timeline|last %}
+
+    <div class="grid gap-3 sm:grid-cols-3">
+      <div class="summary-chip">
+        <span class="summary-label">{{ t('latest_price') }}</span>
+        <span class="summary-value text-lg font-semibold">
+          {% if latest_entry %}
+            {{ '%.0f' % latest_entry.price }}
+          {% else %}—{% endif %}
+        </span>
+      </div>
+      <div class="summary-chip">
+        <span class="summary-label">{{ t('change') }}</span>
+        <span class="summary-value">
+          {% if delta_price is not none %}
+            {{ '+' if delta_price > 0 else '' }}{{ '%.0f' % delta_price }}
+          {% else %}—{% endif %}
+        </span>
+      </div>
+      <div class="summary-chip">
+        <span class="summary-label">{{ t('change_percent') }}</span>
+        <span class="summary-value">
+          {% if delta_percent is not none %}
+            {{ '+' if delta_percent > 0 else '' }}{{ '%.1f' % delta_percent }}%
+          {% else %}—{% endif %}
+        </span>
+      </div>
+    </div>
+
+    <div>
+      {% if timeline %}
+        <div class="relative h-[320px]">
+          <canvas id="priceChart" class="w-full h-full"></canvas>
+        </div>
+        <p class="mt-3 text-xs text-[var(--muted)]">
+          {{ points_count }} {{ t('points') }} · {{ t('trend')|capitalize }}:
+          {% if last_point %}
+            {{ t('up') if last_point.trend == 'up' else t('down') }}
+          {% else %}—{% endif %}
+        </p>
+      {% else %}
+        <div class="p-6 text-center text-[var(--muted)] border border-dashed border-[var(--border)] rounded-xl">
+          {{ t('empty_state_dynamics') }}
+        </div>
+      {% endif %}
+    </div>
+
+    {% if timeline_entries %}
+    <div class="overflow-x-auto">
+      <table class="min-w-full table-card">
+        <thead class="text-left text-sm text-[var(--muted)]">
+          <tr>
+            <th class="py-2">{{ t('updated_at') }}</th>
+            <th class="py-2">{{ t('price') }}</th>
+            <th class="py-2">{{ t('percent') }} %</th>
+            <th class="py-2">{{ t('trend') }}</th>
+          </tr>
+        </thead>
+        <tbody class="text-sm">
+          {% for entry in timeline_entries|reverse %}
+          {% set ts = entry.recorded_at %}
+          <tr>
+            <td class="py-2 font-mono text-xs">{{ ts.strftime('%Y-%m-%d %H:%M') if ts else '—' }}</td>
+            <td class="py-2">{{ '%.0f' % entry.price }}</td>
+            <td class="py-2">{{ '%.0f' % entry.percent }}</td>
+            <td class="py-2">
+              {% if entry.trend == 'up' %}
+                <span class="badge badge-green">{{ t('up') }}</span>
+              {% else %}
+                <span class="badge badge-red">{{ t('down') }}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+
+  <aside class="card p-5 space-y-4 h-fit">
+    <h2 class="text-lg font-semibold">{{ t('filters') }}</h2>
+    <form method="get" class="space-y-4" id="dynamicsForm">
+      <input type="hidden" name="tab" value="dynamics">
+      <div>
+        <label class="label" for="citySelect">{{ t('select_city') }}</label>
+        <select class="select" id="citySelect" name="city">
+          {% for item in all_cities %}
+            <option value="{{ item }}" {% if item == city %}selected{% endif %}>{{ item }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="label" for="productSelect">{{ t('select_product') }}</label>
+        <select class="select" id="productSelect" name="product">
+          {% for item in products_for_city %}
+            <option value="{{ item }}" {% if item == product %}selected{% endif %}>{{ item }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button class="btn btn-primary w-full" type="submit">{{ t('apply') }}</button>
+    </form>
+  </aside>
+</section>
+
+{% if timeline %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js" crossorigin="anonymous"></script>
+<script>
+(() => {
+  const canvas = document.getElementById('priceChart');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  const rawData = {{ timeline | tojson }};
+
+  // Надёжный парсер дат: "YYYY-MM-DD HH:mm[:ss]" и ISO
+  const parseWhen = (s) => {
+    if (!s) return NaN;
+    const normalized = (typeof s === 'string' && s.includes(' '))
+      ? s.replace(' ', 'T')
+      : s;
+    const t = Date.parse(normalized);
+    return Number.isNaN(t) ? NaN : t;
+  };
+
+  const basePoints = (Array.isArray(rawData) ? rawData : [])
+    .map(p => {
+      const price = Number(p?.price);
+      const ts = parseWhen(p?.timestamp);
+      if (!Number.isFinite(price) || Number.isNaN(ts)) return null;
+      return { x: ts, y: price, synthetic: false, label: p.timestamp };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.x - b.x);
+
+  if (!basePoints.length) return;
+
+  const makePaddingPoints = (p) => {
+    const hour = 60 * 60 * 1000;
+    return [
+      { x: p.x - hour, y: p.y, synthetic: true, label: p.label },
+      p,
+      { x: p.x + hour, y: p.y, synthetic: true, label: p.label },
+    ];
+  };
+  const chartPoints = basePoints.length === 1 ? makePaddingPoints(basePoints[0]) : basePoints;
+  const singlePoint = basePoints.length === 1;
+
+  const hexToRgba = (hex, alpha) => {
+    if (!hex) return `rgba(59,130,246,${alpha})`;
+    const s = hex.replace('#','').trim();
+    const full = s.length === 3 ? s.split('').map(ch => ch+ch).join('') : s.slice(0,6);
+    const num = Number.parseInt(full, 16);
+    if (!Number.isFinite(num)) return `rgba(59,130,246,${alpha})`;
+    const r = (num>>16)&255, g=(num>>8)&255, b=num&255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
+
+  const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: "{{ t('price') }}",
+        data: chartPoints,
+        borderColor: '#3b82f6',
+        borderWidth: 2.5,
+        backgroundColor: 'rgba(59,130,246,0.2)',
+        parsing: false,
+        spanGaps: false,
+
+        // Плавная линия
+        stepped: false,
+        tension: 0.35,
+        cubicInterpolationMode: 'monotone',
+        borderJoinStyle: 'round',
+        borderCapStyle: 'round',
+
+        fill: true,
+        showLine: true,
+        pointRadius: c => (c.raw?.synthetic ? 0 : singlePoint ? 6 : 3),
+        pointHoverRadius: c => (c.raw?.synthetic ? 0 : singlePoint ? 8 : 5),
+        pointBackgroundColor: '#3b82f6',
+        pointBorderColor: '#3b82f6',
+        pointHoverBackgroundColor: '#3b82f6',
+        pointHoverBorderColor: '#3b82f6',
+        pointBorderWidth: 0,
+      }]
+    },
+    options: {
+      animation: { duration: 800, easing: 'easeOutQuart' },
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: { padding: { top: 16, bottom: 8, left: 8, right: 8 } },
+      scales: {
+        x: {
+          type: 'time',
+          time: {
+            tooltipFormat: 'yyyy-MM-dd HH:mm',
+            displayFormats: { hour: 'MMM d HH:mm', day: 'MMM d' }
+          },
+          ticks: { color: '#6b7280', maxRotation: 0, autoSkipPadding: 16 },
+          grid: { color: '#e5e7eb', drawBorder: false }
+        },
+        y: {
+          ticks: { color: '#6b7280', padding: 6 },
+          grid: { color: '#e5e7eb', drawBorder: false }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          filter: (ctx) => !ctx.raw?.synthetic,
+          callbacks: {
+            title(items) {
+              if (!items?.length) return '';
+              const original = items[0].raw?.label;
+              if (original) {
+                const d = new Date(parseWhen(original));
+                return Number.isNaN(d.getTime()) ? '' : d.toLocaleString();
+              }
+              const fb = new Date(items[0].parsed.x);
+              return Number.isNaN(fb.getTime()) ? '' : fb.toLocaleString();
+            }
+          }
+        }
+      }
+    }
+  });
+
+  const applyThemeToChart = () => {
+    const styles = getComputedStyle(document.documentElement);
+    const axisColor = styles.getPropertyValue('--muted').trim() || '#6b7280';
+    const gridColor = styles.getPropertyValue('--border').trim() || '#e5e7eb';
+    const lineColor = styles.getPropertyValue('--brand').trim() || '#3b82f6';
+    if (!chart.chartArea) { requestAnimationFrame(applyThemeToChart); return; }
+
+    const fillTop = hexToRgba(lineColor, 0.25);
+    const fillBottom = hexToRgba(lineColor, 0);
+    const { chartArea } = chart;
+    const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+    gradient.addColorStop(0, fillTop);
+    gradient.addColorStop(1, fillBottom);
+
+    const ds = chart.data.datasets[0];
+    ds.borderColor = lineColor;
+    ds.backgroundColor = gradient;
+    ds.pointBackgroundColor = lineColor;
+    ds.pointBorderColor = lineColor;
+    ds.pointHoverBackgroundColor = lineColor;
+    ds.pointHoverBorderColor = lineColor;
+
+    chart.options.scales.x.ticks.color = axisColor;
+    chart.options.scales.x.grid.color = gridColor;
+    chart.options.scales.y.ticks.color = axisColor;
+    chart.options.scales.y.grid.color = gridColor;
+    chart.options.color = axisColor;
+
+    chart.update('none'); // без анимации при смене темы
+  };
+
+  applyThemeToChart();
+  document.getElementById('themeToggle')?.addEventListener('click', () => {
+    setTimeout(applyThemeToChart, 200);
+  });
+
+  const form = document.getElementById('dynamicsForm');
+  document.getElementById('citySelect')?.addEventListener('change', () => form.submit());
+  document.getElementById('productSelect')?.addEventListener('change', () => form.submit());
+})();
+</script>
+{% endif %}
+{% endblock %}

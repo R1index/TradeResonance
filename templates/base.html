@@ -48,7 +48,7 @@
 
         <nav class="hidden md:flex items-center gap-1">
           <a class="tab {{ 'tab-active' if request.args.get('tab','prices')=='prices' else '' }}" href="{{ url_for('index', tab='prices', lang=lang) }}">{{ t('nav_prices') }}</a>
-          <a class="tab {{ 'tab-active' if request.args.get('tab')=='cities' else '' }}" href="{{ url_for('index', tab='cities', lang=lang) }}">{{ t('nav_cities') }}</a>
+          <a class="tab {{ 'tab-active' if request.args.get('tab')=='dynamics' else '' }}" href="{{ url_for('index', tab='dynamics', lang=lang) }}">{{ t('nav_dynamics') }}</a>
           <a class="tab {{ 'tab-active' if request.args.get('tab')=='routes' else '' }}" href="{{ url_for('index', tab='routes', lang=lang) }}">{{ t('nav_routes') }}</a>
           <a class="tab" href="{{ url_for('new_entry', lang=lang) }}">{{ t('nav_add') }}</a>
           <a class="tab" href="{{ url_for('import_csv', lang=lang) }}">{{ t('nav_import') }}</a>
@@ -82,7 +82,7 @@
             <span><span id="mClockLocalTz">LOCAL</span> <span id="mClockLocal">--:--:--</span></span>
           </div>
           <a class="tab block" href="{{ url_for('index', tab='prices', lang=lang) }}">{{ t('nav_prices') }}</a>
-          <a class="tab block" href="{{ url_for('index', tab='cities', lang=lang) }}">{{ t('nav_cities') }}</a>
+          <a class="tab block" href="{{ url_for('index', tab='dynamics', lang=lang) }}">{{ t('nav_dynamics') }}</a>
           <a class="tab block" href="{{ url_for('index', tab='routes', lang=lang) }}">{{ t('nav_routes') }}</a>
           <a class="tab block" href="{{ url_for('new_entry', lang=lang) }}">{{ t('nav_add') }}</a>
           <a class="tab block" href="{{ url_for('import_csv', lang=lang) }}">{{ t('nav_import') }}</a>
