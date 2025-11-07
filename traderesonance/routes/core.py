@@ -92,7 +92,12 @@ def _save_entry_image(file_storage) -> str:
                 TARGET_IMAGE_SIZE,
                 Image.LANCZOS,
             )
-            upload_folder = Path(current_app.static_folder) / UPLOAD_SUBDIR
+            upload_folder = Path(
+                current_app.config.get(
+                    "UPLOADS_FOLDER_PATH",
+                    Path(current_app.static_folder) / UPLOAD_SUBDIR,
+                )
+            )
             upload_folder.mkdir(parents=True, exist_ok=True)
             filename = f"{uuid4().hex}.png"
             output_path = upload_folder / filename
