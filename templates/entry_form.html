@@ -52,14 +52,10 @@
           id="productField"
           name="product"
           class="input"
-          list="productsList"
           autocomplete="off" spellcheck="false"
           data-product-autocomplete
           value="{{ request.form.get('product','') }}"
           required>
-        <datalist id="productsList">
-          {% for p in products_list %}<option value="{{ p }}">{% endfor %}
-        </datalist>
       {% endif %}
     </div>
 

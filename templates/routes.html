@@ -44,10 +44,7 @@
         <div>
           <label class="label">{{ t('product') }}</label>
           <input class="input" name="product" placeholder="{{ t('product') }}"
-                 value="{{ q_product or '' }}" list="productsList" id="productInput" autocomplete="off" data-product-autocomplete>
-          <datalist id="productsList">
-            {% for p in products_list %}<option value="{{ p }}">{% endfor %}
-          </datalist>
+                 value="{{ q_product or '' }}" id="productInput" autocomplete="off" data-product-autocomplete>
         </div>
 
         <div>
