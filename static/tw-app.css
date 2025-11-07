@@ -113,6 +113,16 @@
   filter: brightness(.95);
 }
 
+.btn-danger {
+  background: #dc2626;
+  color: #fff;
+  border-color: transparent;
+}
+
+.btn-danger:hover {
+  filter: brightness(.9);
+}
+
 .btn-outline {
   background: transparent;
   color: var(--fg);
