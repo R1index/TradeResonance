@@ -172,7 +172,7 @@
       {% if e %}
       <div class="flex flex-wrap items-center gap-2 ml-auto">
         <input type="password" name="admin_pass" class="input" placeholder="{{ t('admin_password') }}" autocomplete="off" style="width: 14rem;">
-        <button class="btn btn-danger" type="submit" name="_action" value="delete" onclick="return confirm('{{ t('confirm_delete')|escapejs }}');">{{ t('delete') }}</button>
+        <button class="btn btn-danger" type="submit" name="_action" value="delete" onclick="return confirm({{ t('confirm_delete')|tojson }});">{{ t('delete') }}</button>
       </div>
       {% endif %}
     </div>
