@@ -715,7 +715,8 @@ details[open] > summary {
 }
 
 .product-suggestion-item:hover,
-.product-suggestion-item:focus {
+.product-suggestion-item:focus,
+.product-suggestion-item.is-active {
   background-color: var(--hover);
   outline: none;
 }
