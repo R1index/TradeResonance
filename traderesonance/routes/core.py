@@ -729,14 +729,13 @@ def edit_entry(entry_id: int):
             entry.image_path = new_image_path
             invalidate_cache = True
             # propagate the new image to every entry of the same product so
-            # all cities stay in sync
-            others = (
-                Entry.query.filter(func.lower(Entry.product) == func.lower(entry.product))
-                .filter(Entry.id != entry.id)
-                .all()
+            # all cities stay in sync without touching their update timestamps
+            db.session.execute(
+                sa.update(Entry)
+                .where(func.lower(Entry.product) == func.lower(entry.product))
+                .where(Entry.id != entry.id)
+                .values(image_path=new_image_path, updated_at=Entry.updated_at)
             )
-            for other in others:
-                other.image_path = new_image_path
         db.session.flush()
         record_snapshot(entry)
         db.session.commit()
