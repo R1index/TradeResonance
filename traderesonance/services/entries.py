@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 import sqlalchemy as sa
 from sqlalchemy import text
+from sqlalchemy.orm import load_only
 
 from ..extensions import db
 from ..models import Entry, EntrySnapshot, PendingEntry
@@ -161,33 +162,80 @@ def approve_pending(entry: PendingEntry) -> None:
 
 
 def dedupe_entries() -> None:
-    rows: Iterable[Entry] = (
-        db.session.query(Entry)
-        .order_by(
-            Entry.city.asc(),
-            Entry.product.asc(),
-            Entry.updated_at.desc().nullslast(),
-            Entry.created_at.desc(),
+    trimmed_city = sa.func.trim(Entry.city)
+    trimmed_product = sa.func.trim(Entry.product)
+
+    duplicate_keys: Iterable[Tuple[str, str]] = (
+        db.session.query(
+            trimmed_city.label("city"), trimmed_product.label("product")
         )
+        .group_by(trimmed_city, trimmed_product)
+        .having(sa.func.count(Entry.id) > 1)
         .all()
     )
 
-    keep: Dict[Tuple[str, str], Entry] = {}
-    to_delete: List[int] = []
-    for entry in rows:
-        key = (entry.city.strip(), entry.product.strip())
-        if key not in keep:
-            keep[key] = entry
-            continue
-        if entry.is_production_city and not keep[key].is_production_city:
-            keep[key].is_production_city = True
-        if not keep[key].image_path and entry.image_path:
-            keep[key].image_path = entry.image_path
-        to_delete.append(entry.id)
+    if not duplicate_keys:
+        return
 
-    if to_delete:
-        Entry.query.filter(Entry.id.in_(to_delete)).delete(synchronize_session=False)
+    order_columns = (
+        Entry.updated_at.desc().nullslast(),
+        Entry.created_at.desc(),
+        Entry.id.desc(),
+    )
+
+    ids_to_delete: List[int] = []
+    modified = False
+
+    for norm_city, norm_product in duplicate_keys:
+        entries: List[Entry] = (
+            Entry.query.options(
+                load_only(
+                    Entry.id,
+                    Entry.city,
+                    Entry.product,
+                    Entry.image_path,
+                    Entry.is_production_city,
+                    Entry.updated_at,
+                    Entry.created_at,
+                )
+            )
+            .filter(trimmed_city == norm_city, trimmed_product == norm_product)
+            .order_by(*order_columns)
+            .all()
+        )
+
+        if not entries:
+            continue
+
+        keep = entries[0]
+        merged_is_production = bool(keep.is_production_city)
+        merged_image = keep.image_path
+
+        for extra in entries[1:]:
+            if extra.is_production_city and not merged_is_production:
+                merged_is_production = True
+            if not merged_image and extra.image_path:
+                merged_image = extra.image_path
+            ids_to_delete.append(extra.id)
+
+        if keep.is_production_city != merged_is_production:
+            keep.is_production_city = merged_is_production
+            modified = True
+        if keep.image_path != merged_image:
+            keep.image_path = merged_image
+            modified = True
+
+    if ids_to_delete:
+        Entry.query.filter(Entry.id.in_(ids_to_delete)).delete(
+            synchronize_session=False
+        )
+        modified = True
+
+    if not modified:
+        return
+
     db.session.commit()
+    invalidate_product_image_cache()
 
 
 def setup_database(app) -> None:
