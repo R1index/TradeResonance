@@ -157,7 +157,7 @@
     </div>
 
     <!-- Кнопки -->
-    <div class="md:col-span-4 flex gap-2 pt-2">
+    <div class="md:col-span-4 flex flex-wrap items-center gap-2 pt-2">
       {% if e %}
         <button class="btn btn-primary" id="submitBtn" type="submit">{{ t('save') }}</button>
       {% else %}
@@ -169,6 +169,12 @@
         </button>
       {% endif %}
       <a class="btn btn-outline" href="{{ next_url or request.referrer or url_for('index', lang=lang) }}">← {{ t('back') }}</a>
+      {% if e %}
+      <div class="flex flex-wrap items-center gap-2 ml-auto">
+        <input type="password" name="admin_pass" class="input" placeholder="{{ t('admin_password') }}" autocomplete="off" style="width: 14rem;">
+        <button class="btn btn-danger" type="submit" name="_action" value="delete" onclick="return confirm('{{ t('confirm_delete')|escapejs }}');">{{ t('delete') }}</button>
+      </div>
+      {% endif %}
     </div>
   </form>
 

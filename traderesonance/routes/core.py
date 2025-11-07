@@ -698,6 +698,42 @@ def edit_entry(entry_id: int):
 
     if request.method == "POST":
         next_param = request.form.get("next")
+        safe_next_value = safe_next(next_param)
+        redirect_args = {"entry_id": entry.id, "lang": lang}
+        if safe_next_value:
+            redirect_args["next"] = safe_next_value
+
+        action = (request.form.get("_action") or "save").strip()
+
+        if action == "delete":
+            admin_password = current_app.config.get("ADMIN_PASSWORD")
+            admin_pass = request.form.get("admin_pass", "")
+            if not admin_pass:
+                flash(translate("required_password"))
+                return redirect(url_for("edit_entry", **redirect_args))
+            if admin_pass != admin_password:
+                flash(translate("wrong_password"))
+                return redirect(url_for("edit_entry", **redirect_args))
+
+            image_path = entry.image_path
+            db.session.delete(entry)
+            db.session.commit()
+            flash(translate("deleted"))
+
+            if image_path:
+                still_used = (
+                    db.session.query(Entry.id)
+                    .filter(Entry.image_path == image_path)
+                    .first()
+                )
+                if not still_used:
+                    _delete_image_file(image_path)
+
+            invalidate_product_image_cache()
+
+            next_url = safe_next_value or url_for("index", lang=lang)
+            return redirect(next_url)
+
         image_file = request.files.get("image")
         new_image_path: Optional[str] = None
         if image_file and image_file.filename:
@@ -705,10 +741,6 @@ def edit_entry(entry_id: int):
                 new_image_path = _save_entry_image(image_file)
             except ValueError:
                 flash(translate("invalid_image"))
-                redirect_args = {"entry_id": entry.id, "lang": lang}
-                safe_next_value = safe_next(next_param)
-                if safe_next_value:
-                    redirect_args["next"] = safe_next_value
                 return redirect(url_for("edit_entry", **redirect_args))
 
         previous_image_path = entry.image_path
