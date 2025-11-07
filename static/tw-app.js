@@ -226,7 +226,7 @@ const ProductAutocomplete = {
   data: [],
   panels: new Map(),
   states: new Map(),
-  maxVisible: 20,
+  maxVisible: 50,
 
   init() {
     const script = document.getElementById('product-suggestions-data');
