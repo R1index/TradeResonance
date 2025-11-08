@@ -48,8 +48,7 @@
 
       <div>
         <label class="label">{{ t('product') }}</label>
-        <input class="input" name="product" placeholder="{{ t('product') }}" value="{{ q_product }}" list="productsList">
-        <datalist id="productsList">{% for p in products_list %}<option value="{{ p }}">{% endfor %}</datalist>
+        <input class="input" name="product" placeholder="{{ t('product') }}" value="{{ q_product }}" data-product-autocomplete autocomplete="off">
       </div>
 
       <div>
@@ -146,7 +145,18 @@
               <span>{{ e.city }}</span>
             </span>
           </td>
-          <td class="py-2" data-label="{{ t('product') }}">{{ e.product }}</td>
+          <td class="py-2" data-label="{{ t('product') }}">
+            <div class="flex items-center gap-3">
+              <div class="product-thumb product-thumb--table">
+                {% if e.image_path %}
+                  <img src="{{ url_for('static', filename=e.image_path) }}" alt="{{ e.product }}">
+                {% else %}
+                  <span>📦</span>
+                {% endif %}
+              </div>
+              <span>{{ e.product }}</span>
+            </div>
+          </td>
           <td class="py-2" data-col="pricing" data-label="{{ t('price') }} / {{ t('trend') }} / {{ t('percent') }}%">
             <div class="pricing-group">
               <div class="pricing-item">

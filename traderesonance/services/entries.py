@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Callable, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 import sqlalchemy as sa
 from sqlalchemy import text
@@ -13,6 +13,7 @@ from ..models import Entry, EntrySnapshot, PendingEntry
 
 CacheBuilder = Callable[[], List[str]]
 _cache: Dict[str, Tuple[datetime, List[str]]] = {}
+_value_cache: Dict[str, Tuple[datetime, Any]] = {}
 
 
 def cached_list(key: str, factory: CacheBuilder, ttl_seconds: int = 60) -> List[str]:
@@ -24,6 +25,49 @@ def cached_list(key: str, factory: CacheBuilder, ttl_seconds: int = 60) -> List[
     value = factory()
     _cache[key] = (now, value)
     return value
+
+
+def cached_value(key: str, factory: Callable[[], Any], ttl_seconds: int = 60) -> Any:
+    now = datetime.utcnow()
+    if key in _value_cache:
+        ts, value = _value_cache[key]
+        if now - ts < timedelta(seconds=ttl_seconds):
+            return value
+    value = factory()
+    _value_cache[key] = (now, value)
+    return value
+
+
+def product_image_map() -> Dict[str, Optional[str]]:
+    def build() -> Dict[str, Optional[str]]:
+        rows = (
+            db.session.query(
+                Entry.product,
+                Entry.image_path,
+                Entry.updated_at,
+                Entry.created_at,
+            )
+            .order_by(
+                Entry.product.asc(),
+                Entry.updated_at.desc().nullslast(),
+                Entry.created_at.desc(),
+            )
+            .all()
+        )
+
+        result: Dict[str, Optional[str]] = {}
+        for product, image_path, *_ in rows:
+            if product not in result:
+                result[product] = image_path
+            elif not result[product] and image_path:
+                result[product] = image_path
+        return result
+
+    return cached_value("product_image_map", build, ttl_seconds=120)
+
+
+def invalidate_product_image_cache() -> None:
+    _value_cache.pop("product_image_map", None)
 
 
 def record_snapshot(entry: Entry, *, recorded_at: Optional[datetime] = None) -> None:
@@ -79,6 +123,7 @@ def latest_entries_subquery() -> sa.sql.Select:
         Entry.trend,
         Entry.percent,
         Entry.is_production_city,
+        Entry.image_path,
         Entry.created_at,
         Entry.updated_at,
         ts,
@@ -136,6 +181,8 @@ def dedupe_entries() -> None:
             continue
         if entry.is_production_city and not keep[key].is_production_city:
             keep[key].is_production_city = True
+        if not keep[key].image_path and entry.image_path:
+            keep[key].image_path = entry.image_path
         to_delete.append(entry.id)
 
     if to_delete:
@@ -146,6 +193,18 @@ def dedupe_entries() -> None:
 def setup_database(app) -> None:
     with app.app_context():
         db.create_all()
+
+        try:
+            inspector = sa.inspect(db.engine)
+            entry_columns = {col["name"] for col in inspector.get_columns("entries")}
+            if "image_path" not in entry_columns:
+                db.session.execute(
+                    sa.text("ALTER TABLE entries ADD COLUMN image_path VARCHAR(255)")
+                )
+                db.session.commit()
+        except Exception:  # pragma: no cover - defensive upgrade path
+            db.session.rollback()
+
         dedupe_entries()
 
         created_snapshots = 0

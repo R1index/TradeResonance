@@ -222,12 +222,149 @@ const ToastManager = {
   }
 };
 
+const ProductAutocomplete = {
+  data: [],
+  panels: new Map(),
+
+  init() {
+    const script = document.getElementById('product-suggestions-data');
+    if (!script) return;
+
+    try {
+      this.data = JSON.parse(script.textContent) || [];
+    } catch (error) {
+      console.warn('Failed to parse product suggestions:', error);
+      return;
+    }
+
+    if (!this.data.length) return;
+
+    const inputs = Array.from(document.querySelectorAll('[data-product-autocomplete]'));
+    if (!inputs.length) return;
+
+    inputs.forEach((input) => this.attach(input));
+
+    window.addEventListener('resize', () => this.repositionAll());
+    window.addEventListener('scroll', () => this.repositionAll(), true);
+    document.addEventListener('click', (event) => {
+      this.panels.forEach((panel, input) => {
+        if (event.target === input || panel.contains(event.target)) return;
+        panel.classList.add('hidden');
+      });
+    });
+  },
+
+  attach(input) {
+    const panel = document.createElement('div');
+    panel.className = 'product-suggestion-panel hidden';
+    panel.setAttribute('role', 'listbox');
+    document.body.appendChild(panel);
+    this.panels.set(input, panel);
+
+    const update = () => {
+      this.positionPanel(input, panel);
+      this.renderSuggestions(input, panel);
+    };
+
+    input.addEventListener('focus', () => {
+      update();
+      if (panel.dataset.items === 'true') panel.classList.remove('hidden');
+    });
+
+    input.addEventListener('input', () => {
+      update();
+      if (panel.dataset.items === 'true') panel.classList.remove('hidden');
+    });
+
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        panel.classList.add('hidden');
+      }
+    });
+
+    input.addEventListener('blur', () => {
+      setTimeout(() => panel.classList.add('hidden'), 120);
+    });
+
+    panel.addEventListener('mousedown', (event) => event.preventDefault());
+    panel.addEventListener('click', (event) => {
+      const target = event.target.closest('[data-value]');
+      if (!target) return;
+      input.value = target.dataset.value || '';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      panel.classList.add('hidden');
+    });
+  },
+
+  repositionAll() {
+    this.panels.forEach((panel, input) => {
+      if (panel.classList.contains('hidden')) return;
+      this.positionPanel(input, panel);
+    });
+  },
+
+  positionPanel(input, panel) {
+    const rect = input.getBoundingClientRect();
+    panel.style.minWidth = `${rect.width}px`;
+    panel.style.width = `${rect.width}px`;
+    panel.style.left = `${window.scrollX + rect.left}px`;
+    panel.style.top = `${window.scrollY + rect.bottom + 4}px`;
+  },
+
+  renderSuggestions(input, panel) {
+    const query = (input.value || '').trim().toLowerCase();
+    const results = this.data
+      .filter((item) => !query || item.name.toLowerCase().includes(query))
+      .slice(0, 10);
+
+    panel.innerHTML = '';
+
+    if (!results.length) {
+      panel.dataset.items = 'false';
+      panel.classList.add('hidden');
+      return;
+    }
+
+    results.forEach((item) => {
+      const option = document.createElement('button');
+      option.type = 'button';
+      option.className = 'product-suggestion-item';
+      option.dataset.value = item.name;
+      option.setAttribute('role', 'option');
+
+      const thumb = document.createElement('div');
+      thumb.className = 'product-thumb product-thumb--suggestion';
+      if (item.image) {
+        const img = document.createElement('img');
+        img.src = item.image;
+        img.alt = item.name;
+        thumb.appendChild(img);
+      } else {
+        const fallback = document.createElement('span');
+        fallback.textContent = '📦';
+        thumb.appendChild(fallback);
+      }
+      option.appendChild(thumb);
+
+      const label = document.createElement('span');
+      label.className = 'product-suggestion-name';
+      label.textContent = item.name;
+      option.appendChild(label);
+
+      panel.appendChild(option);
+    });
+
+    panel.dataset.items = 'true';
+  },
+};
+
 // Инициализация приложения
 document.addEventListener('DOMContentLoaded', () => {
   ThemeManager.init();
   MobileMenu.init();
   ClockManager.init();
   ToastManager.init();
+  ProductAutocomplete.init();
 });
 
 // Очистка при размонтировании (если нужно)
