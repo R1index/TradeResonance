@@ -215,6 +215,27 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
                 .correlate(Entry)
             )
 
+        filtered_query = query
+
+        best_buy_entry = filtered_query.order_by(Entry.price.asc()).first()
+        best_sell_entry = filtered_query.order_by(Entry.price.desc()).first()
+
+        def serialize_best(entry: Optional[Entry]) -> Optional[Dict[str, Any]]:
+            if not entry:
+                return None
+            updated = entry.updated_at or entry.created_at
+            return {
+                "id": entry.id,
+                "city": entry.city,
+                "product": entry.product,
+                "price": entry.price,
+                "trend": entry.trend,
+                "percent": entry.percent,
+                "is_production_city": entry.is_production_city,
+                "updated": updated,
+                "updated_iso": updated.strftime("%Y-%m-%dT%H:%M:%SZ") if updated else None,
+            }
+
         sort_map = {
             "price_asc": Entry.price.asc(),
             "price_desc": Entry.price.desc(),
@@ -271,6 +292,8 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
                 "cities": total_cities,
                 "products": total_products,
             },
+            best_buy=serialize_best(best_buy_entry),
+            best_sell=serialize_best(best_sell_entry),
             lang=lang,
         )
 

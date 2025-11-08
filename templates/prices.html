@@ -327,6 +327,64 @@
   </nav>
   {% endif %}
   {% endif %}
+  {% if best_buy or best_sell %}
+  <div class="card best-deals-widget" role="complementary" aria-live="polite">
+    <div class="best-deals-widget__header">
+      <strong>{{ t('best_deals_title') }}</strong>
+      <span>{{ t('best_deals_hint') }}</span>
+    </div>
+
+    {% if best_buy %}
+    <div class="best-deal-row">
+      <span class="best-deal-row__label">🛒 {{ t('best_buy_label') }}</span>
+      <div class="best-deal-row__meta">
+        <span class="best-deal-row__product">{{ best_buy.product }}</span>
+        <span class="best-deal-row__city">🏙 {{ best_buy.city }}</span>
+        <span class="best-deal-row__price">{{ '%.0f' % best_buy.price }}</span>
+        <span>
+          {{ t('trend') }}:
+          {% if best_buy.trend == 'up' %}
+            <span class="badge badge-green">{{ t('up') }}</span>
+          {% else %}
+            <span class="badge badge-red">{{ t('down') }}</span>
+          {% endif %}
+        </span>
+        <span>{{ t('percent') }}: {{ '%.0f' % best_buy.percent }}%</span>
+        {% if best_buy.updated_iso %}
+        <span class="best-deal-row__updated" title="{{ best_buy.updated.strftime('%Y-%m-%d %H:%M:%S') if best_buy.updated }}">
+          {{ t('updated_at') }} · <span data-updated-iso="{{ best_buy.updated_iso }}"></span>
+        </span>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if best_sell %}
+    <div class="best-deal-row">
+      <span class="best-deal-row__label">💰 {{ t('best_sell_label') }}</span>
+      <div class="best-deal-row__meta">
+        <span class="best-deal-row__product">{{ best_sell.product }}</span>
+        <span class="best-deal-row__city">🏙 {{ best_sell.city }}</span>
+        <span class="best-deal-row__price">{{ '%.0f' % best_sell.price }}</span>
+        <span>
+          {{ t('trend') }}:
+          {% if best_sell.trend == 'up' %}
+            <span class="badge badge-green">{{ t('up') }}</span>
+          {% else %}
+            <span class="badge badge-red">{{ t('down') }}</span>
+          {% endif %}
+        </span>
+        <span>{{ t('percent') }}: {{ '%.0f' % best_sell.percent }}%</span>
+        {% if best_sell.updated_iso %}
+        <span class="best-deal-row__updated" title="{{ best_sell.updated.strftime('%Y-%m-%d %H:%M:%S') if best_sell.updated }}">
+          {{ t('updated_at') }} · <span data-updated-iso="{{ best_sell.updated_iso }}"></span>
+        </span>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
 </section>
 
 <script>
@@ -419,7 +477,7 @@
 
   function renderAllRelative(){
     const lang = "{{ lang }}";
-    table.querySelectorAll('[data-updated-iso]').forEach(cell => {
+    document.querySelectorAll('[data-updated-iso]').forEach(cell => {
       cell.textContent = relLabel(cell.getAttribute('data-updated-iso'), lang);
     });
   }
