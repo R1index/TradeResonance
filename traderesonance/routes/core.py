@@ -691,7 +691,6 @@ def new_entry():
         next_url=request.args.get("next"),
     )
 
-
 def edit_entry(entry_id: int):
     lang = get_lang()
     entry = Entry.query.get_or_404(entry_id)
@@ -757,6 +756,7 @@ def edit_entry(entry_id: int):
         entry.is_production_city = parse_bool(
             request.form.get("is_production_city", entry.is_production_city)
         )
+
         if new_image_path:
             entry.image_path = new_image_path
             invalidate_cache = True
@@ -768,12 +768,16 @@ def edit_entry(entry_id: int):
                 .where(Entry.id != entry.id)
                 .values(image_path=new_image_path, updated_at=Entry.updated_at)
             )
+
+        # 🟢 Обновляем timestamp даже если пользователь ничего не менял
         entry.updated_at = datetime.utcnow()
+
         db.session.flush()
         record_snapshot(entry)
         db.session.commit()
         flash(translate("updated"))
         dedupe_entries()
+
         if new_image_path and previous_image_path and previous_image_path != new_image_path:
             still_used = (
                 db.session.query(Entry.id)
@@ -783,8 +787,10 @@ def edit_entry(entry_id: int):
             if not still_used:
                 _delete_image_file(previous_image_path)
                 invalidate_cache = True
+
         if invalidate_cache:
             invalidate_product_image_cache()
+
         next_url = next_param or url_for("index", lang=lang)
         return redirect(next_url)
 
@@ -815,9 +821,7 @@ def edit_entry(entry_id: int):
         overrides=overrides,
         product_suggestions=product_suggestions,
     )
-
-
-
+    
 def import_csv():
     lang = get_lang()
     if request.method == "POST":
