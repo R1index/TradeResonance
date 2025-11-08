@@ -20,6 +20,7 @@ from flask import (
 )
 from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy import func
+from sqlalchemy.orm import aliased
 
 from ..extensions import db
 from ..localization import context_processor, get_lang, translate
@@ -162,6 +163,7 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
         q_percent_min = request.args.get("percent_min", type=float)
         q_percent_max = request.args.get("percent_max", type=float)
         q_prod = (request.args.get("prod") or "any").strip().lower()
+        q_has_prod = parse_bool(request.args.get("has_prod"))
         q_sort = (request.args.get("sort") or "updated_desc").strip().lower()
 
         page = request.args.get("page", 1, type=int)
@@ -186,6 +188,14 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
             query = query.filter(Entry.is_production_city.is_(True))
         elif q_prod == "no":
             query = query.filter(Entry.is_production_city.is_(False))
+        if q_has_prod:
+            producer = aliased(Entry)
+            query = query.filter(
+                sa.exists()
+                .where(producer.is_production_city.is_(True))
+                .where(func.lower(producer.product) == func.lower(Entry.product))
+                .correlate(Entry)
+            )
 
         sort_map = {
             "price_asc": Entry.price.asc(),
@@ -237,6 +247,7 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
             q_percent_min=q_percent_min,
             q_percent_max=q_percent_max,
             q_prod=q_prod,
+            q_has_prod=q_has_prod,
             q_sort=q_sort,
             totals={
                 "entries": total_entries,

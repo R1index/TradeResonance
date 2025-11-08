@@ -26,7 +26,7 @@
          href="{{ url_for('export_csv') }}?city={{ q_city }}&product={{ q_product }}&trend={{ q_trend }}
          &price_min={{ q_price_min }}&price_max={{ q_price_max }}
          &percent_min={{ q_percent_min }}&percent_max={{ q_percent_max }}
-         &prod={{ q_prod }}&sort={{ q_sort }}&lang={{ lang }}">
+         &prod={{ q_prod }}&has_prod={% if q_has_prod %}1{% endif %}&sort={{ q_sort }}&lang={{ lang }}">
         Export CSV
       </a>
       <a href="{{ url_for('new_entry', lang=lang) }}" class="btn btn-primary">{{ t('nav_add') }}</a>
@@ -34,7 +34,7 @@
   </div>
 
   <!-- ФИЛЬТРЫ -->
-  {% set filters_active = q_city or q_product or q_trend or q_price_min is not none or q_price_max is not none or q_percent_min is not none or q_percent_max is not none or q_prod != 'any' or q_sort != 'updated_desc' or per_page != 15 %}
+  {% set filters_active = q_city or q_product or q_trend or q_price_min is not none or q_price_max is not none or q_percent_min is not none or q_percent_max is not none or q_prod != 'any' or q_has_prod or q_sort != 'updated_desc' or per_page != 15 %}
   <details class="filters-card" {% if filters_active %}open{% endif %}>
     <summary class="filters-summary">{{ t('filters') }}</summary>
     <form class="filters-grid" method="get" id="filtersForm">
@@ -85,6 +85,14 @@
           <option value="yes" {% if q_prod=='yes' %}selected{% endif %}>{{ t('yes') }}</option>
           <option value="no"  {% if q_prod=='no'  %}selected{% endif %}>{{ t('no') }}</option>
         </select>
+      </div>
+
+      <div>
+        <label class="label">{{ t('production_filter') }}</label>
+        <label class="inline-flex items-center gap-2 text-sm text-[var(--muted)]">
+          <input type="checkbox" class="h-4 w-4" name="has_prod" value="1" {% if q_has_prod %}checked{% endif %}>
+          <span class="text-[var(--text)]">{{ t('production_filter_only') }}</span>
+        </label>
       </div>
 
       <div>
