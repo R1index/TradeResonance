@@ -49,15 +49,12 @@
 
         <div>
           <label class="label">{{ 'Buy city' if lang=='en' else 'Город покупки' }}</label>
-          <input class="input" name="buy_city" value="{{ q_buy_city or '' }}" list="citiesList" autocomplete="off">
+          <input class="input" name="buy_city" value="{{ q_buy_city or '' }}" autocomplete="off" data-city-autocomplete>
         </div>
         <div>
           <label class="label">{{ 'Sell city' if lang=='en' else 'Город продажи' }}</label>
-          <input class="input" name="sell_city" value="{{ q_sell_city or '' }}" list="citiesList" autocomplete="off">
+          <input class="input" name="sell_city" value="{{ q_sell_city or '' }}" autocomplete="off" data-city-autocomplete>
         </div>
-        <datalist id="citiesList">
-          {% for c in cities_list %}<option value="{{ c }}">{% endfor %}
-        </datalist>
 
         <div class="flex items-center gap-2 mt-6">
           <input id="onlyProd" type="checkbox" class="checkbox" name="buy_only_prod" value="1"

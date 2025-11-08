@@ -25,13 +25,10 @@
           id="cityField"
           name="city"
           class="input"
-          list="citiesList"
           autocomplete="off" spellcheck="false"
+          data-city-autocomplete
           value="{{ request.form.get('city','') or request.args.get('city','') }}"
           required>
-        <datalist id="citiesList">
-          {% for c in cities_list %}<option value="{{ c }}">{% endfor %}
-        </datalist>
       {% endif %}
     </div>
 

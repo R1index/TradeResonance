@@ -42,8 +42,7 @@
 
       <div>
         <label class="label">{{ t('city') }}</label>
-        <input class="input" name="city" placeholder="{{ t('city') }}" value="{{ q_city }}" list="citiesList">
-        <datalist id="citiesList">{% for c in cities_list %}<option value="{{ c }}">{% endfor %}</datalist>
+        <input class="input" name="city" placeholder="{{ t('city') }}" value="{{ q_city }}" autocomplete="off" data-city-autocomplete>
       </div>
 
       <div>

@@ -222,26 +222,57 @@ const ToastManager = {
   }
 };
 
-const ProductAutocomplete = {
+const APP_LANG = document.documentElement.getAttribute('lang') || 'en';
+
+const formatCountLabel = (value) => {
+  const count = Number(value) || 0;
+  const formatted = new Intl.NumberFormat(APP_LANG).format(count);
+
+  if (APP_LANG.startsWith('ru')) {
+    const mod10 = count % 10;
+    const mod100 = count % 100;
+    let noun = 'записей';
+    if (mod10 === 1 && mod100 !== 11) {
+      noun = 'запись';
+    } else if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) {
+      noun = 'записи';
+    }
+    return `${formatted} ${noun}`;
+  }
+
+  const noun = count === 1 ? 'entry' : 'entries';
+  return `${formatted} ${noun}`;
+};
+
+const createAutocomplete = ({
+  scriptId,
+  selector,
+  panelClass = 'autocomplete-panel',
+  itemClass = 'autocomplete-item',
+  maxVisible = 50,
+  filterFn,
+  getValue,
+  renderOption,
+}) => ({
   data: [],
   panels: new Map(),
   states: new Map(),
-  maxVisible: 50,
+  maxVisible,
 
   init() {
-    const script = document.getElementById('product-suggestions-data');
+    const script = document.getElementById(scriptId);
     if (!script) return;
 
     try {
       this.data = JSON.parse(script.textContent) || [];
     } catch (error) {
-      console.warn('Failed to parse product suggestions:', error);
+      console.warn(`Failed to parse suggestions for ${scriptId}:`, error);
       return;
     }
 
-    if (!this.data.length) return;
+    if (!Array.isArray(this.data) || !this.data.length) return;
 
-    const inputs = Array.from(document.querySelectorAll('[data-product-autocomplete]'));
+    const inputs = Array.from(document.querySelectorAll(selector));
     if (!inputs.length) return;
 
     inputs.forEach((input) => this.attach(input));
@@ -258,7 +289,7 @@ const ProductAutocomplete = {
 
   attach(input) {
     const panel = document.createElement('div');
-    panel.className = 'product-suggestion-panel hidden';
+    panel.className = `${panelClass} hidden`;
     panel.setAttribute('role', 'listbox');
     document.body.appendChild(panel);
     this.panels.set(input, panel);
@@ -341,8 +372,12 @@ const ProductAutocomplete = {
 
   renderSuggestions(input, panel) {
     const query = (input.value || '').trim().toLowerCase();
+    const matcher = filterFn
+      ? filterFn
+      : (item, q) => !q || (item?.name || '').toLowerCase().includes(q);
+
     const results = this.data
-      .filter((item) => !query || item.name.toLowerCase().includes(query))
+      .filter((item) => matcher(item, query))
       .slice(0, this.maxVisible);
 
     panel.innerHTML = '';
@@ -357,29 +392,18 @@ const ProductAutocomplete = {
     results.forEach((item) => {
       const option = document.createElement('button');
       option.type = 'button';
-      option.className = 'product-suggestion-item';
-      option.dataset.value = item.name;
+      option.className = itemClass;
+      const value = getValue ? getValue(item) : (item?.name || '');
+      option.dataset.value = value;
       option.setAttribute('role', 'option');
       option.setAttribute('aria-selected', 'false');
+      option.title = value;
 
-      const thumb = document.createElement('div');
-      thumb.className = 'product-thumb product-thumb--suggestion';
-      if (item.image) {
-        const img = document.createElement('img');
-        img.src = item.image;
-        img.alt = item.name;
-        thumb.appendChild(img);
+      if (renderOption) {
+        renderOption(option, item, query);
       } else {
-        const fallback = document.createElement('span');
-        fallback.textContent = '📦';
-        thumb.appendChild(fallback);
+        option.textContent = value;
       }
-      option.appendChild(thumb);
-
-      const label = document.createElement('span');
-      label.className = 'product-suggestion-name';
-      label.textContent = item.name;
-      option.appendChild(label);
 
       panel.appendChild(option);
     });
@@ -427,7 +451,71 @@ const ProductAutocomplete = {
 
     state.activeIndex = nextIndex;
   },
-};
+});
+
+const ProductAutocomplete = createAutocomplete({
+  scriptId: 'product-suggestions-data',
+  selector: '[data-product-autocomplete]',
+  panelClass: 'autocomplete-panel product-suggestion-panel',
+  itemClass: 'autocomplete-item product-suggestion-item',
+  maxVisible: 50,
+  getValue: (item) => item?.name || '',
+  renderOption(option, item) {
+    const thumb = document.createElement('div');
+    thumb.className = 'product-thumb product-thumb--suggestion';
+    if (item?.image) {
+      const img = document.createElement('img');
+      img.src = item.image;
+      img.alt = item.name;
+      thumb.appendChild(img);
+    } else {
+      const fallback = document.createElement('span');
+      fallback.textContent = '📦';
+      thumb.appendChild(fallback);
+    }
+    option.appendChild(thumb);
+
+    const labelWrap = document.createElement('div');
+    labelWrap.className = 'autocomplete-text';
+    const label = document.createElement('span');
+    label.className = 'autocomplete-label product-suggestion-name';
+    label.textContent = item?.name || '';
+    labelWrap.appendChild(label);
+    option.appendChild(labelWrap);
+  },
+});
+
+const CityAutocomplete = createAutocomplete({
+  scriptId: 'city-suggestions-data',
+  selector: '[data-city-autocomplete]',
+  panelClass: 'autocomplete-panel city-suggestion-panel',
+  itemClass: 'autocomplete-item city-suggestion-item',
+  maxVisible: 40,
+  getValue: (item) => item?.name || '',
+  renderOption(option, item) {
+    const icon = document.createElement('div');
+    icon.className = 'autocomplete-icon';
+    const name = item?.name || '';
+    icon.textContent = name ? name.charAt(0).toUpperCase() : '🏙️';
+    option.appendChild(icon);
+
+    const textWrap = document.createElement('div');
+    textWrap.className = 'autocomplete-text';
+    const label = document.createElement('span');
+    label.className = 'autocomplete-label';
+    label.textContent = name;
+    textWrap.appendChild(label);
+
+    if (typeof item?.count === 'number') {
+      const meta = document.createElement('span');
+      meta.className = 'autocomplete-meta';
+      meta.textContent = formatCountLabel(item.count);
+      textWrap.appendChild(meta);
+    }
+
+    option.appendChild(textWrap);
+  },
+});
 
 // Инициализация приложения
 document.addEventListener('DOMContentLoaded', () => {
@@ -436,6 +524,7 @@ document.addEventListener('DOMContentLoaded', () => {
   ClockManager.init();
   ToastManager.init();
   ProductAutocomplete.init();
+  CityAutocomplete.init();
 });
 
 // Очистка при размонтировании (если нужно)

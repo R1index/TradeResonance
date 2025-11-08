@@ -34,6 +34,7 @@
   </head>
 
   <body class="min-h-full bg-[var(--bg)] text-[var(--fg)] transition-colors">
+    <div class="page-gradient" aria-hidden="true"></div>
     <!-- флэш-тосты -->
     <div id="toast-zone" class="fixed top-4 right-4 z-50 space-y-2"></div>
     {% set flash_msg = (get_flashed_messages() or [])|first %}
@@ -94,12 +95,15 @@
       </div>
     </header>
 
-    <main class="mx-auto max-w-7xl px-3 sm:px-6 py-6 space-y-6">
+    <main class="app-main mx-auto max-w-7xl px-3 sm:px-6 py-6 space-y-6">
       {% block content %}{% endblock %}
     </main>
 
     {% if product_suggestions is defined %}
     <script id="product-suggestions-data" type="application/json">{{ product_suggestions | tojson }}</script>
+    {% endif %}
+    {% if city_suggestions is defined %}
+    <script id="city-suggestions-data" type="application/json">{{ city_suggestions | tojson }}</script>
     {% endif %}
     <script src="{{ url_for('static', filename='tw-app.js') }}"></script>
   </body>

@@ -5,7 +5,7 @@ import csv
 import io
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 from uuid import uuid4
 
 import sqlalchemy as sa
@@ -28,6 +28,7 @@ from ..models import Entry, EntrySnapshot, PendingEntry
 from ..services.entries import (
     approve_pending,
     cached_list,
+    cached_value,
     dedupe_entries,
     latest_entries_subquery,
     invalidate_product_image_cache,
@@ -146,6 +147,23 @@ def _build_product_suggestions(products: List[str]) -> List[Dict[str, Optional[s
     return suggestions
 
 
+def _build_city_suggestions() -> List[Dict[str, Any]]:
+    rows = (
+        db.session.query(Entry.city, func.count(Entry.id))
+        .filter(Entry.city.isnot(None))
+        .group_by(Entry.city)
+        .order_by(func.lower(Entry.city))
+        .all()
+    )
+
+    suggestions: List[Dict[str, Any]] = []
+    for name, count in rows:
+        if not name:
+            continue
+        suggestions.append({"name": name, "count": int(count or 0)})
+    return suggestions
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -216,10 +234,8 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
         start = max(1, end - window + 1)
         page_numbers = list(range(start, (end or 0) + 1)) if pagination.pages else []
 
-        cities_list = cached_list(
-            "cities",
-            lambda: [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()],
-        )
+        city_suggestions = cached_value("city_suggestions", _build_city_suggestions, ttl_seconds=180)
+        cities_list = [item["name"] for item in city_suggestions]
         products_list = cached_list(
             "products",
             lambda: [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()],
@@ -227,7 +243,7 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
         product_suggestions = _build_product_suggestions(products_list)
 
         total_entries = pagination.total
-        total_cities = len(cities_list)
+        total_cities = len(city_suggestions)
         total_products = len(products_list)
 
         return render_template(
@@ -239,6 +255,7 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
             cities_list=cities_list,
             products_list=products_list,
             product_suggestions=product_suggestions,
+            city_suggestions=city_suggestions,
             q_city=q_city,
             q_product=q_product,
             q_trend=q_trend,
@@ -368,10 +385,8 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
             "products_latest",
             lambda: [p for (p,) in db.session.query(latest.c.product).distinct().order_by(latest.c.product.asc()).all()],
         )
-        cities_list = cached_list(
-            "cities_latest",
-            lambda: [c for (c,) in db.session.query(latest.c.city).distinct().order_by(latest.c.city.asc()).all()],
-        )
+        city_suggestions = cached_value("city_suggestions", _build_city_suggestions, ttl_seconds=180)
+        cities_list = [item["name"] for item in city_suggestions]
         product_suggestions = _build_product_suggestions(products_list)
 
         query = (
@@ -397,7 +412,6 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
                 "routes.html",
                 groups=[],
                 products_list=products_list,
-                cities_list=cities_list,
                 q_product=q_product,
                 q_buy_city=q_buy_city,
                 q_sell_city=q_sell_city,
@@ -419,6 +433,7 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
                 lang=lang,
                 per_page=per_page,
                 product_suggestions=product_suggestions,
+                city_suggestions=city_suggestions,
             )
 
         from collections import defaultdict
@@ -569,7 +584,6 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
             "routes.html",
             groups=page_groups,
             products_list=products_list,
-            cities_list=cities_list,
             q_product=q_product,
             q_buy_city=q_buy_city,
             q_sell_city=q_sell_city,
@@ -591,6 +605,7 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
             lang=lang,
             per_page=per_page,
             product_suggestions=product_suggestions,
+            city_suggestions=city_suggestions,
         )
 
     return redirect(url_for("index", tab="prices", lang=lang))
@@ -598,10 +613,8 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
 
 def new_entry():
     lang = get_lang()
-    cities_list = cached_list(
-        "cities",
-        lambda: [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()],
-    )
+    city_suggestions = cached_value("city_suggestions", _build_city_suggestions, ttl_seconds=180)
+    cities_list = [item["name"] for item in city_suggestions]
     products_list = cached_list(
         "products",
         lambda: [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()],
@@ -698,6 +711,7 @@ def new_entry():
         cities_list=cities_list,
         products_list=products_list,
         product_suggestions=product_suggestions,
+        city_suggestions=city_suggestions,
         pending=pending,
         next_url=request.args.get("next"),
     )
@@ -804,10 +818,8 @@ def edit_entry(entry_id: int):
         "trend": request.args.get("trend") if request.args.get("trend") is not None else None,
     }
 
-    cities_list = cached_list(
-        "cities",
-        lambda: [c for (c,) in db.session.query(Entry.city).distinct().order_by(Entry.city.asc()).all()],
-    )
+    city_suggestions = cached_value("city_suggestions", _build_city_suggestions, ttl_seconds=180)
+    cities_list = [item["name"] for item in city_suggestions]
     products_list = cached_list(
         "products",
         lambda: [p for (p,) in db.session.query(Entry.product).distinct().order_by(Entry.product.asc()).all()],
@@ -824,6 +836,7 @@ def edit_entry(entry_id: int):
         next_url=next_url,
         overrides=overrides,
         product_suggestions=product_suggestions,
+        city_suggestions=city_suggestions,
     )
 
 
