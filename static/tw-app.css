@@ -14,6 +14,8 @@
   --accent-fade: rgba(59, 130, 246, 0.06);
   --accent-fade-strong: rgba(59, 130, 246, 0.18);
 
+  --surface: rgba(255, 255, 255, 0.55);
+
   --brand: #3b82f6;
   --ok: #16a34a;
   --warn: #f59e0b;
@@ -49,6 +51,8 @@
   --panel-tint-strong: rgba(59, 130, 246, 0.26);
   --accent-fade: rgba(59, 130, 246, 0.16);
   --accent-fade-strong: rgba(59, 130, 246, 0.32);
+
+  --surface: rgba(17, 24, 39, 0.65);
 
   --chip-green-bg: #14321f;
   --chip-green-fg: #a6e8bf;
@@ -758,6 +762,32 @@ details[open] > summary {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+.best-route--empty {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.25rem 0.25rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.best-route--empty-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+  filter: drop-shadow(0 6px 16px rgba(59, 130, 246, 0.35));
+}
+
+.best-route--empty-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.best-route--empty-copy strong {
+  font-size: 0.95rem;
+  color: var(--fg);
 }
 
 .best-route__product {

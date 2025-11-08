@@ -327,13 +327,13 @@
   </nav>
   {% endif %}
   {% endif %}
-  {% if best_route %}
   <div class="card best-deals-widget" role="complementary" aria-live="polite">
     <div class="best-deals-widget__header">
       <strong>{{ t('best_deals_title') }}</strong>
       <span>{{ t('best_deals_hint') }}</span>
     </div>
 
+    {% if best_route %}
     <div class="best-route">
       <div class="best-route__product" title="{{ best_route.product }}">
         <span class="best-route__icon" aria-hidden="true">🧭</span>
@@ -397,8 +397,16 @@
         {% endif %}
       </div>
     </div>
+    {% else %}
+    <div class="best-route best-route--empty">
+      <div class="best-route--empty-icon" aria-hidden="true">🛰️</div>
+      <div class="best-route--empty-copy">
+        <strong>{{ t('best_route_empty_title') }}</strong>
+        <span>{{ t('best_route_empty_hint') }}</span>
+      </div>
+    </div>
+    {% endif %}
   </div>
-  {% endif %}
 </section>
 
 <script>
