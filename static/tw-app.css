@@ -744,12 +744,6 @@ details[open] > summary {
   padding: 1rem 1.1rem;
 }
 
-.best-route {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
 .best-route--empty {
   display: flex;
   align-items: center;
