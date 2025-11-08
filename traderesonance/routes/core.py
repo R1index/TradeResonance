@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import csv
 import io
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 from uuid import uuid4
@@ -217,8 +217,14 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
 
         filtered_query = query
 
-        best_buy_entry = filtered_query.order_by(Entry.price.asc()).first()
-        best_sell_entry = filtered_query.order_by(Entry.price.desc()).first()
+        recent_threshold = datetime.utcnow() - timedelta(hours=1)
+        timestamp_expr = sa.func.coalesce(Entry.updated_at, Entry.created_at)
+
+        fresh_entries = (
+            filtered_query
+            .filter(timestamp_expr >= recent_threshold)
+            .all()
+        )
 
         def serialize_best(entry: Optional[Entry]) -> Optional[Dict[str, Any]]:
             if not entry:
@@ -235,6 +241,65 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
                 "updated": updated,
                 "updated_iso": updated.strftime("%Y-%m-%dT%H:%M:%SZ") if updated else None,
             }
+
+        best_route: Optional[Dict[str, Any]] = None
+        best_profit: float = float("-inf")
+        best_margin: float = float("-inf")
+
+        if fresh_entries:
+            entries_by_product: Dict[str, List[Entry]] = {}
+            for item in fresh_entries:
+                if not item.product or not item.city or item.price is None:
+                    continue
+                entries_by_product.setdefault(item.product, []).append(item)
+
+            for product, product_entries in entries_by_product.items():
+                if len(product_entries) < 2:
+                    continue
+
+                sorted_entries = sorted(product_entries, key=lambda e: e.price or 0)
+                for buy_entry in sorted_entries:
+                    if buy_entry.price is None or buy_entry.city is None:
+                        continue
+
+                    for sell_entry in reversed(sorted_entries):
+                        if sell_entry.price is None or sell_entry.city is None:
+                            continue
+                        if sell_entry.city == buy_entry.city and sell_entry.id == buy_entry.id:
+                            continue
+                        if sell_entry.city == buy_entry.city:
+                            continue
+                        if sell_entry.price is None or sell_entry.price <= buy_entry.price:
+                            break
+
+                        profit = sell_entry.price - buy_entry.price
+                        if profit <= 0:
+                            continue
+
+                        margin = (
+                            (profit / buy_entry.price) * 100
+                            if buy_entry.price
+                            else None
+                        )
+
+                        if (
+                            profit > best_profit
+                            or (
+                                profit == best_profit
+                                and margin is not None
+                                and margin > best_margin
+                            )
+                        ):
+                            best_profit = profit
+                            best_margin = margin if margin is not None else best_margin
+                            best_route = {
+                                "product": product,
+                                "buy": serialize_best(buy_entry),
+                                "sell": serialize_best(sell_entry),
+                                "profit": profit,
+                                "margin": margin,
+                            }
+                        break
 
         sort_map = {
             "price_asc": Entry.price.asc(),
@@ -292,8 +357,7 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
                 "cities": total_cities,
                 "products": total_products,
             },
-            best_buy=serialize_best(best_buy_entry),
-            best_sell=serialize_best(best_sell_entry),
+            best_route=best_route,
             lang=lang,
         )
 
