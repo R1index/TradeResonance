@@ -744,15 +744,6 @@ details[open] > summary {
   padding: 1rem 1.1rem;
 }
 
-.best-deals-widget__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
 .best-route {
   display: flex;
   flex-direction: column;
