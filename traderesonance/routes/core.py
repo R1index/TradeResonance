@@ -733,6 +733,7 @@ def edit_entry(entry_id: int):
             next_url = safe_next_value or url_for("index", lang=lang)
             return redirect(next_url)
 
+        # === обычные поля ===
         image_file = request.files.get("image")
         new_image_path: Optional[str] = None
         if image_file and image_file.filename:
@@ -744,6 +745,7 @@ def edit_entry(entry_id: int):
 
         previous_image_path = entry.image_path
         invalidate_cache = False
+
         try:
             entry.price = float(request.form.get("price", entry.price))
         except Exception:
@@ -760,8 +762,7 @@ def edit_entry(entry_id: int):
         if new_image_path:
             entry.image_path = new_image_path
             invalidate_cache = True
-            # propagate the new image to every entry of the same product so
-            # all cities stay in sync without touching their update timestamps
+            # распространить картинку на все записи этого продукта
             db.session.execute(
                 sa.update(Entry)
                 .where(func.lower(Entry.product) == func.lower(entry.product))
@@ -769,10 +770,18 @@ def edit_entry(entry_id: int):
                 .values(image_path=new_image_path, updated_at=Entry.updated_at)
             )
 
-        # 🟢 Обновляем timestamp даже если пользователь ничего не менял
-        entry.updated_at = datetime.utcnow()
-
+        # === FORCE TOUCH: гарантированный апдейт строки в БД ===
+        # Используем серверное NOW(), чтобы UPDATE точно случился,
+        # даже если SQLAlchemy решит, что «ничего не поменялось».
+        db.session.execute(
+            sa.update(Entry)
+            .where(Entry.id == entry.id)
+            .values(updated_at=sa.func.now())
+        )
         db.session.flush()
+        # подтянуть реальное значение из БД (на случай триггеров/таймзоны)
+        db.session.refresh(entry, ["updated_at"])
+
         record_snapshot(entry)
         db.session.commit()
         flash(translate("updated"))
@@ -794,6 +803,7 @@ def edit_entry(entry_id: int):
         next_url = next_param or url_for("index", lang=lang)
         return redirect(next_url)
 
+    # === GET ===
     overrides = {
         "price": request.args.get("price") if request.args.get("price") is not None else None,
         "percent": request.args.get("percent") if request.args.get("percent") is not None else None,
