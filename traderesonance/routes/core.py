@@ -261,6 +261,8 @@ def index():  # noqa: C901 - the view is complex but mirrored from legacy code
                 for buy_entry in sorted_entries:
                     if buy_entry.price is None or buy_entry.city is None:
                         continue
+                    if not buy_entry.is_production_city:
+                        continue
 
                     for sell_entry in reversed(sorted_entries):
                         if sell_entry.price is None or sell_entry.city is None:
