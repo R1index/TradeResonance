@@ -731,17 +731,21 @@ details[open] > summary {
   animation: slideOut 0.3s ease forwards;
 }
 
-/* Виджет лучших предложений */
+/* Виджет лучших предложений — ВНИЗУ СПРАВА ВПЛОТНУЮ */
 .best-deals-widget {
   position: fixed;
-  bottom: 0.75rem;
-  right: 0.5rem;
-  width: min(360px, calc(100vw - 1rem));
-  z-index: 40;
+  bottom: 0;
+  right: 0;
+  left: auto;
+  top: auto;
+  margin: 0;
+  padding: 0.5rem 0.75rem; /* убери, если нужно прям без внутренних отступов */
+  width: auto;
+  z-index: 100;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding: 1rem 1.1rem;
+  align-items: flex-end;
+  gap: 0.5rem;
 }
 
 .best-deals-widget__header {
@@ -867,12 +871,14 @@ details[open] > summary {
   color: var(--muted);
 }
 
+/* Мобильная адаптация виджета */
 @media (max-width: 640px) {
   .best-deals-widget {
-    right: 0.5rem;
-    left: 0.5rem;
-    bottom: 0.75rem;
+    bottom: 0.25rem;
+    right: 0.25rem;
+    left: auto;
     width: auto;
+    padding: 0.25rem;
   }
 
   .best-route__legs {
