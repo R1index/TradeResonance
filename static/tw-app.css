@@ -1173,3 +1173,90 @@ input[list] {
   border-color: var(--border);
   color: var(--fg);
 }
+/* === Market highlights: INSIDE the Prices card, TOP-LEFT === */
+.card .best-deals-widget {
+  position: absolute !important;
+  top: 0.75rem !important;
+  left: 0.75rem !important;
+  right: auto !important;
+  bottom: auto !important;
+
+  width: 320px !important;
+  max-width: calc(100% - 1.5rem);
+  z-index: 30 !important;
+
+  padding: 0.75rem 0.9rem;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  color: var(--fg);
+  backdrop-filter: blur(6px);
+}
+
+/* заголовок в одну строку: "Market highlights  Top trade route from the last hour" */
+.best-deals-widget__header {
+  display: flex;
+  align-items: baseline;
+  gap: .5rem;
+  font-size: .85rem;
+  color: var(--muted);
+}
+.best-deals-widget__header strong {
+  color: var(--fg);
+  font-weight: 700;
+}
+
+/* строка с продуктом */
+.best-route__product {
+  margin-top: .35rem;
+  gap: .5rem;
+  font-weight: 700;
+}
+
+/* внутренние карточки Buy/Sell как на скрине */
+.best-route__legs {
+  margin-top: .5rem;
+  display: grid;
+  gap: .6rem;
+}
+.best-route-leg {
+  border-radius: 12px;
+  padding: .7rem .85rem;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.best-route-leg__label { 
+  font-weight: 700; 
+  color: var(--fg);
+  margin-bottom: .15rem;
+}
+.best-route-leg__price { 
+  font-size: 1.05rem; 
+  font-weight: 800; 
+  color: var(--fg);
+}
+.best-route-leg__updated { 
+  font-size: .72rem; 
+  color: var(--muted); 
+}
+
+/* нижняя строка Profit/Margin */
+.best-route__summary {
+  margin-top: .45rem;
+  padding-top: .35rem;
+  border-top: 1px solid rgba(148,163,184,.25);
+  display: flex;
+  gap: 1rem;
+  font-size: .85rem;
+}
+.best-route__profit { font-weight: 700; }
+
+/* Мобильный режим — убираем absolute, делаем обычным блоком над контентом */
+@media (max-width: 1024px) {
+  .card .best-deals-widget {
+    position: static !important;
+    width: 100% !important;
+    margin-bottom: .75rem;
+  }
+}
