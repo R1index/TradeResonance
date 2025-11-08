@@ -1172,3 +1172,26 @@ input[list] {
   border-color: var(--border);
   color: var(--fg);
 }
+/* === Force: Market highlights в ПРАВЫЙ НИЖНИЙ УГОЛ === */
+.best-deals-widget {
+  position: fixed !important;
+  bottom: 0 !important;
+  right: 0 !important;
+  top: auto !important;
+  left: auto !important;
+
+  margin: 0 !important;
+  padding: 0.5rem 0.75rem;      /* можешь убрать до 0 */
+  width: auto !important;       /* не зависеть от сеток/контейнеров */
+  max-width: min(380px, 100vw); /* чтобы не вылезало за экран */
+  z-index: 1000 !important;     /* поверх всего */
+  transform: none !important;
+}
+
+@media (max-width: 640px) {
+  .best-deals-widget {
+    bottom: 0.25rem !important;
+    right: 0.25rem !important;
+    padding: 0.25rem !important;
+  }
+}
