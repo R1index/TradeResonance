@@ -409,6 +409,54 @@
   </div>
 </section>
 
+<div class="best-deals-widget card" role="complementary" aria-live="polite">
+  <div class="best-deals-widget__header">
+    <strong>{{ t('best_deals_title') }}</strong>
+    <span>{{ t('best_deals_hint') }}</span>
+  </div>
+
+  {% if best_route %}
+  <div class="best-route">
+    <div class="best-route__product" title="{{ best_route.product }}">
+      <span class="best-route__icon" aria-hidden="true">🧭</span>
+      <span>{{ best_route.product }}</span>
+    </div>
+
+    <div class="best-route__legs">
+      {% if best_route.buy %}
+      <div class="best-route-leg">
+        <span class="best-route-leg__label">🛒 {{ t('best_route_buy') }}</span>
+        <span class="best-route-leg__city">{{ best_route.buy.city }}</span>
+        <span class="best-route-leg__price">{{ '%.0f' % best_route.buy.price }}</span>
+      </div>
+      {% endif %}
+      {% if best_route.sell %}
+      <div class="best-route-leg">
+        <span class="best-route-leg__label">💰 {{ t('best_route_sell') }}</span>
+        <span class="best-route-leg__city">{{ best_route.sell.city }}</span>
+        <span class="best-route-leg__price">{{ '%.0f' % best_route.sell.price }}</span>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="best-route__summary">
+      <span class="best-route__profit">{{ t('best_route_profit') }}: {{ '%.0f' % best_route.profit }}</span>
+      {% if best_route.margin is not none %}
+      <span class="best-route__margin">{{ t('best_route_margin') }}: {{ '%.1f' % best_route.margin }}%</span>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div class="best-route best-route--empty">
+    <div class="best-route--empty-icon" aria-hidden="true">🛰️</div>
+    <div class="best-route--empty-copy">
+      <strong>{{ t('best_route_empty_title') }}</strong>
+      <span>{{ t('best_route_empty_hint') }}</span>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
 <script>
 (function(){
   // Сброс страницы на 1 при применении фильтров
