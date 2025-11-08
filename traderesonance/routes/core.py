@@ -691,6 +691,7 @@ def new_entry():
         next_url=request.args.get("next"),
     )
 
+
 def edit_entry(entry_id: int):
     lang = get_lang()
     entry = Entry.query.get_or_404(entry_id)
@@ -733,7 +734,6 @@ def edit_entry(entry_id: int):
             next_url = safe_next_value or url_for("index", lang=lang)
             return redirect(next_url)
 
-        # === обычные поля ===
         image_file = request.files.get("image")
         new_image_path: Optional[str] = None
         if image_file and image_file.filename:
@@ -745,7 +745,6 @@ def edit_entry(entry_id: int):
 
         previous_image_path = entry.image_path
         invalidate_cache = False
-
         try:
             entry.price = float(request.form.get("price", entry.price))
         except Exception:
@@ -758,35 +757,22 @@ def edit_entry(entry_id: int):
         entry.is_production_city = parse_bool(
             request.form.get("is_production_city", entry.is_production_city)
         )
-
         if new_image_path:
             entry.image_path = new_image_path
             invalidate_cache = True
-            # распространить картинку на все записи этого продукта
+            # propagate the new image to every entry of the same product so
+            # all cities stay in sync without touching their update timestamps
             db.session.execute(
                 sa.update(Entry)
                 .where(func.lower(Entry.product) == func.lower(entry.product))
                 .where(Entry.id != entry.id)
                 .values(image_path=new_image_path, updated_at=Entry.updated_at)
             )
-
-        # === FORCE TOUCH: гарантированный апдейт строки в БД ===
-        # Используем серверное NOW(), чтобы UPDATE точно случился,
-        # даже если SQLAlchemy решит, что «ничего не поменялось».
-        db.session.execute(
-            sa.update(Entry)
-            .where(Entry.id == entry.id)
-            .values(updated_at=sa.func.now())
-        )
         db.session.flush()
-        # подтянуть реальное значение из БД (на случай триггеров/таймзоны)
-        db.session.refresh(entry, ["updated_at"])
-
         record_snapshot(entry)
         db.session.commit()
         flash(translate("updated"))
         dedupe_entries()
-
         if new_image_path and previous_image_path and previous_image_path != new_image_path:
             still_used = (
                 db.session.query(Entry.id)
@@ -796,14 +782,11 @@ def edit_entry(entry_id: int):
             if not still_used:
                 _delete_image_file(previous_image_path)
                 invalidate_cache = True
-
         if invalidate_cache:
             invalidate_product_image_cache()
-
         next_url = next_param or url_for("index", lang=lang)
         return redirect(next_url)
 
-    # === GET ===
     overrides = {
         "price": request.args.get("price") if request.args.get("price") is not None else None,
         "percent": request.args.get("percent") if request.args.get("percent") is not None else None,
@@ -831,7 +814,9 @@ def edit_entry(entry_id: int):
         overrides=overrides,
         product_suggestions=product_suggestions,
     )
-    
+
+
+
 def import_csv():
     lang = get_lang()
     if request.method == "POST":
