@@ -768,7 +768,7 @@ def edit_entry(entry_id: int):
                 .where(Entry.id != entry.id)
                 .values(image_path=new_image_path, updated_at=Entry.updated_at)
             )
-        entry.updated_at = datetime.utcnow()    
+        entry.updated_at = datetime.utcnow()
         db.session.flush()
         record_snapshot(entry)
         db.session.commit()
