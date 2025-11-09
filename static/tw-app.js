@@ -225,6 +225,8 @@ const ToastManager = {
 const ProductAutocomplete = {
   data: [],
   panels: new Map(),
+  states: new Map(),
+  maxVisible: 50,
 
   init() {
     const script = document.getElementById('product-suggestions-data');
@@ -260,6 +262,7 @@ const ProductAutocomplete = {
     panel.setAttribute('role', 'listbox');
     document.body.appendChild(panel);
     this.panels.set(input, panel);
+    this.states.set(input, { activeIndex: -1 });
 
     const update = () => {
       this.positionPanel(input, panel);
@@ -277,8 +280,32 @@ const ProductAutocomplete = {
     });
 
     input.addEventListener('keydown', (event) => {
+      const state = this.states.get(input);
+      const items = this.getItems(panel);
+
       if (event.key === 'Escape') {
         panel.classList.add('hidden');
+        this.clearActive(input, panel);
+        return;
+      }
+
+      if (!items.length || panel.dataset.items !== 'true') return;
+
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        panel.classList.remove('hidden');
+        this.moveActive(input, panel, 1);
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        panel.classList.remove('hidden');
+        this.moveActive(input, panel, -1);
+      } else if (event.key === 'Enter' && state && state.activeIndex >= 0) {
+        event.preventDefault();
+        const target = items[state.activeIndex];
+        if (target) {
+          target.click();
+          panel.classList.add('hidden');
+        }
       }
     });
 
@@ -293,6 +320,7 @@ const ProductAutocomplete = {
       input.value = target.dataset.value || '';
       input.dispatchEvent(new Event('input', { bubbles: true }));
       panel.classList.add('hidden');
+      this.clearActive(input, panel);
     });
   },
 
@@ -315,13 +343,14 @@ const ProductAutocomplete = {
     const query = (input.value || '').trim().toLowerCase();
     const results = this.data
       .filter((item) => !query || item.name.toLowerCase().includes(query))
-      .slice(0, 10);
+      .slice(0, this.maxVisible);
 
     panel.innerHTML = '';
 
     if (!results.length) {
       panel.dataset.items = 'false';
       panel.classList.add('hidden');
+      this.clearActive(input, panel);
       return;
     }
 
@@ -331,6 +360,7 @@ const ProductAutocomplete = {
       option.className = 'product-suggestion-item';
       option.dataset.value = item.name;
       option.setAttribute('role', 'option');
+      option.setAttribute('aria-selected', 'false');
 
       const thumb = document.createElement('div');
       thumb.className = 'product-thumb product-thumb--suggestion';
@@ -355,6 +385,47 @@ const ProductAutocomplete = {
     });
 
     panel.dataset.items = 'true';
+    this.clearActive(input, panel);
+  },
+
+  getItems(panel) {
+    return Array.from(panel.querySelectorAll('[data-value]'));
+  },
+
+  clearActive(input, panel) {
+    const state = this.states.get(input);
+    if (!state) return;
+    state.activeIndex = -1;
+    this.getItems(panel).forEach((item) => {
+      item.classList.remove('is-active');
+      item.setAttribute('aria-selected', 'false');
+    });
+  },
+
+  moveActive(input, panel, delta) {
+    const items = this.getItems(panel);
+    if (!items.length) return;
+
+    const state = this.states.get(input);
+    if (!state) return;
+
+    let nextIndex = state.activeIndex + delta;
+    if (nextIndex < 0) {
+      nextIndex = items.length - 1;
+    } else if (nextIndex >= items.length) {
+      nextIndex = 0;
+    }
+
+    items.forEach((item, index) => {
+      const isActive = index === nextIndex;
+      item.classList.toggle('is-active', isActive);
+      item.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      if (isActive) {
+        item.scrollIntoView({ block: 'nearest' });
+      }
+    });
+
+    state.activeIndex = nextIndex;
   },
 };
 
